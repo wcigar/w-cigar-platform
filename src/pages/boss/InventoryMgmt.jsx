@@ -1,279 +1,396 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
-import { Package, AlertTriangle, Search, Save, ChevronDown, ChevronUp, TrendingDown } from 'lucide-react'
+import { Package, Save, Send, Search, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Users, Settings, ClipboardList, History } from 'lucide-react'
 import { format } from 'date-fns'
 
 export default function InventoryMgmt() {
   const [tab, setTab] = useState('overview')
+  const [items, setItems] = useState([])
+  const [employees, setEmployees] = useState([])
+  const [records, setRecords] = useState([])
+  const [tasks, setTasks] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState('all')
+  const [keyword, setKeyword] = useState('')
+  const [msg, setMsg] = useState('')
+
+  // Safe stock editing state
+  const [safeEdits, setSafeEdits] = useState({})
+  const [savingSafe, setSavingSafe] = useState(false)
+
+  // Assignment state
+  const [assignEdits, setAssignEdits] = useState({})
+  const [savingAssign, setSavingAssign] = useState(false)
+
+  // Batch select
+  const [selected, setSelected] = useState(new Set())
+  const [batchOwner, setBatchOwner] = useState('')
+  const [batchDay, setBatchDay] = useState('')
+  const [batchSafe, setBatchSafe] = useState('')
+
+  // Expand/collapse categories
+  const [collapsed, setCollapsed] = useState(new Set())
+
+  useEffect(() => { loadAll() }, [])
+
+  async function loadAll() {
+    setLoading(true)
+    const [itemRes, empRes, recRes, taskRes] = await Promise.all([
+      supabase.from('inventory_master').select('*').order('category').order('sub_category').order('name'),
+      supabase.from('employees').select('*').eq('is_active', true).order('name'),
+      supabase.from('inventory_records').select('*').order('created_at', { ascending: false }).limit(100),
+      supabase.from('inventory_tasks').select('*').order('created_at', { ascending: false }).limit(200),
+    ])
+    setItems(itemRes.data || [])
+    setEmployees(empRes.data || [])
+    setRecords(recRes.data || [])
+    setTasks(taskRes.data || [])
+    setLoading(false)
+  }
+
+  function flash(text) { setMsg(text); setTimeout(() => setMsg(''), 3000) }
+
+  // --- Filtered items ---
+  const filtered = useMemo(() => {
+    let list = items
+    if (filter === 'low') list = list.filter(i => i.is_low)
+    if (filter === 'enabled') list = list.filter(i => i.enabled)
+    if (filter === 'disabled') list = list.filter(i => !i.enabled)
+    if (filter === 'noSafe') list = list.filter(i => !i.safe_stock && i.safe_stock !== 0)
+    if (keyword) {
+      const kw = keyword.toLowerCase()
+      list = list.filter(i => i.name?.toLowerCase().includes(kw) || i.id?.toLowerCase().includes(kw) || i.category?.toLowerCase().includes(kw) || i.sub_category?.toLowerCase().includes(kw))
+    }
+    return list
+  }, [items, filter, keyword])
+
+  const byCat = useMemo(() => {
+    const map = {}
+    filtered.forEach(i => { const c = i.category || '未分類'; if (!map[c]) map[c] = []; map[c].push(i) })
+    return map
+  }, [filtered])
+
+  const lowCount = items.filter(i => i.is_low).length
+  const totalEnabled = items.filter(i => i.enabled).length
+
+  // --- Safe stock batch save ---
+  async function saveSafeStocks() {
+    const entries = Object.entries(safeEdits).filter(([_, v]) => v !== '' && v != null)
+    if (!entries.length) return flash('沒有變更')
+    setSavingSafe(true)
+    let ok = 0
+    for (const [id, val] of entries) {
+      const num = Number(val)
+      if (isNaN(num) || num < 0) continue
+      const item = items.find(i => i.id === id)
+      const isLow = item ? (num > 0 && (item.current_stock || 0) < num) : false
+      const { error } = await supabase.from('inventory_master').update({ safe_stock: num, is_low: isLow }).eq('id', id)
+      if (!error) ok++
+    }
+    setSavingSafe(false)
+    setSafeEdits({})
+    flash(`✅ 已更新 ${ok} 筆安全庫存`)
+    loadAll()
+  }
+
+  // --- Batch assignment save ---
+  async function saveAssignments() {
+    const entries = Object.entries(assignEdits).filter(([_, v]) => v.owner || v.count_day)
+    if (!entries.length) return flash('沒有變更')
+    setSavingAssign(true)
+    let ok = 0
+    for (const [id, changes] of entries) {
+      const update = {}
+      if (changes.owner) update.owner = changes.owner
+      if (changes.count_day) update.count_day = changes.count_day
+      const { error } = await supabase.from('inventory_master').update(update).eq('id', id)
+      if (!error) ok++
+    }
+    setSavingAssign(false)
+    setAssignEdits({})
+    flash(`✅ 已指派 ${ok} 筆`)
+    loadAll()
+  }
+
+  // --- Batch operations ---
+  function toggleSelect(id) {
+    setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  }
+  function selectAll() {
+    if (selected.size === filtered.length) setSelected(new Set())
+    else setSelected(new Set(filtered.map(i => i.id)))
+  }
+
+  async function applyBatch() {
+    if (!selected.size) return flash('請先勾選品項')
+    const update = {}
+    if (batchOwner) update.owner = batchOwner
+    if (batchDay) update.count_day = batchDay
+    if (batchSafe !== '') update.safe_stock = Number(batchSafe)
+    if (!Object.keys(update).length) return flash('請選擇要批量修改的項目')
+    if (!confirm(`確定批量修改 ${selected.size} 筆品項？`)) return
+    let ok = 0
+    for (const id of selected) {
+      const finalUpdate = { ...update }
+      if (finalUpdate.safe_stock != null) {
+        const item = items.find(i => i.id === id)
+        finalUpdate.is_low = item ? (finalUpdate.safe_stock > 0 && (item.current_stock || 0) < finalUpdate.safe_stock) : false
+      }
+      const { error } = await supabase.from('inventory_master').update(finalUpdate).eq('id', id)
+      if (!error) ok++
+    }
+    flash(`✅ 批量更新 ${ok} 筆`)
+    setSelected(new Set()); setBatchOwner(''); setBatchDay(''); setBatchSafe('')
+    loadAll()
+  }
+
+  function toggleCat(cat) {
+    setCollapsed(prev => { const n = new Set(prev); n.has(cat) ? n.delete(cat) : n.add(cat); return n })
+  }
+
+  const empOptions = employees.filter(e => e.employee_id !== 'ADMIN')
+
   const tabs = [
-    { id: 'overview', l: '庫存總覽' },
-    { id: 'low', l: '低庫存警報' },
-    { id: 'records', l: '盤點紀錄' },
-    { id: 'correct', l: '手動校正' },
+    { id: 'overview', icon: <Package size={13} />, label: '品項總覽' },
+    { id: 'safe', icon: <Settings size={13} />, label: '安全庫存' },
+    { id: 'assign', icon: <Users size={13} />, label: '盤點指派' },
+    { id: 'records', icon: <History size={13} />, label: '盤點紀錄' },
   ]
 
+  if (loading) return <div>{[1, 2, 3].map(i => <div key={i} className="loading-shimmer" style={{ height: 80, marginBottom: 8 }} />)}</div>
+
   return (
     <div>
+      {msg && <div style={{ position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)', background: 'var(--gold)', color: '#000', padding: '10px 20px', borderRadius: 12, fontSize: 14, fontWeight: 700, zIndex: 999, boxShadow: '0 4px 20px rgba(0,0,0,.4)' }}>{msg}</div>}
+
+      {/* Sub-tabs */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 16, overflowX: 'auto' }}>
-        {tabs.map(t => <button key={t.id} onClick={() => setTab(t.id)} style={{ padding: '7px 12px', borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', background: tab === t.id ? 'var(--gold-glow)' : 'transparent', color: tab === t.id ? 'var(--gold)' : 'var(--text-dim)', border: tab === t.id ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>{t.l}</button>)}
-      </div>
-      {tab === 'overview' && <OverviewTab />}
-      {tab === 'low' && <LowStockTab />}
-      {tab === 'records' && <RecordsTab />}
-      {tab === 'correct' && <CorrectTab />}
-    </div>
-  )
-}
-
-function OverviewTab() {
-  const [items, setItems] = useState([])
-  const [keyword, setKeyword] = useState('')
-  const [catFilter, setCatFilter] = useState('all')
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => { load() }, [])
-  async function load() {
-    setLoading(true)
-    const { data } = await supabase.from('inventory_master').select('*').eq('enabled', true).order('category').order('name')
-    setItems(data || []); setLoading(false)
-  }
-
-  const cats = [...new Set(items.map(i => i.category || '未分類'))]
-  const filtered = items.filter(i => {
-    if (catFilter !== 'all' && (i.category || '未分類') !== catFilter) return false
-    if (keyword) { const kw = keyword.toLowerCase(); return i.name?.toLowerCase().includes(kw) || i.id?.toLowerCase().includes(kw) }
-    return true
-  })
-  const lowCount = items.filter(i => i.is_low).length
-  const zeroCount = items.filter(i => i.current_stock === 0).length
-
-  if (loading) return <div>{[1, 2, 3].map(i => <div key={i} className="loading-shimmer" style={{ height: 60, marginBottom: 8 }} />)}</div>
-
-  return (
-    <div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
-        <SB label="總品項" value={items.length} color="var(--gold)" />
-        <SB label="低庫存" value={lowCount} color={lowCount ? 'var(--red)' : 'var(--green)'} />
-        <SB label="零庫存" value={zeroCount} color={zeroCount ? 'var(--red)' : 'var(--green)'} />
-        <SB label="分類" value={cats.length} color="var(--blue)" />
+        {tabs.map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)} style={{
+            padding: '7px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+            whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4,
+            background: tab === t.id ? 'var(--gold-glow)' : 'transparent',
+            color: tab === t.id ? 'var(--gold)' : 'var(--text-dim)',
+            border: tab === t.id ? '1px solid var(--border-gold)' : '1px solid var(--border)',
+          }}>{t.icon}{t.label}</button>
+        ))}
       </div>
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-        <input placeholder="🔍 搜尋品項" value={keyword} onChange={e => setKeyword(e.target.value)} style={{ flex: 1, minWidth: 120, fontSize: 13, padding: 8 }} />
-        <select value={catFilter} onChange={e => setCatFilter(e.target.value)} style={{ width: 120, fontSize: 13, padding: 8 }}>
-          <option value="all">全部分類</option>
-          {cats.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
+      {/* Stats row */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6, marginBottom: 14 }}>
+        <StatCard label="總品項" value={items.length} />
+        <StatCard label="啟用中" value={totalEnabled} color="var(--gold)" />
+        <StatCard label="低庫存" value={lowCount} color={lowCount > 0 ? 'var(--red)' : 'var(--green)'} />
+        <StatCard label="已選取" value={selected.size} color="var(--gold)" />
       </div>
 
-      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>共 {filtered.length} 項</div>
-
-      {filtered.map(item => (
-        <div key={item.id} className="card" style={{ padding: 12, marginBottom: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderColor: item.is_low ? 'rgba(196,77,77,.3)' : item.current_stock === 0 ? 'rgba(196,77,77,.5)' : undefined }}>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 600 }}>{item.name}</div>
-            <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{item.category} · {item.sub_category} · {item.owner} · {item.count_day}</div>
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 18, fontFamily: 'var(--font-mono)', fontWeight: 700, color: item.current_stock === 0 ? 'var(--red)' : item.is_low ? '#ffb347' : 'var(--green)' }}>{item.current_stock} <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{item.unit}</span></div>
-            <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>安全:{item.safe_stock}</div>
-          </div>
+      {/* Search + Filter */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+        <div style={{ flex: 1, position: 'relative' }}>
+          <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+          <input placeholder="搜尋品項/分類" value={keyword} onChange={e => setKeyword(e.target.value)}
+            style={{ width: '100%', paddingLeft: 30, fontSize: 12, padding: '8px 8px 8px 30px' }} />
         </div>
-      ))}
-    </div>
-  )
-}
-
-function LowStockTab() {
-  const [items, setItems] = useState([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => { load() }, [])
-  async function load() {
-    setLoading(true)
-    const { data } = await supabase.from('inventory_master').select('*').eq('enabled', true).eq('is_low', true).order('current_stock')
-    setItems(data || []); setLoading(false)
-  }
-
-  if (loading) return <div>{[1, 2].map(i => <div key={i} className="loading-shimmer" style={{ height: 60, marginBottom: 8 }} />)}</div>
-
-  return (
-    <div>
-      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--red)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}><AlertTriangle size={16} /> 低庫存警報 ({items.length})</div>
-      {items.length === 0 ? <div className="card" style={{ textAlign: 'center', padding: 30, color: 'var(--green)' }}>所有品項庫存充足！</div> :
-        items.map(item => {
-          const shortage = Math.max(0, (item.safe_stock || 0) - (item.current_stock || 0))
-          const danger = item.current_stock === 0
-          return (
-            <div key={item.id} className="card" style={{ padding: 14, marginBottom: 8, borderColor: danger ? 'rgba(196,77,77,.5)' : 'rgba(196,77,77,.2)', background: danger ? 'rgba(196,77,77,.06)' : undefined }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div style={{ fontSize: 15, fontWeight: 700 }}>{item.name} {danger && <span style={{ color: 'var(--red)' }}>🚨 零庫存</span>}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{item.category} · {item.owner} · {item.count_day} · {item.unit}</div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 24, fontFamily: 'var(--font-mono)', fontWeight: 700, color: danger ? 'var(--red)' : '#ffb347' }}>{item.current_stock}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>安全:{item.safe_stock} 缺:{shortage}</div>
-                </div>
-              </div>
-              {item.last_update && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 6 }}>最後更新: {String(item.last_update).slice(0, 16)}</div>}
-            </div>
-          )
-        })}
-    </div>
-  )
-}
-
-function RecordsTab() {
-  const [records, setRecords] = useState([])
-  const [keyword, setKeyword] = useState('')
-  const [diffOnly, setDiffOnly] = useState(false)
-  const [page, setPage] = useState(1)
-  const [loading, setLoading] = useState(true)
-  const pageSize = 20
-
-  useEffect(() => { load() }, [page])
-  async function load() {
-    setLoading(true)
-    const { data } = await supabase.from('inventory_records').select('*').order('time', { ascending: false }).range((page - 1) * pageSize, page * pageSize - 1)
-    setRecords(prev => page === 1 ? (data || []) : [...prev, ...(data || [])]); setLoading(false)
-  }
-
-  function search() { setPage(1); setRecords([]); load() }
-
-  const filtered = records.filter(r => {
-    if (diffOnly && r.diff === 0) return false
-    if (keyword) { const kw = keyword.toLowerCase(); return r.item_name?.toLowerCase().includes(kw) || r.item_id?.toLowerCase().includes(kw) || r.staff_code?.toLowerCase().includes(kw) }
-    return true
-  })
-
-  return (
-    <div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-        <input placeholder="搜尋品項/員工" value={keyword} onChange={e => setKeyword(e.target.value)} style={{ flex: 1, minWidth: 120, fontSize: 13, padding: 8 }} />
-        <label style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-dim)', cursor: 'pointer' }}><input type="checkbox" checked={diffOnly} onChange={e => setDiffOnly(e.target.checked)} /> 只看有差異</label>
+      </div>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 14, overflowX: 'auto', flexWrap: 'wrap' }}>
+        {[['all', '全部'], ['low', `低庫存(${lowCount})`], ['enabled', '啟用'], ['disabled', '停用'], ['noSafe', '未設安全值']].map(([v, l]) => (
+          <button key={v} onClick={() => setFilter(v)} style={{
+            padding: '5px 10px', borderRadius: 16, fontSize: 10, fontWeight: 600, cursor: 'pointer',
+            background: filter === v ? 'var(--gold-glow)' : 'transparent',
+            color: filter === v ? 'var(--gold)' : 'var(--text-dim)',
+            border: filter === v ? '1px solid var(--border-gold)' : '1px solid var(--border)',
+          }}>{l}</button>
+        ))}
       </div>
 
-      {loading && page === 1 ? <div>{[1, 2, 3].map(i => <div key={i} className="loading-shimmer" style={{ height: 50, marginBottom: 6 }} />)}</div> :
-        filtered.length === 0 ? <div className="card" style={{ textAlign: 'center', padding: 30, color: 'var(--text-dim)' }}>無紀錄</div> :
-          filtered.map(r => (
-            <div key={r.id} className="card" style={{ padding: 12, marginBottom: 4, borderColor: Math.abs(r.diff || 0) >= 10 ? 'rgba(196,77,77,.3)' : undefined }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{r.item_name}</div>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{r.staff_code} · {r.source} · {String(r.time || '').slice(0, 16)}</div>
-                  {r.note && <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>📝 {r.note}</div>}
-                </div>
-                <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{r.before_stock}→</span>
-                  <span style={{ fontSize: 16, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--text)' }}>{r.after_stock}</span>
-                  <div style={{ fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 700, color: r.diff > 0 ? 'var(--green)' : r.diff < 0 ? 'var(--red)' : 'var(--text-muted)' }}>
-                    {r.diff > 0 ? '+' : ''}{r.diff || 0}
-                    {Math.abs(r.diff || 0) >= 10 && <span style={{ color: 'var(--red)', marginLeft: 4 }}>⚠</span>}
+      {/* ========= TAB: OVERVIEW ========= */}
+      {tab === 'overview' && (
+        <div>
+          {Object.entries(byCat).map(([cat, catItems]) => (
+            <div key={cat} style={{ marginBottom: 12 }}>
+              <div onClick={() => toggleCat(cat)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--gold)' }}>{cat} ({catItems.length})</span>
+                {collapsed.has(cat) ? <ChevronDown size={16} color="var(--text-dim)" /> : <ChevronUp size={16} color="var(--text-dim)" />}
+              </div>
+              {!collapsed.has(cat) && catItems.map(item => (
+                <div key={item.id} className="card" style={{ padding: 10, marginBottom: 4, borderColor: item.is_low ? 'rgba(196,77,77,.3)' : undefined }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>{item.name}</div>
+                      <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
+                        {item.sub_category} · {item.unit} · {item.count_day} · {item.owner || '未指派'}
+                        {item.is_low && <span style={{ color: 'var(--red)', marginLeft: 6, fontWeight: 700 }}>⚠低庫存</span>}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right', minWidth: 70 }}>
+                      <div style={{ fontSize: 18, fontFamily: 'var(--font-mono)', fontWeight: 700, color: item.is_low ? 'var(--red)' : 'var(--text)' }}>{item.current_stock ?? '—'}</div>
+                      <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>安全:{item.safe_stock ?? '未設'}</div>
+                    </div>
                   </div>
                 </div>
-              </div>
+              ))}
             </div>
           ))}
-
-      <button className="btn-outline" style={{ width: '100%', marginTop: 10, fontSize: 13, padding: 10 }} onClick={() => setPage(p => p + 1)} disabled={loading}>
-        {loading ? '載入中...' : '載入更多'}
-      </button>
-    </div>
-  )
-}
-
-function CorrectTab() {
-  const [items, setItems] = useState([])
-  const [selectedId, setSelectedId] = useState('')
-  const [newQty, setNewQty] = useState('')
-  const [reason, setReason] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => { load() }, [])
-  async function load() {
-    setLoading(true)
-    const { data } = await supabase.from('inventory_master').select('*').eq('enabled', true).order('name')
-    setItems(data || []); setLoading(false)
-  }
-
-  const selected = items.find(i => i.id === selectedId)
-
-  async function submit() {
-    if (!selectedId) return alert('請選擇品項')
-    if (newQty === '' || +newQty < 0) return alert('數量必須 ≥ 0')
-    if (!reason.trim()) return alert('請填寫校正原因')
-    if (!confirm(`確定將「${selected?.name}」庫存校正為 ${newQty}？`)) return
-
-    setSubmitting(true)
-    const before = selected?.current_stock || 0
-    const qty = +newQty
-    const safe = selected?.safe_stock || 0
-
-    await supabase.from('inventory_master').update({
-      current_stock: qty, is_low: safe > 0 && qty < safe,
-      last_count_date: new Date().toISOString(), last_update: new Date().toISOString()
-    }).eq('id', selectedId)
-
-    await supabase.from('inventory_records').insert({
-      staff_code: 'ADMIN', item_id: selectedId, item_name: selected?.name || '',
-      before_stock: before, after_stock: qty, diff: qty - before,
-      is_low: safe > 0 && qty < safe, note: '老闆校正：' + reason.trim(), source: '老闆手動校正'
-    })
-
-    setSubmitting(false)
-    alert(`已校正「${selected?.name}」庫存為 ${qty}`)
-    setNewQty(''); setReason(''); setSelectedId('')
-    load()
-  }
-
-  if (loading) return <div className="loading-shimmer" style={{ height: 200 }} />
-
-  return (
-    <div>
-      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--gold)', marginBottom: 12 }}>手動校正庫存</div>
-      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>校正紀錄會自動寫入盤點紀錄表，可追溯。</div>
-
-      <div style={{ marginBottom: 12 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 6 }}>選擇品項</div>
-        <select value={selectedId} onChange={e => { setSelectedId(e.target.value); setNewQty('') }} style={{ fontSize: 14, padding: 10 }}>
-          <option value="">請選擇...</option>
-          {items.map(i => <option key={i.id} value={i.id}>{i.name}（{i.category} · 目前:{i.current_stock} {i.unit}）</option>)}
-        </select>
-      </div>
-
-      {selected && (
-        <div className="card" style={{ padding: 14, marginBottom: 12, borderColor: selected.is_low ? 'rgba(196,77,77,.3)' : 'var(--border-gold)' }}>
-          <div style={{ fontSize: 16, fontWeight: 700 }}>{selected.name}</div>
-          <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 4 }}>
-            目前庫存: <strong style={{ fontSize: 20, color: selected.is_low ? 'var(--red)' : 'var(--green)', fontFamily: 'var(--font-mono)' }}>{selected.current_stock}</strong> {selected.unit}
-            <span style={{ marginLeft: 12 }}>安全庫存: {selected.safe_stock}</span>
-          </div>
-          {selected.last_update && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>最後更新: {String(selected.last_update).slice(0, 16)}</div>}
+          {filtered.length === 0 && <div className="card" style={{ textAlign: 'center', padding: 30, color: 'var(--text-dim)' }}>無符合條件的品項</div>}
         </div>
       )}
 
-      <div style={{ marginBottom: 12 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 6 }}>校正後數量</div>
-        <input type="number" min="0" inputMode="numeric" value={newQty} onChange={e => setNewQty(e.target.value)} placeholder="輸入正確庫存數量" style={{ fontSize: 18, padding: 12, fontFamily: 'var(--font-mono)', fontWeight: 600 }} />
-      </div>
+      {/* ========= TAB: SAFE STOCK SETTINGS ========= */}
+      {tab === 'safe' && (
+        <div>
+          <div className="card" style={{ padding: 12, marginBottom: 12, background: 'var(--gold-glow)', borderColor: 'var(--border-gold)' }}>
+            <div style={{ fontSize: 12, color: 'var(--gold)', fontWeight: 600 }}>💡 直接修改安全庫存值，改完點底部「儲存」一次送出</div>
+          </div>
 
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 6 }}>校正原因（必填）</div>
-        <textarea value={reason} onChange={e => setReason(e.target.value)} placeholder="例如：現場實數 12 瓶、系統誤差、進貨未登記..." rows={3} style={{ fontSize: 14, padding: 10, resize: 'none' }} />
-      </div>
+          {Object.entries(byCat).map(([cat, catItems]) => (
+            <div key={cat} style={{ marginBottom: 12 }}>
+              <div onClick={() => toggleCat(cat)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--gold)' }}>{cat} ({catItems.length})</span>
+                {collapsed.has(cat) ? <ChevronDown size={16} color="var(--text-dim)" /> : <ChevronUp size={16} color="var(--text-dim)" />}
+              </div>
+              {!collapsed.has(cat) && catItems.map(item => (
+                <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px dashed var(--border)' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>現有:{item.current_stock ?? '—'} {item.unit}</div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                    <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>安全值</span>
+                    <input type="number" inputMode="numeric" min="0"
+                      value={safeEdits[item.id] ?? item.safe_stock ?? ''}
+                      onChange={e => setSafeEdits(p => ({ ...p, [item.id]: e.target.value }))}
+                      style={{ width: 60, fontSize: 14, fontFamily: 'var(--font-mono)', fontWeight: 700, textAlign: 'center', padding: '6px 4px',
+                        borderColor: safeEdits[item.id] != null && safeEdits[item.id] !== '' && Number(safeEdits[item.id]) !== (item.safe_stock || 0) ? 'var(--gold)' : undefined }}
+                    />
+                    <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{item.unit}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
 
-      <button className="btn-gold" style={{ width: '100%', fontSize: 16, padding: 14, opacity: submitting ? .6 : 1 }} onClick={submit} disabled={submitting}>
-        {submitting ? '校正中...' : '確認校正庫存'}
-      </button>
+          <button className="btn-gold" onClick={saveSafeStocks} disabled={savingSafe}
+            style={{ width: '100%', padding: 14, fontSize: 16, marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: savingSafe ? .5 : 1 }}>
+            <Save size={18} /> {savingSafe ? '儲存中...' : `儲存安全庫存 (${Object.keys(safeEdits).length} 筆變更)`}
+          </button>
+        </div>
+      )}
+
+      {/* ========= TAB: ASSIGN ========= */}
+      {tab === 'assign' && (
+        <div>
+          {/* Batch operation bar */}
+          <div className="card" style={{ padding: 12, marginBottom: 12, borderColor: 'var(--border-gold)' }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--gold)', marginBottom: 10 }}>批量操作（已勾選 {selected.size} 筆）</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+              <button onClick={selectAll} style={miniBtn}>{selected.size === filtered.length ? '取消全選' : '全選'}</button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
+              <select value={batchOwner} onChange={e => setBatchOwner(e.target.value)} style={{ fontSize: 11, padding: '6px 4px' }}>
+                <option value="">負責人...</option>
+                {empOptions.map(e => <option key={e.employee_id} value={e.employee_id}>{e.name}</option>)}
+              </select>
+              <select value={batchDay} onChange={e => setBatchDay(e.target.value)} style={{ fontSize: 11, padding: '6px 4px' }}>
+                <option value="">盤點日...</option>
+                <option>週一</option><option>週二</option>
+              </select>
+              <input type="number" placeholder="安全值" value={batchSafe} onChange={e => setBatchSafe(e.target.value)}
+                style={{ fontSize: 11, padding: '6px 4px', fontFamily: 'var(--font-mono)' }} />
+            </div>
+            <button className="btn-gold" onClick={applyBatch} style={{ width: '100%', padding: 10, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <Send size={14} /> 批量套用
+            </button>
+          </div>
+
+          {/* Item list with checkboxes and per-item assignment */}
+          {Object.entries(byCat).map(([cat, catItems]) => (
+            <div key={cat} style={{ marginBottom: 12 }}>
+              <div onClick={() => toggleCat(cat)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--gold)' }}>{cat} ({catItems.length})</span>
+                {collapsed.has(cat) ? <ChevronDown size={16} color="var(--text-dim)" /> : <ChevronUp size={16} color="var(--text-dim)" />}
+              </div>
+              {!collapsed.has(cat) && catItems.map(item => {
+                const edit = assignEdits[item.id] || {}
+                return (
+                  <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 0', borderBottom: '1px dashed var(--border)' }}>
+                    <input type="checkbox" checked={selected.has(item.id)} onChange={() => toggleSelect(item.id)}
+                      style={{ width: 18, height: 18, accentColor: 'var(--gold)', flexShrink: 0, cursor: 'pointer' }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</div>
+                      <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{item.sub_category} · {item.unit}</div>
+                    </div>
+                    <select value={edit.owner || item.owner || ''} onChange={e => setAssignEdits(p => ({ ...p, [item.id]: { ...p[item.id], owner: e.target.value } }))}
+                      style={{ width: 75, fontSize: 10, padding: '5px 2px', flexShrink: 0,
+                        borderColor: edit.owner && edit.owner !== item.owner ? 'var(--gold)' : undefined }}>
+                      <option value="">未指派</option>
+                      {empOptions.map(e => <option key={e.employee_id} value={e.employee_id}>{e.name}</option>)}
+                    </select>
+                    <select value={edit.count_day || item.count_day || ''} onChange={e => setAssignEdits(p => ({ ...p, [item.id]: { ...p[item.id], count_day: e.target.value } }))}
+                      style={{ width: 55, fontSize: 10, padding: '5px 2px', flexShrink: 0,
+                        borderColor: edit.count_day && edit.count_day !== item.count_day ? 'var(--gold)' : undefined }}>
+                      <option value="">—</option>
+                      <option>週一</option><option>週二</option>
+                    </select>
+                  </div>
+                )
+              })}
+            </div>
+          ))}
+
+          {Object.keys(assignEdits).length > 0 && (
+            <button className="btn-gold" onClick={saveAssignments} disabled={savingAssign}
+              style={{ width: '100%', padding: 14, fontSize: 16, marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: savingAssign ? .5 : 1 }}>
+              <Save size={18} /> {savingAssign ? '儲存中...' : `儲存指派 (${Object.keys(assignEdits).length} 筆)`}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* ========= TAB: RECORDS ========= */}
+      {tab === 'records' && (
+        <div>
+          {records.length === 0 ? (
+            <div className="card" style={{ textAlign: 'center', padding: 30, color: 'var(--text-dim)' }}>無盤點紀錄</div>
+          ) : records.map((r, i) => (
+            <div key={r.id || i} className="card" style={{ padding: 10, marginBottom: 4 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>{r.item_name}</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-dim)', marginLeft: 8 }}>{r.staff_code}</span>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }}>
+                    {r.before_stock}→{r.after_stock}
+                  </span>
+                  <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, color: r.diff > 0 ? 'var(--green)' : r.diff < 0 ? 'var(--red)' : 'var(--text-muted)' }}>
+                    {r.diff > 0 ? '+' : ''}{r.diff}
+                  </span>
+                </div>
+              </div>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
+                {r.source} · {r.created_at?.slice(0, 16)}
+                {r.note && <span> · {r.note}</span>}
+                {r.is_low && <span style={{ color: 'var(--red)', fontWeight: 700 }}> ⚠低庫存</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
 
-function SB({ label, value, color }) {
-  return <div className="card" style={{ padding: 8, textAlign: 'center' }}>
-    <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{label}</div>
-    <div style={{ fontSize: 18, fontFamily: 'var(--font-mono)', fontWeight: 600, color }}>{value}</div>
-  </div>
+function StatCard({ label, value, color }) {
+  return (
+    <div className="card" style={{ padding: 8, textAlign: 'center' }}>
+      <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{label}</div>
+      <div style={{ fontSize: 18, fontFamily: 'var(--font-mono)', fontWeight: 700, color: color || 'var(--text)' }}>{value}</div>
+    </div>
+  )
+}
+
+const miniBtn = {
+  padding: '5px 10px', borderRadius: 12, fontSize: 10, fontWeight: 600,
+  cursor: 'pointer', background: 'var(--gold-glow)', color: 'var(--gold)',
+  border: '1px solid var(--border-gold)',
 }
