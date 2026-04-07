@@ -9,6 +9,7 @@ import StaffSOP from './pages/staff/StaffSOP'
 import StaffSchedule from './pages/staff/StaffSchedule'
 import StaffKPI from './pages/staff/StaffKPI'
 import StaffCleaning from './pages/staff/StaffCleaning'
+import StaffInventory from './pages/staff/StaffInventory'
 import BossHome from './pages/boss/BossHome'
 import BossOperations from './pages/boss/Operations'
 import BossHR from './pages/boss/HRSchedule'
@@ -34,6 +35,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<StaffHome />} />
       <Route path="/sop" element={<StaffSOP />} />
+      <Route path="/inventory" element={<StaffInventory />} />
       <Route path="/clean" element={<StaffCleaning />} />
       <Route path="/schedule" element={<StaffSchedule />} />
       <Route path="/kpi" element={<StaffKPI />} />
