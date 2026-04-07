@@ -1,5 +1,7 @@
+import { useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './lib/auth'
+import { seedTodayTasks } from './lib/seeder'
 import Login from './components/Login'
 import Layout from './components/Layout'
 import StaffHome from './pages/staff/StaffHome'
@@ -14,6 +16,11 @@ import BossSettings from './pages/boss/Settings'
 
 export default function App() {
   const { user, loading } = useAuth()
+
+  useEffect(() => {
+    if (user) seedTodayTasks().catch(console.error)
+  }, [user])
+
   if (loading) return <div style={{height:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'#0a0a0a'}}><div className="loading-shimmer" style={{width:120,height:120,borderRadius:'50%'}}/></div>
   if (!user) return <Login />
   const isBoss = user.role === 'boss'
