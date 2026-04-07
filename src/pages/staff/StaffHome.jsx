@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { SHIFTS } from '../../lib/constants'
-import { Clock, CheckCircle2, Circle, AlertCircle, MapPin, AlertTriangle, Trophy, Camera, Send } from 'lucide-react'
+import { Clock, CheckCircle2, Circle, AlertCircle, MapPin, AlertTriangle, Trophy } from 'lucide-react'
 import { format } from 'date-fns'
 import { zhTW } from 'date-fns/locale'
+import AbnormalReport from '../../components/AbnormalReport'
 
 export default function StaffHome() {
   const { user } = useAuth()
@@ -14,9 +15,6 @@ export default function StaffHome() {
   const [notices, setNotices] = useState([])
   const [leaderboard, setLeaderboard] = useState([])
   const [showAbnormal, setShowAbnormal] = useState(false)
-  const [abnNote, setAbnNote] = useState('')
-  const [abnPhoto, setAbnPhoto] = useState(null)
-  const [abnSending, setAbnSending] = useState(false)
   const [loading, setLoading] = useState(true)
   const today = format(new Date(), 'yyyy-MM-dd')
   const month = format(new Date(), 'yyyy-MM')
@@ -53,22 +51,6 @@ export default function StaffHome() {
     }, () => alert('請開啟GPS'))
   }
 
-  async function sendAbnormal() {
-    if (!abnNote && !abnPhoto) return alert('請填寫說明或上傳照片')
-    setAbnSending(true)
-    let photoUrl = ''
-    if (abnPhoto) {
-      const ext = abnPhoto.name.split('.').pop() || 'jpg'
-      const path = `abnormal/${today}/${user.employee_id}_${Date.now()}.${ext}`
-      await supabase.storage.from('photos').upload(path, abnPhoto)
-      const { data } = supabase.storage.from('photos').getPublicUrl(path)
-      photoUrl = data.publicUrl
-    }
-    await supabase.from('abnormal_reports').insert({ date: today, reporter: user.name, description: abnNote, photo_url: photoUrl, status: '待處理' })
-    setAbnNote(''); setAbnPhoto(null); setShowAbnormal(false); setAbnSending(false)
-    alert('異常回報已送出！')
-  }
-
   const shiftName = shift?.shift
   const shiftInfo = shiftName ? SHIFTS[shiftName] : null
   const done = tasks.filter(t => t.completed).length
@@ -80,12 +62,13 @@ export default function StaffHome() {
 
   return (
     <div className="page-container fade-in">
+      <AbnormalReport show={showAbnormal} onClose={() => setShowAbnormal(false)} />
+
       <div style={{ marginBottom: 24 }}>
         <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 28, color: 'var(--gold)', fontWeight: 600 }}>{greeting}，{user.name}</h2>
         <p style={{ color: 'var(--text-dim)', fontSize: 13, marginTop: 4 }}>{format(new Date(), 'yyyy年M月d日 EEEE', { locale: zhTW })}</p>
       </div>
 
-      {/* Stats */}
       <div className="grid-2" style={{ marginBottom: 16 }}>
         <div className="card" style={{ padding: 14, textAlign: 'center' }}>
           <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>SOP 進度</div>
@@ -97,14 +80,13 @@ export default function StaffHome() {
         </div>
       </div>
 
-      {/* Shift card */}
       <div className="card" style={{ marginBottom: 16, borderColor: 'var(--border-gold)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Clock size={16} color="var(--gold)" /><span style={{ fontSize: 14, fontWeight: 600, color: 'var(--gold)' }}>今日班別</span></div>
           {shiftName && <span className={`badge ${shiftName === '休假' || shiftName === '臨時請假' ? 'badge-blue' : 'badge-gold'}`}>{shiftName}</span>}
         </div>
         {shiftInfo?.start ? (
-          <div style={{ fontSize: 28, fontFamily: 'var(--font-mono)', fontWeight: 500 }}>{shiftInfo.start}  {shiftInfo.end}</div>
+          <div style={{ fontSize: 28, fontFamily: 'var(--font-mono)', fontWeight: 500 }}>{shiftInfo.start} — {shiftInfo.end}</div>
         ) : shiftName ? (
           <div style={{ fontSize: 16, color: 'var(--blue)' }}>今日{shiftName}</div>
         ) : <div style={{ fontSize: 14, color: 'var(--text-dim)' }}>尚未排班</div>}
@@ -116,7 +98,6 @@ export default function StaffHome() {
         )}
       </div>
 
-      {/* SOP Progress */}
       <div className="card" style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <span style={{ fontSize: 14, fontWeight: 600 }}>今日 SOP</span>
@@ -133,42 +114,22 @@ export default function StaffHome() {
         ))}
       </div>
 
-      {/* Abnormal report button */}
-      <button className="btn-red" style={{ width: '100%', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: 14 }} onClick={() => setShowAbnormal(!showAbnormal)}>
-        <AlertTriangle size={16} /> 突發異常回報
+      <button style={{ width: '100%', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, background: 'rgba(196,77,77,.1)', border: '1px solid rgba(196,77,77,.25)', borderRadius: 'var(--radius-sm)', color: 'var(--red)', fontSize: 15, fontWeight: 700, cursor: 'pointer' }} onClick={() => setShowAbnormal(true)}>
+        <AlertTriangle size={18} /> 🚨 突發異常回報
       </button>
 
-      {showAbnormal && (
-        <div className="card" style={{ marginBottom: 16, borderColor: 'rgba(196,77,77,.3)' }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--red)', marginBottom: 10 }}>異常回報</div>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--gold)', marginBottom: 8 }}>常用廠商</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 12, fontSize: 11 }}>
-            {[['鐵捲門', '0921919256'], ['網路', '0980942828'], ['水電', '0972095569'], ['鮮奶', '0928195030'], ['炸油', '0227016519'], ['送酒', '0287728820']].map(([l, p]) => (
-              <a key={p} href={`tel:${p}`} style={{ display: 'block', padding: 6, background: 'rgba(255,255,255,.03)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text-dim)', textDecoration: 'none' }}>{l}<div style={{ color: 'var(--green)', fontWeight: 600 }}>{p}</div></a>
-            ))}
-          </div>
-          <textarea placeholder="發生了什麼事？" rows={3} value={abnNote} onChange={e => setAbnNote(e.target.value)} style={{ marginBottom: 8, resize: 'none' }} />
-          <input type="file" accept="image/*" capture="environment" onChange={e => setAbnPhoto(e.target.files?.[0])} style={{ fontSize: 12, marginBottom: 8 }} />
-          <button className="btn-gold" style={{ width: '100%', opacity: abnSending ? .6 : 1 }} onClick={sendAbnormal} disabled={abnSending}>
-            {abnSending ? '回報中...' : '立即回報老闆'}
-          </button>
-        </div>
-      )}
-
-      {/* Leaderboard */}
       {leaderboard.length > 0 && (
         <div className="card" style={{ marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}><Trophy size={16} color="var(--gold)" /><span style={{ fontSize: 14, fontWeight: 600 }}>搶單排行榜</span></div>
           {leaderboard.slice(0, 5).map((x, i) => (
             <div key={x.name} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: 13, borderBottom: '1px solid var(--border)' }}>
-              <span>{i === 0 ? '' : i === 1 ? '' : i === 2 ? '' : `${i + 1}.`} {x.name}</span>
+              <span>{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`} {x.name}</span>
               <strong style={{ color: 'var(--gold)' }}>{x.count} 單</strong>
             </div>
           ))}
         </div>
       )}
 
-      {/* Notices */}
       {notices.length > 0 && (
         <div className="card">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}><AlertCircle size={16} color="var(--gold)" /><span style={{ fontSize: 14, fontWeight: 600 }}>公告</span></div>
