@@ -17,7 +17,7 @@ export function AuthProvider({ children }) {
 
   const login = async (employeeId, pin) => {
     const { data, error } = await supabase
-      .from('僱員')
+      .from('employees')
       .select('*')
       .eq('ID', employeeId)
       .eq('登入碼', pin)
@@ -29,10 +29,12 @@ export function AuthProvider({ children }) {
       employee_id: data['ID'],
       name: data['姓名'],
       position: data['標題'],
-      pin: data['登入碼'],
       is_active: data['已啟用'],
       employee_type: data['員工類型'],
-      role: (data['標題']?.includes('總覽') || data['ID'] === '行政') ? 'boss' : 'staff',
+      is_admin: data['is_admin'],
+      role: data['is_admin'] ? 'boss' : 'staff',
+      salary_type: data['薪資類型'],
+      salary_amount: data['薪資金額'],
       _raw: data,
     }
     setUser(userData)
