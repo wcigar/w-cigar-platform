@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { CheckCircle2, Circle, Plus, AlertTriangle, Trophy, Sparkles } from 'lucide-react'
+import { CheckCircle2, Circle, Plus, AlertTriangle, Trophy } from 'lucide-react'
 import { format } from 'date-fns'
 import CleaningMgmt from './CleaningMgmt'
+import InventoryMgmt from './InventoryMgmt'
 
 export default function Operations() {
   const [tab, setTab] = useState('sop')
@@ -45,7 +46,14 @@ export default function Operations() {
   async function updateAbnormalStatus(id, status) { await supabase.from('abnormal_reports').update({ status }).eq('id', id); load() }
 
   const byOwner = {}; tasks.forEach(t => { const k = t.owner; if (!byOwner[k]) byOwner[k] = []; byOwner[k].push(t) })
-  const tabs = [{ id: 'sop', l: 'SOP儀表板' }, { id: 'cleaning', l: '大掃除' }, { id: 'abnormal', l: `異常(${abnormals.filter(a => a.status === '待處理').length})` }, { id: 'ranking', l: '搶單排行' }, { id: 'notices', l: '公告管理' }]
+  const tabs = [
+    { id: 'sop', l: 'SOP儀表板' },
+    { id: 'cleaning', l: '大掃除' },
+    { id: 'inventory', l: '庫存管理' },
+    { id: 'abnormal', l: '異常(' + abnormals.filter(a => a.status === '待處理').length + ')' },
+    { id: 'ranking', l: '搶單排行' },
+    { id: 'notices', l: '公告' },
+  ]
 
   if (loading) return <div className="page-container">{[1, 2, 3].map(i => <div key={i} className="loading-shimmer" style={{ height: 80, marginBottom: 10 }} />)}</div>
 
@@ -63,7 +71,7 @@ export default function Operations() {
 
       <div className="section-title">營運管理</div>
       <div style={{ display: 'flex', gap: 4, marginBottom: 20, overflowX: 'auto', paddingBottom: 4 }}>
-        {tabs.map(t => <button key={t.id} onClick={() => setTab(t.id)} style={{ padding: '7px 12px', borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', background: tab === t.id ? 'var(--gold-glow)' : 'transparent', color: tab === t.id ? 'var(--gold)' : 'var(--text-dim)', border: tab === t.id ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>{t.l}</button>)}
+        {tabs.map(t => <button key={t.id} onClick={() => setTab(t.id)} style={{ padding: '7px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', background: tab === t.id ? 'var(--gold-glow)' : 'transparent', color: tab === t.id ? 'var(--gold)' : 'var(--text-dim)', border: tab === t.id ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>{t.l}</button>)}
       </div>
 
       {tab === 'sop' && (
@@ -94,8 +102,8 @@ export default function Operations() {
                             {t.audit_status === '合格' ? <span className="badge badge-green" style={{ fontSize: 10 }}>合格</span> :
                               t.audit_status === '不合格' ? <span className="badge badge-red" style={{ fontSize: 10 }}>不合格</span> : (
                                 <div style={{ display: 'flex', gap: 2 }}>
-                                  <button style={{ background: 'rgba(77,168,108,.15)', color: 'var(--green)', border: 'none', borderRadius: 6, padding: '3px 6px', fontSize: 10, fontWeight: 700, cursor: 'pointer' }} onClick={() => auditTask(t.id, '合格')}>✓合格</button>
-                                  <button style={{ background: 'rgba(196,77,77,.15)', color: 'var(--red)', border: 'none', borderRadius: 6, padding: '3px 6px', fontSize: 10, fontWeight: 700, cursor: 'pointer' }} onClick={() => auditTask(t.id, '不合格')}>✗退回</button>
+                                  <button style={{ background: 'rgba(77,168,108,.15)', color: 'var(--green)', border: 'none', borderRadius: 6, padding: '3px 6px', fontSize: 10, fontWeight: 700, cursor: 'pointer' }} onClick={() => auditTask(t.id, '合格')}>✓</button>
+                                  <button style={{ background: 'rgba(196,77,77,.15)', color: 'var(--red)', border: 'none', borderRadius: 6, padding: '3px 6px', fontSize: 10, fontWeight: 700, cursor: 'pointer' }} onClick={() => auditTask(t.id, '不合格')}>✗</button>
                                 </div>
                               )}
                           </div>
@@ -106,7 +114,6 @@ export default function Operations() {
                           <img src={t.photo_url} alt="" style={{ width: '100%', maxHeight: 120, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)' }} />
                         </div>
                       )}
-                      {t.completed && t.humidor_temp && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>🌡️ 雪茄房 {t.humidor_temp}°C/{t.humidor_rh}% · 雪茄櫃 {t.cabinet_temp}°C/{t.cabinet_rh}%</div>}
                       {t.completed && t.note && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>📝 {t.note}</div>}
                     </div>
                   ))}
@@ -117,21 +124,21 @@ export default function Operations() {
       )}
 
       {tab === 'cleaning' && <CleaningMgmt />}
+      {tab === 'inventory' && <InventoryMgmt />}
 
       {tab === 'abnormal' && (
         <div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--red)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}><AlertTriangle size={16} /> 異常回報</div>
           {abnormals.length === 0 ? <div className="card" style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>無異常</div> :
             abnormals.map(a => (
               <div key={a.id} className="card" style={{ padding: 14, marginBottom: 8, borderColor: a.status === '待處理' ? 'rgba(196,77,77,.3)' : undefined }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                   <span style={{ fontWeight: 600 }}>{a.reporter} · {a.date}</span>
-                  <select value={a.status || '待處理'} onChange={e => updateAbnormalStatus(a.id, e.target.value)} style={{ width: 'auto', fontSize: 12, padding: '4px 8px', background: a.status === '已解決' ? 'rgba(77,168,108,.1)' : 'rgba(196,77,77,.1)', borderColor: a.status === '已解決' ? 'rgba(77,168,108,.2)' : 'rgba(196,77,77,.2)', color: a.status === '已解決' ? 'var(--green)' : 'var(--red)' }}>
+                  <select value={a.status || '待處理'} onChange={e => updateAbnormalStatus(a.id, e.target.value)} style={{ width: 'auto', fontSize: 12, padding: '4px 8px' }}>
                     <option>待處理</option><option>處理中</option><option>已解決</option>
                   </select>
                 </div>
                 <div style={{ fontSize: 14 }}>{a.description}</div>
-                {a.photo_url && <img src={a.photo_url} alt="" style={{ width: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 10, marginTop: 8, border: '1px solid var(--border)', cursor: 'pointer' }} onClick={() => setPhotoModal({ url: a.photo_url, title: '異常', by: a.reporter })} />}
+                {a.photo_url && <img src={a.photo_url} alt="" style={{ width: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 10, marginTop: 8, cursor: 'pointer' }} onClick={() => setPhotoModal({ url: a.photo_url, title: '異常', by: a.reporter })} />}
               </div>
             ))}
         </div>
@@ -139,11 +146,10 @@ export default function Operations() {
 
       {tab === 'ranking' && (
         <div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--gold)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}><Trophy size={16} /> {month} 搶單排行</div>
           {leaderboard.length === 0 ? <div className="card" style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>本月無搶單</div> :
             leaderboard.map((x, i) => (
-              <div key={x.name} className="card" style={{ padding: 14, marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderColor: i === 0 ? 'var(--border-gold)' : undefined }}>
-                <span style={{ fontSize: 14, fontWeight: 600 }}>{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`} {x.name}</span>
+              <div key={x.name} className="card" style={{ padding: 14, marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 14, fontWeight: 600 }}>{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1) + '.'} {x.name}</span>
                 <span style={{ fontSize: 18, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--gold)' }}>{x.count} 單</span>
               </div>
             ))}
