@@ -1,10 +1,10 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
-import { Home, ClipboardList, BarChart3, Calendar, Settings, DollarSign, Users, LogOut, Briefcase, Sparkles, Package } from 'lucide-react'
+import { Home, ClipboardList, BarChart3, Calendar, Settings, DollarSign, Users, LogOut, Briefcase, Package } from 'lucide-react'
 
 const STAFF_NAV = [
   { path: '/', icon: Home, label: '首頁' },
-  { path: '/sop', icon: ClipboardList, label: 'SOP' },
+  { path: '/sop', icon: ClipboardList, label: '任務' },
   { path: '/inventory', icon: Package, label: '盤點' },
   { path: '/schedule', icon: Calendar, label: '排班' },
   { path: '/kpi', icon: BarChart3, label: 'KPI' },
@@ -41,7 +41,7 @@ export default function Layout({ children }) {
         {nav.map(item => {
           const active = location.pathname === item.path
           return (
-            <button key={item.path} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '6px 8px', background: active ? 'rgba(201,168,76,.08)' : 'none', border: 'none', cursor: 'pointer', minWidth: 44, borderRadius: 8 }} onClick={() => navigate(item.path)}>
+            <button key={item.path} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '6px 10px', background: active ? 'rgba(201,168,76,.08)' : 'none', border: 'none', cursor: 'pointer', minWidth: 48, borderRadius: 8 }} onClick={() => navigate(item.path)}>
               <item.icon size={17} style={{ color: active ? '#c9a84c' : '#5a554e' }} />
               <span style={{ fontSize: 9, fontWeight: 500, color: active ? '#c9a84c' : '#5a554e' }}>{item.label}</span>
             </button>
