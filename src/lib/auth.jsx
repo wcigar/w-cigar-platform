@@ -19,13 +19,22 @@ export function AuthProvider({ children }) {
     const { data, error } = await supabase
       .from('employees')
       .select('*')
-      .eq('employee_id', employeeId.toUpperCase())
-      .eq('pin', pin)
-      .eq('is_active', true)
+      .eq('id', employeeId)
+      .eq('login_code', pin)
+      .eq('enabled', true)
       .single()
 
     if (error || !data) throw new Error('帳號或密碼錯誤')
-    const userData = { ...data }
+    const userData = {
+      employee_id: data.id,
+      name: data.name,
+      position: data.title,
+      is_active: data.enabled,
+      employee_type: data.emp_type,
+      is_admin: data.is_admin,
+      role: data.is_admin ? 'boss' : 'staff',
+      _raw: data,
+    }
     setUser(userData)
     localStorage.setItem('w_cigar_user', JSON.stringify(userData))
     return userData
