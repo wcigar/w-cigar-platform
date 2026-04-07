@@ -8,6 +8,7 @@ import StaffHome from './pages/staff/StaffHome'
 import StaffSOP from './pages/staff/StaffSOP'
 import StaffSchedule from './pages/staff/StaffSchedule'
 import StaffKPI from './pages/staff/StaffKPI'
+import StaffCleaning from './pages/staff/StaffCleaning'
 import BossHome from './pages/boss/BossHome'
 import BossOperations from './pages/boss/Operations'
 import BossHR from './pages/boss/HRSchedule'
@@ -16,30 +17,27 @@ import BossSettings from './pages/boss/Settings'
 
 export default function App() {
   const { user, loading } = useAuth()
-
-  useEffect(() => {
-    if (user) seedTodayTasks().catch(console.error)
-  }, [user])
-
-  if (loading) return <div style={{height:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'#0a0a0a'}}><div className="loading-shimmer" style={{width:120,height:120,borderRadius:'50%'}}/></div>
+  useEffect(() => { if (user) seedTodayTasks().catch(console.error) }, [user])
+  if (loading) return <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a0a' }}><div className="loading-shimmer" style={{ width: 120, height: 120, borderRadius: '50%' }} /></div>
   if (!user) return <Login />
   const isBoss = user.role === 'boss'
   return <Layout>{isBoss ? (
     <Routes>
-      <Route path="/" element={<BossHome/>}/>
-      <Route path="/operations" element={<BossOperations/>}/>
-      <Route path="/hr" element={<BossHR/>}/>
-      <Route path="/payroll" element={<BossPayroll/>}/>
-      <Route path="/settings" element={<BossSettings/>}/>
-      <Route path="*" element={<Navigate to="/" replace/>}/>
+      <Route path="/" element={<BossHome />} />
+      <Route path="/operations" element={<BossOperations />} />
+      <Route path="/hr" element={<BossHR />} />
+      <Route path="/payroll" element={<BossPayroll />} />
+      <Route path="/settings" element={<BossSettings />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   ) : (
     <Routes>
-      <Route path="/" element={<StaffHome/>}/>
-      <Route path="/sop" element={<StaffSOP/>}/>
-      <Route path="/schedule" element={<StaffSchedule/>}/>
-      <Route path="/kpi" element={<StaffKPI/>}/>
-      <Route path="*" element={<Navigate to="/" replace/>}/>
+      <Route path="/" element={<StaffHome />} />
+      <Route path="/sop" element={<StaffSOP />} />
+      <Route path="/clean" element={<StaffCleaning />} />
+      <Route path="/schedule" element={<StaffSchedule />} />
+      <Route path="/kpi" element={<StaffKPI />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )}</Layout>
 }
