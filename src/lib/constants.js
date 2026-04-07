@@ -29,3 +29,9 @@ export function calcOvertimePay(hourlyRate, otMinutes) {
   if (hrs <= 2) return Math.round(hourlyRate * hrs * 1.34)
   return Math.round(hourlyRate * 2 * 1.34 + hourlyRate * (hrs - 2) * 1.67)
 }
+export const SCHED_RULES = {
+  tuesdayAllWork: true,
+  rickyFixedOff: [0, 6],
+  danielConsecRest: 2,
+  jessicaConsecRest: 2,
+}
