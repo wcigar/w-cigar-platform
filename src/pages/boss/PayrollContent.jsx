@@ -278,7 +278,7 @@ export default function Payroll() {
             </div>
             {isE&&<div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
               <select value={editingSal.salary_type} onChange={e => setEditingSal(p=>({...p,salary_type:e.target.value}))} style={{width:80,fontSize:13,padding:8}}><option>月薪</option><option>時薪</option></select>
-              <input type="number" inputMode="numeric" pattern="[0-9]*" value={editingSal.monthly_salary} onChange={e => setEditingSal(p=>({...p,monthly_salary:e.target.value}))} style={{flex:1,fontSize:13,padding:8}}/>
+              <input type="text" inputMode="numeric" pattern="[0-9]*" value={editingSal.monthly_salary} onChange={e => setEditingSal(p=>({...p,monthly_salary:e.target.value}))} style={{flex:1,fontSize:13,padding:8}}/>
               <button className="btn-gold" style={{padding:'8px 14px',fontSize:12}} onClick={() => saveSalConfig(emp.id)}><Save size={12}/></button>
               <button className="btn-outline" style={{padding:'8px 14px',fontSize:12}} onClick={() => setEditingSal(null)}>取消</button>
             </div>}
@@ -291,7 +291,7 @@ export default function Payroll() {
         {showBonusForm&&<div className="card" style={{marginBottom:16,padding:16}}>
           <select value={newBonus.employee_id} onChange={e => setNewBonus(p=>({...p,employee_id:e.target.value}))} style={{marginBottom:8}}><option value="">選擇員工</option>{emps.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}</select>
           <input value={newBonus.bonus_name} onChange={e => setNewBonus(p=>({...p,bonus_name:e.target.value}))} placeholder="加給名稱" style={{marginBottom:8}}/>
-          <input type="number" value={newBonus.amount} onChange={e => setNewBonus(p=>({...p,amount:e.target.value}))} placeholder="金額" style={{marginBottom:8}} inputMode="numeric" pattern="[0-9]*"/>
+          <input type="text" inputMode="numeric" pattern="[0-9]*" value={newBonus.amount} onChange={e => setNewBonus(p=>({...p,amount:e.target.value}))} placeholder="金額" style={{marginBottom:8}} inputMode="numeric" pattern="[0-9]*"/>
           <button className="btn-gold" onClick={addBonus}>新增</button>
         </div>}
         {emps.map(emp => {
@@ -312,7 +312,7 @@ export default function Payroll() {
         {showExpForm&&<div className="card" style={{marginBottom:16,padding:16}}>
           <div style={{display:'flex',gap:8,marginBottom:8}}><input type="date" value={newExp.date} onChange={e => setNewExp(p=>({...p,date:e.target.value}))} style={{flex:1,fontSize:13,padding:8}}/><select value={newExp.category} onChange={e => setNewExp(p=>({...p,category:e.target.value}))} style={{flex:1,fontSize:13,padding:8}}><option value="">分類</option>{['食材','酒水','雪茄進貨','設備','房租','水電','人事','行銷','雜支'].map(c => <option key={c}>{c}</option>)}</select></div>
           <input value={newExp.item} onChange={e => setNewExp(p=>({...p,item:e.target.value}))} placeholder="項目" style={{marginBottom:8}}/>
-          <div style={{display:'flex',gap:8,marginBottom:8}}><input type="number" value={newExp.amount} onChange={e => setNewExp(p=>({...p,amount:e.target.value}))} placeholder="金額" style={{flex:1}} inputMode="numeric" pattern="[0-9]*"/><select value={newExp.payment} onChange={e => setNewExp(p=>({...p,payment:e.target.value}))} style={{width:100,fontSize:13,padding:8}}>{['現金','刷卡','轉帳','LINE Pay'].map(p => <option key={p}>{p}</option>)}</select></div>
+          <div style={{display:'flex',gap:8,marginBottom:8}}><input type="text" inputMode="numeric" pattern="[0-9]*" value={newExp.amount} onChange={e => setNewExp(p=>({...p,amount:e.target.value}))} placeholder="金額" style={{flex:1}} inputMode="numeric" pattern="[0-9]*"/><select value={newExp.payment} onChange={e => setNewExp(p=>({...p,payment:e.target.value}))} style={{width:100,fontSize:13,padding:8}}>{['現金','刷卡','轉帳','LINE Pay'].map(p => <option key={p}>{p}</option>)}</select></div>
           <button className="btn-gold" onClick={addExpense}>儲存</button>
         </div>}
         {expenses.map(e => <div key={e.id} className="card" style={{padding:12,marginBottom:6,display:'flex',justifyContent:'space-between'}}>

@@ -175,7 +175,7 @@ function SOPManager() {
                   </div>
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                     <label style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}><input type="checkbox" checked={editing.need_photo} onChange={e => setEditing(p => ({ ...p, need_photo: e.target.checked }))} />需拍照</label>
-                    <input type="number" inputMode="numeric" pattern="[0-9]*" value={editing.weight} onChange={e => setEditing(p => ({ ...p, weight: +e.target.value }))} style={{ width: 50, fontSize: 12, padding: 6 }} min={1} max={3} />
+                    <input type="text" inputMode="numeric" pattern="[0-9]*" value={editing.weight} onChange={e => setEditing(p => ({ ...p, weight: +e.target.value }))} style={{ width: 50, fontSize: 12, padding: 6 }} min={1} max={3} />
                     <select value={editing.frequency} onChange={e => setEditing(p => ({ ...p, frequency: e.target.value }))} style={{ width: 80, fontSize: 12, padding: 6 }}>
                       <option>每日</option><option>每週一</option><option>每週二</option><option>每週三</option><option>每週四</option><option>每週五</option><option>每週六</option><option>每週日</option>
                     </select>
@@ -225,7 +225,7 @@ function SOPManager() {
           </div>
           <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <label style={{ fontSize: 13, display: 'flex', alignItems: 'center', gap: 4 }}><input type="checkbox" checked={newTask.need_photo} onChange={e => setNewTask(p => ({ ...p, need_photo: e.target.checked }))} /> 需拍照</label>
-            <input type="number" inputMode="numeric" pattern="[0-9]*" value={newTask.weight} onChange={e => setNewTask(p => ({ ...p, weight: +e.target.value }))} placeholder="權重" style={{ width: 60, fontSize: 13, padding: 8 }} min={1} max={3} />
+            <input type="text" inputMode="numeric" pattern="[0-9]*" value={newTask.weight} onChange={e => setNewTask(p => ({ ...p, weight: +e.target.value }))} placeholder="權重" style={{ width: 60, fontSize: 13, padding: 8 }} min={1} max={3} />
             <select value={newTask.frequency} onChange={e => setNewTask(p => ({ ...p, frequency: e.target.value }))} style={{ width: 80, fontSize: 13, padding: 8 }}>
               <option>每日</option><option>每週一</option><option>每週二</option><option>每週三</option><option>每週四</option><option>每週五</option><option>每週六</option><option>每週日</option>
             </select>
