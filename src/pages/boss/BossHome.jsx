@@ -27,7 +27,7 @@ export default function BossHome() {
     setLoading(true)
     const [eR, sR, tR, aR, lbR, leaveR, invR, punchR, revR, hoR, abnR] = await Promise.all([
       supabase.from('employees').select('*').eq('enabled', true),
-      supabase.from('schedules').select('*, employees(name)').eq('date', today),
+      supabase.from('schedules').select('*').eq('date', today),
       supabase.from('task_status').select('*').eq('date', today),
       supabase.from('abnormal_reports').select('id', { count: 'exact' }).eq('status', '待處理'),
       supabase.from('task_status').select('completed_by').eq('owner', 'ALL').eq('completed', true).gte('date', month + '-01').lte('date', format(endOfMonth(new Date(month + '-01')), 'yyyy-MM-dd')),
