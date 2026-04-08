@@ -1,3 +1,4 @@
+import LeaveRequest from './LeaveRequest'
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
@@ -9,7 +10,7 @@ import { zhTW } from 'date-fns/locale'
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
 
-export default function StaffSchedule() {
+function ScheduleContent() {
   const { user } = useAuth()
   const [month, setMonth] = useState(new Date())
   const [schedules, setSchedules] = useState([])
@@ -18,6 +19,7 @@ export default function StaffSchedule() {
   const [punchMonth, setPunchMonth] = useState(format(new Date(), 'yyyy-MM'))
   const [punches, setPunches] = useState([])
   const [loading, setLoading] = useState(true)
+  const [pageMode, setPageMode] = useState('schedule')
 
   const start = startOfMonth(month), end = endOfMonth(month)
   const days = eachDayOfInterval({ start, end })
@@ -65,7 +67,7 @@ export default function StaffSchedule() {
   if (loading) return <div className="page-container"><div className="loading-shimmer" style={{ height: 300 }} /></div>
 
   return (
-    <div className="page-container fade-in">
+    <div className="fade-in">
       <div className="section-title">我的排班</div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <button style={nb} onClick={() => setMonth(subMonths(month, 1))}><ChevronLeft size={18} /></button>
@@ -135,3 +137,17 @@ function ST({ label, value, color }) {
   </div>
 }
 const nb = { background: 'var(--black-card)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }
+
+
+export default function StaffSchedule() {
+  const [pageMode, setPageMode] = useState('schedule')
+  return (
+    <div className="page-container fade-in">
+      <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+        <button onClick={() => setPageMode('schedule')} style={{ padding: '8px 16px', borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: 'pointer', background: pageMode === 'schedule' ? 'var(--gold-glow)' : 'transparent', color: pageMode === 'schedule' ? 'var(--gold)' : 'var(--text-dim)', border: pageMode === 'schedule' ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>排班表</button>
+        <button onClick={() => setPageMode('leave')} style={{ padding: '8px 16px', borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: 'pointer', background: pageMode === 'leave' ? 'var(--gold-glow)' : 'transparent', color: pageMode === 'leave' ? 'var(--gold)' : 'var(--text-dim)', border: pageMode === 'leave' ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>請假</button>
+      </div>
+      {pageMode === 'leave' ? <LeaveRequest /> : <ScheduleContent />}
+    </div>
+  )
+}
