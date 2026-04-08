@@ -6,8 +6,8 @@ import { DollarSign, Send, TrendingUp } from 'lucide-react'
 
 const METHODS = [
   { key: 'cash_amount', label: '現金', icon: '💵', color: '#4da86c' },
-  { key: 'acpay_amount', label: 'ACPAY刮卡', icon: '💳', color: '#4d8ac4' },
-  { key: 'teb_amount', label: '臺灣企銀刮卡', icon: '🏦', color: '#8b6cc4' },
+  { key: 'acpay_amount', label: 'ACPAY刷卡', icon: '💳', color: '#4d8ac4' },
+  { key: 'teb_amount', label: '臺灣企銀刷卡', icon: '🏦', color: '#8b6cc4' },
   { key: 'transfer_amount', label: '銀行轉帳', icon: '🔄', color: '#c4a84d' },
   { key: 'wechat_amount', label: '微信支付', icon: '💚', color: '#07c160' },
   { key: 'alipay_amount', label: '支付寶', icon: '🔵', color: '#1677ff' },
@@ -61,11 +61,11 @@ export default function StaffRevenue() {
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:16 }}>
         <div className="card" style={{ textAlign:'center', padding:12 }}>
           <div style={{ fontSize:11, color:'var(--text-dim)' }}>今日合計</div>
-          <div style={{ fontSize:22, fontFamily:'var(--font-mono)', fontWeight:700, color:'var(--gold)', marginTop:4 }}>{getTotal().toLocaleString()}</div>
+          <div style={{ fontSize:22, fontFamily:'var(--font-mono)', fontWeight:700, color:'var(--gold)', marginTop:4 }}>{"$"}{getTotal().toLocaleString()}</div>
         </div>
         <div className="card" style={{ textAlign:'center', padding:12 }}>
           <div style={{ fontSize:11, color:'var(--text-dim)' }}>本月累計</div>
-          <div style={{ fontSize:22, fontFamily:'var(--font-mono)', fontWeight:700, color:'var(--green)', marginTop:4 }}>{monthTotal.toLocaleString()}</div>
+          <div style={{ fontSize:22, fontFamily:'var(--font-mono)', fontWeight:700, color:'var(--green)', marginTop:4 }}>{"$"}{monthTotal.toLocaleString()}</div>
         </div>
       </div>
       {existing && <div style={{ background:'rgba(77,168,108,.1)', border:'1px solid rgba(77,168,108,.3)', borderRadius:8, padding:'8px 12px', marginBottom:12, fontSize:12, color:'var(--green)' }}>✅ 今日已登記（by {existing.recorded_by}），可修改更新</div>}
@@ -97,7 +97,7 @@ export default function StaffRevenue() {
                 {r.wechat_amount > 0 && <span style={{color:'#07c160'}}>💚{(+r.wechat_amount).toLocaleString()}</span>}
                 {r.alipay_amount > 0 && <span style={{color:'#1677ff'}}>🔵{(+r.alipay_amount).toLocaleString()}</span>}
               </div>
-              <span style={{ fontSize:14, fontFamily:'var(--font-mono)', fontWeight:700, color:'var(--gold)' }}>{(+r.total).toLocaleString()}</span>
+              <span style={{ fontSize:14, fontFamily:'var(--font-mono)', fontWeight:700, color:'var(--gold)' }}>{"$"}{(+r.total).toLocaleString()}</span>
             </div>
           ))}
         </div>
