@@ -109,6 +109,24 @@ export default function StaffRevenue() {
         <div>
           <div className="card" style={{ marginBottom:12, padding:14 }}>
             <div style={{ fontSize:13, fontWeight:600, color:'var(--gold)', marginBottom:10 }}>🏧 現金盤點</div>
+            <div style={{ fontSize:12, color:'var(--text-dim)', marginBottom:8 }}>輸入每種面額的張/枚數</div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+              {[{v:2000,label:"$2,000",color:"#c9a84c"},{v:1000,label:"$1,000",color:"#4da86c"},{v:500,label:"$500",color:"#4d8ac4"},{v:100,label:"$100",color:"#c44d4d"},{v:50,label:"$50",color:"#8b6cc4"},{v:10,label:"$10",color:"#c4a84d"},{v:5,label:"$5",color:"#f59e0b"},{v:1,label:"$1",color:"var(--text-dim)"}].map(d => (
+                <div key={d.v} style={{ display:'flex', alignItems:'center', gap:6, background:'var(--black)', border:'1px solid var(--border)', borderRadius:8, padding:'8px 10px' }}>
+                  <span style={{ fontSize:13, fontWeight:700, color:d.color, minWidth:52 }}>{d.label}</span>
+                  <span style={{ color:'var(--text-dim)', fontSize:12 }}>×</span>
+                  <input type="number" inputMode="numeric" placeholder="0" value={form['d'+d.v]||''} onChange={e => setForm(p=>({...p,['d'+d.v]:e.target.value}))} style={{ flex:1, fontSize:16, fontFamily:'var(--font-mono)', fontWeight:700, padding:'6px 8px', minHeight:38, textAlign:'center' }} />
+                  <span style={{ fontSize:11, color:'var(--text-dim)', minWidth:55, textAlign:'right', fontFamily:'var(--font-mono)' }}>{"="}{((+(form['d'+d.v]||0))*d.v).toLocaleString()}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ borderTop:'1px solid var(--border-gold)', marginTop:10, paddingTop:10, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <span style={{ fontSize:14, fontWeight:700, color:'var(--gold)' }}>💰 盤點總計</span>
+              <span style={{ fontSize:22, fontFamily:'var(--font-mono)', fontWeight:700, color:'var(--gold)' }}>{"$"}{[2000,1000,500,100,50,10,5,1].reduce((s,v)=>s+(+(form["d"+v]||0))*v,0).toLocaleString()}</span>
+            </div>
+          </div>
+          <div className="card" style={{ marginBottom:12, padding:14 }}>
+            <div style={{ fontSize:13, fontWeight:600, color:'var(--text-dim)', marginBottom:8 }}>比對驗證</div>
             <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6, fontSize:13 }}>
               <span style={{ color:'var(--text-dim)' }}>開店備用金</span>
               <span style={{ fontFamily:'var(--font-mono)', fontWeight:600 }}>{"$"}{DRAWER_BASE.toLocaleString()}</span>
@@ -122,26 +140,20 @@ export default function StaffRevenue() {
               <span style={{ fontFamily:'var(--font-mono)', color:'var(--gold)' }}>{"$"}{getCashExpected().toLocaleString()}</span>
             </div>
           </div>
-          <div style={{ marginBottom:12 }}>
-            <label style={{ fontSize:12, color:'#f59e0b', fontWeight:600, marginBottom:4, display:'block' }}>💰 實際盤點金額</label>
-            <input type="number" inputMode="numeric" placeholder="實際清點現金數" value={form.cash_drawer} onChange={e => setForm(p=>({...p,cash_drawer:e.target.value}))} style={{ fontSize:22, fontFamily:'var(--font-mono)', fontWeight:700, padding:'12px 14px' }} />
-          </div>
-          {form.cash_drawer && (
-            <div className="card" style={{ padding:14, borderColor: getCashDiff() === 0 ? 'rgba(77,168,108,.4)' : 'rgba(196,77,77,.4)' }}>
+          {(() => { const counted = [2000,1000,500,100,50,10,5,1].reduce((s,v)=>s+(+(form["d"+v]||0))*v,0); const diff = counted - getCashExpected(); return counted > 0 ? (
+            <div className="card" style={{ padding:14, borderColor: diff===0?'rgba(77,168,108,.4)':'rgba(196,77,77,.4)' }}>
               <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                {getCashDiff() === 0 ? <CheckCircle2 size={20} color="var(--green)" /> : <AlertTriangle size={20} color={getCashDiff() > 0 ? '#f59e0b' : 'var(--red)'} />}
+                {diff===0 ? <CheckCircle2 size={20} color="var(--green)" /> : <AlertTriangle size={20} color={diff>0?'#f59e0b':'var(--red)'} />}
                 <div>
-                  <div style={{ fontSize:14, fontWeight:700, color: getCashDiff() === 0 ? 'var(--green)' : getCashDiff() > 0 ? '#f59e0b' : 'var(--red)' }}>
-                    {getCashDiff() === 0 ? '✅ 現金正確' : getCashDiff() > 0 ? '⚠️ 多 $' + getCashDiff().toLocaleString() : '❌ 短少 $' + Math.abs(getCashDiff()).toLocaleString()}
+                  <div style={{ fontSize:14, fontWeight:700, color:diff===0?'var(--green)':diff>0?'#f59e0b':'var(--red)' }}>
+                    {diff===0 ? '✅ 現金正確' : diff>0 ? '⚠️ 多 $'+diff.toLocaleString() : '❌ 短少 $'+Math.abs(diff).toLocaleString()}
                   </div>
-                  <div style={{ fontSize:11, color:'var(--text-dim)', marginTop:2 }}>
-                    應有 {"$"}{getCashExpected().toLocaleString()} / 實際 {"$"}{(+form.cash_drawer).toLocaleString()}
-                  </div>
+                  <div style={{ fontSize:11, color:'var(--text-dim)', marginTop:2 }}>應有 {"$"}{getCashExpected().toLocaleString()} / 實點 {"$"}{counted.toLocaleString()}</div>
                 </div>
               </div>
             </div>
-          )}
-          <button onClick={submit} disabled={submitting} className="btn-gold" style={{ width:'100%', marginTop:16, display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+          ) : null })()}
+          <button onClick={()=>{const c=[2000,1000,500,100,50,10,5,1].reduce((s,v)=>s+(+(form["d"+v]||0))*v,0);setForm(p=>({...p,cash_drawer:String(c)}));submit()}} disabled={submitting} className="btn-gold" style={{ width:'100%', marginTop:16, display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
             <Send size={16} /> 儲存盤點結果
           </button>
         </div>
