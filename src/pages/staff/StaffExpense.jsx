@@ -61,6 +61,8 @@ export default function StaffExpense() {
   const today = format(new Date(), 'yyyy-MM-dd')
   const month = format(new Date(), 'yyyy-MM')
   const [showCashForm, setShowCashForm] = useState(false)
+  const [newCatName, setNewCatName] = useState('')
+  const [newVendorName, setNewVendorName] = useState('')
   const [cashForm, setCashForm] = useState({ amount: '', method: '現金', given_by: 'Wilson', note: '' })
   const [showSign, setShowSign] = useState(false)
 
@@ -209,13 +211,22 @@ export default function StaffExpense() {
             {vendors.filter(v => !form.category || v.category === form.category || !v.category).map(v => (
               <button key={v.id} onClick={() => { setForm(p => ({ ...p, vendor: v.name })); if (v.category && !form.category) setForm(p => ({ ...p, category: v.category })) }} style={{ padding: '5px 10px', borderRadius: 12, fontSize: 11, cursor: 'pointer', background: form.vendor === v.name ? 'rgba(77,168,108,.1)' : 'transparent', color: form.vendor === v.name ? 'var(--green)' : 'var(--text-muted)', border: form.vendor === v.name ? '1px solid rgba(77,168,108,.3)' : '1px solid var(--border)' }}>{v.name}</button>
             ))}
-            <input placeholder="或手動輸入" value={vendors.some(v => v.name === form.vendor) ? '' : form.vendor} onChange={e => setForm(p => ({ ...p, vendor: e.target.value }))} style={{ flex: 1, minWidth: 100, fontSize: 11, padding: '5px 10px' }} />
+            <input placeholder="或手動輸入" value={vendors.some(v => v.name === form.vendor) ? '' : form.vendor} onChange={e => setForm(p => ({ ...p, vendor: e.target.value }))} style={{ flex: 1, minWidth: 80, fontSize: 11, padding: '5px 10px' }} />
+            {newVendorName === '' ? (
+              <button onClick={() => setNewVendorName(' ')} style={{ padding: '5px 10px', borderRadius: 12, fontSize: 11, cursor: 'pointer', background: 'transparent', color: 'var(--green)', border: '1px dashed rgba(77,168,108,.4)', whiteSpace: 'nowrap' }}>+ 廠商</button>
+            ) : (
+              <div style={{ display: 'flex', gap: 4, alignItems: 'center', width: '100%', marginTop: 6 }}>
+                <input placeholder="廠商名稱" value={newVendorName.trim()} onChange={e => setNewVendorName(e.target.value)} style={{ flex: 1, fontSize: 12, padding: '6px 8px', minHeight: 32 }} />
+                <button onClick={async () => { if (!newVendorName.trim()) return; await supabase.from('expense_vendors').insert({ name: newVendorName.trim(), category: form.category || '', enabled: true }); setNewVendorName(''); load() }} style={{ padding: '6px 10px', borderRadius: 10, fontSize: 11, fontWeight: 700, cursor: 'pointer', background: 'rgba(77,168,108,.12)', color: 'var(--green)', border: '1px solid rgba(77,168,108,.3)' }}>✓</button>
+                <button onClick={() => setNewVendorName('')} style={{ padding: '6px 8px', borderRadius: 10, fontSize: 11, cursor: 'pointer', background: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>✕</button>
+              </div>
+            )}
           </div>
           <input placeholder="品項說明（選填）" value={form.item} onChange={e => setForm(p => ({ ...p, item: e.target.value }))} style={{ marginBottom: 8, fontSize: 14, padding: 12 }} />
           <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
             <div style={{ flex: 1, position: 'relative' }}>
-              <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 18, color: 'var(--gold)', fontWeight: 700 }}>$</span>
-              <input type="number" inputMode="numeric" placeholder="金額" value={form.amount} onChange={e => setForm(p => ({ ...p, amount: e.target.value }))} style={{ width: '100%', paddingLeft: 32, fontSize: 22, fontFamily: 'var(--font-mono)', fontWeight: 700, padding: '12px 12px 12px 32px' }} />
+              
+              <input type="number" inputMode="numeric" placeholder="金額" value={form.amount} onChange={e => setForm(p => ({ ...p, amount: e.target.value }))} style={{ width: '100%', fontSize: 22, fontFamily: 'var(--font-mono)', fontWeight: 700, padding: '12px 14px' }} />
             </div>
             <select value={form.payment} onChange={e => setForm(p => ({ ...p, payment: e.target.value }))} style={{ width: 100, fontSize: 13, padding: 12 }}><option>現金</option><option>刷卡</option><option>轉帳</option><option>LINE Pay</option></select>
           </div>
