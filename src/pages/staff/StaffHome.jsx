@@ -22,6 +22,8 @@ export default function StaffHome() {
 
   useEffect(() => { load() }, [])
 
+  useEffect(() => { if (notices.length > 0 && user) markNoticesRead(notices, user.employee_id, user.name) }, [notices])
+
   async function load() {
     setLoading(true)
     const [sRes, tRes, pRes, nRes, lbRes] = await Promise.all([
