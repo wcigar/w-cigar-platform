@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { SHIFTS } from '../../lib/constants'
@@ -18,6 +18,11 @@ export default function StaffHome() {
   const [showAbnormal, setShowAbnormal] = useState(false)
   const [loading, setLoading] = useState(true)
   const today = format(new Date(), 'yyyy-MM-dd')
+  const punchCamRef = useRef(null)
+  const punchCanvasRef = useRef(null)
+  const [punchType, setPunchType] = useState(null)
+  const [punchStream, setPunchStream] = useState(null)
+  const [showPunchCam, setShowPunchCam] = useState(false)
   const month = format(new Date(), 'yyyy-MM')
 
   useEffect(() => { load() }, [])
@@ -40,7 +45,49 @@ export default function StaffHome() {
     setLoading(false)
   }
 
-  async function handlePunch(type) {
+  function openPunchCam(type) {
+    setPunchType(type)
+    setShowPunchCam(true)
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
+      .then(stream => { setPunchStream(stream); setTimeout(() => { if (punchCamRef.current) punchCamRef.current.srcObject = stream }, 100) })
+      .catch(() => alert('無法開啟相機'))
+  }
+
+  function closePunchCam() {
+    if (punchStream) { punchStream.getTracks().forEach(t => t.stop()); setPunchStream(null) }
+    setShowPunchCam(false); setPunchType(null)
+  }
+
+  async function capturePunchPhoto() {
+    const video = punchCamRef.current
+    const canvas = punchCanvasRef.current
+    if (!video || !canvas) return
+    canvas.width = video.videoWidth || 640
+    canvas.height = video.videoHeight || 480
+    const ctx = canvas.getContext('2d')
+    ctx.drawImage(video, 0, 0)
+    // Overlay text
+    const now = new Date()
+    const timeStr = format(now, 'yyyy/MM/dd HH:mm:ss')
+    const label = user.name + ' ' + punchType + '打卡'
+    ctx.fillStyle = 'rgba(0,0,0,0.5)'
+    ctx.fillRect(0, canvas.height - 60, canvas.width, 60)
+    ctx.fillStyle = '#FFD700'
+    ctx.font = 'bold 20px sans-serif'
+    ctx.fillText(label, 12, canvas.height - 35)
+    ctx.fillStyle = '#fff'
+    ctx.font = '16px sans-serif'
+    ctx.fillText(timeStr, 12, canvas.height - 12)
+    // Upload
+    const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.8))
+    const fileName = 'punch/' + user.employee_id + '_' + punchType + '_' + format(now, 'yyyyMMdd_HHmmss') + '.jpg'
+    const { data: upData } = await supabase.storage.from('photos').upload(fileName, blob)
+    const photoUrl = upData?.path ? supabase.storage.from('photos').getPublicUrl(upData.path).data.publicUrl : null
+    closePunchCam()
+    handlePunch(punchType, photoUrl)
+  }
+
+  async function handlePunch(type, photoUrl) {
     if (!navigator.geolocation) return alert('請開啟定位')
     navigator.geolocation.getCurrentPosition(async pos => {
       const { latitude: lat, longitude: lng } = pos.coords
@@ -48,7 +95,7 @@ export default function StaffHome() {
       const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat * Math.PI / 180) * Math.cos(25.0269184 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
       const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
       const valid = dist <= 100
-      await supabase.from('punch_records').insert({ date: today, employee_id: user.employee_id, name: user.name, punch_type: type, lat, lng, distance_m: Math.round(dist), is_valid: valid })
+      await supabase.from('punch_records').insert({ date: today, employee_id: user.employee_id, name: user.name, punch_type: type, photo_url: photoUrl || null, lat, lng, distance_m: Math.round(dist), is_valid: valid })
       alert(valid ? `${type}打卡成功！距離 ${Math.round(dist)}m` : `距離店面 ${Math.round(dist)}m，超出範圍`)
       load()
     }, () => alert('請開啟GPS'))
@@ -95,8 +142,8 @@ export default function StaffHome() {
         ) : <div style={{ fontSize: 14, color: 'var(--text-dim)' }}>尚未排班</div>}
         {shiftInfo?.start && (
           <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-            <button className="btn-gold" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }} onClick={() => handlePunch('上班')}><MapPin size={14} />上班打卡</button>
-            <button className="btn-outline" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }} onClick={() => handlePunch('下班')}><MapPin size={14} />下班打卡</button>
+            <button className="btn-gold" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }} onClick={() => openPunchCam('上班')}><MapPin size={14} />上班打卡</button>
+            <button className="btn-outline" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }} onClick={() => openPunchCam('下班')}><MapPin size={14} />下班打卡</button>
           </div>
         )}
       </div>
@@ -139,6 +186,18 @@ export default function StaffHome() {
           {notices.map(n => <div key={n.id} style={{ padding: '8px 0', borderBottom: '1px solid var(--border)', fontSize: 13 }}>{n.content}<div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{n.publisher}</div></div>)}
         </div>
       )}
-    </div>
+    
+      {showPunchCam && (
+        <div style={{ position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.9)', zIndex:9999, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center' }}>
+          <div style={{ fontSize:16, color:'var(--gold)', fontWeight:700, marginBottom:12 }}>{punchType}打卡 - 請拍照</div>
+          <video ref={punchCamRef} autoPlay playsInline muted style={{ width:'90%', maxWidth:400, borderRadius:12, border:'2px solid var(--gold)' }} />
+          <canvas ref={punchCanvasRef} style={{ display:'none' }} />
+          <div style={{ display:'flex', gap:12, marginTop:16 }}>
+            <button onClick={capturePunchPhoto} className="btn-gold" style={{ padding:'14px 32px', fontSize:16 }}>📸 拍照打卡</button>
+            <button onClick={closePunchCam} className="btn-outline" style={{ padding:'14px 24px', fontSize:14 }}>取消</button>
+          </div>
+        </div>
+      )}
+</div>
   )
 }
