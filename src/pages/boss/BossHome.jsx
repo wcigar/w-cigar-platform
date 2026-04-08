@@ -26,7 +26,7 @@ export default function BossHome() {
   async function load() {
     setLoading(true)
     const [eR, sR, tR, aR, lbR, leaveR, invR, punchR, revR, hoR, abnR] = await Promise.all([
-      supabase.from('employees').select('*').eq('is_active', true),
+      supabase.from('employees').select('*').eq('enabled', true),
       supabase.from('schedules').select('*, employees(name)').eq('date', today),
       supabase.from('task_status').select('*').eq('date', today),
       supabase.from('abnormal_reports').select('id', { count: 'exact' }).eq('status', '待處理'),
@@ -41,7 +41,7 @@ export default function BossHome() {
     const tasks = tR.data || [], sc = sR.data || [], emps = eR.data || [], low = invR.data || [], abns = abnR.data || []
     setStats({
       emps: emps.length,
-      working: sc.filter(s => s.shift_type !== '休假' && s.shift_type !== '臨時請假').length,
+      working: sc.filter(s => s.shift !== '休假' && s.shift !== '臨時請假').length,
       sop: tasks.length ? Math.round(tasks.filter(t => t.completed).length / tasks.length * 100) : 0,
       abnPending: aR.count || 0,
       leavePending: leaveR.count || 0,
