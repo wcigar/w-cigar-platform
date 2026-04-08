@@ -8,6 +8,7 @@ import StaffHome from './pages/staff/StaffHome'
 import StaffSOP from './pages/staff/StaffSOP'
 import StaffSchedule from './pages/staff/StaffSchedule'
 import StaffKPI from './pages/staff/StaffKPI'
+import StaffRevenue from './pages/staff/StaffRevenue'
 import StaffInventory from './pages/staff/StaffInventory'
 import StaffExpense from './pages/staff/StaffExpense'
 import BossHome from './pages/boss/BossHome'
@@ -37,7 +38,8 @@ export default function App() {
       <Route path="/sop" element={<StaffSOP />} />
       <Route path="/inventory" element={<StaffInventory />} />
       <Route path="/schedule" element={<StaffSchedule />} />
-      <Route path="/kpi" element={<StaffKPI />} />
+      <Route path="/revenue" element={<StaffRevenue />} />
+            <Route path="/kpi" element={<StaffKPI />} />
       <Route path="/expense" element={<StaffExpense />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
