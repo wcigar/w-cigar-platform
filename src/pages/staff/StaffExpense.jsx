@@ -52,6 +52,8 @@ export default function StaffExpense() {
   const [tab, setTab] = useState('new')
   const [form, setForm] = useState({ category: '', vendor: '', item: '', amount: '', payment: '現金', note: '' })
   const [photo, setPhoto] = useState(null)
+  const [noReceipt, setNoReceipt] = useState(false)
+  const [noReceiptReason, setNoReceiptReason] = useState('')
   const [preview, setPreview] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -94,7 +96,8 @@ export default function StaffExpense() {
   async function handleSubmitExpense() {
     if (!form.category) return alert('請選擇分類')
     if (!form.amount || +form.amount <= 0) return alert('請輸入金額')
-    if (!photo) return alert('請拍照上傳收據')
+    if (!photo && !noReceipt) return alert('請拍照或勾選無收據')
+    if (noReceipt && !noReceiptReason) return alert('無收據請選擇原因')
     if (!confirm('確定提交 $' + (+form.amount).toLocaleString() + ' 的支出？')) return
     setSubmitting(true)
     let photoUrl = ''
@@ -103,9 +106,9 @@ export default function StaffExpense() {
       const { error } = await supabase.storage.from('photos').upload(path, photo)
       if (!error) { const { data } = supabase.storage.from('photos').getPublicUrl(path); photoUrl = data.publicUrl }
     }
-    await supabase.from('expenses').insert({ date: today, category: form.category, vendor: form.vendor, item: form.item || form.category, amount: +form.amount, payment: form.payment, handler: user.name, submitted_by: user.employee_id, photo_url: photoUrl, note: form.note })
+    await supabase.from('expenses').insert({ date: today, category: form.category, vendor: form.vendor, item: form.item || form.category, amount: +form.amount, payment: form.payment, handler: user.name, submitted_by: user.employee_id, photo_url: photoUrl, note: (noReceipt ? '[無收據:' + noReceiptReason + '] ' : '') + form.note })
     setSubmitting(false); alert('支出已提交！')
-    setForm({ category: '', vendor: '', item: '', amount: '', payment: '現金', note: '' }); setPhoto(null); setPreview(null); load()
+    setForm({ category: '', vendor: '', item: '', amount: '', payment: '現金', note: '' }); setPhoto(null); setPreview(null); setNoReceipt(false); setNoReceiptReason(''); load()
   }
 
   async function submitCashRequest(sigDataUrl) {
@@ -216,9 +219,23 @@ export default function StaffExpense() {
             </div>
             <select value={form.payment} onChange={e => setForm(p => ({ ...p, payment: e.target.value }))} style={{ width: 100, fontSize: 13, padding: 12 }}><option>現金</option><option>刷卡</option><option>轉帳</option><option>LINE Pay</option></select>
           </div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 6 }}>收據照片 *</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 6 }}>收據照片</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <input type="checkbox" checked={noReceipt} onChange={e => { setNoReceipt(e.target.checked); if (e.target.checked) { setPhoto(null); setPreview(null) } }} style={{ width: 22, height: 22, accentColor: '#f59e0b' }} />
+            <span style={{ fontSize: 13, color: noReceipt ? '#f59e0b' : 'var(--text-dim)' }}>無收據</span>
+            {noReceipt && (
+              <select value={noReceiptReason} onChange={e => setNoReceiptReason(e.target.value)} style={{ flex: 1, fontSize: 13, padding: '6px 8px', minHeight: 36 }}>
+                <option value="">請選擇原因</option>
+                <option>小額零星消費</option>
+                <option>廠商未提供</option>
+                <option>線上轉帳</option>
+                <option>代增收據</option>
+                <option>其他</option>
+              </select>
+            )}
+          </div>
           <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={e => handlePhoto(e.target.files?.[0])} />
-          <button className="btn-outline" onClick={() => fileRef.current?.click()} style={{ width: '100%', padding: 14, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 8, background: photo ? 'rgba(77,168,108,.06)' : undefined, borderColor: photo ? 'rgba(77,168,108,.3)' : undefined, color: photo ? 'var(--green)' : undefined }}>
+          <button className="btn-outline" onClick={() => fileRef.current?.click()} style={{ width: '100%', padding: 14, display: noReceipt ? 'none' : 'flex', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 8, background: photo ? 'rgba(77,168,108,.06)' : undefined, borderColor: photo ? 'rgba(77,168,108,.3)' : undefined, color: photo ? 'var(--green)' : undefined }}>
             <Camera size={18} /> {photo ? '已拍照 (' + Math.round(photo.size / 1024) + 'KB) 點擊重拍' : '📷 拍照上傳收據（必須）'}
           </button>
           {preview && <img src={preview} alt="" style={{ width: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 10, marginBottom: 10, border: '1px solid var(--border-gold)' }} />}
