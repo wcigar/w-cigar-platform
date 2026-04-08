@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { CheckCircle2, Circle, Plus, AlertTriangle, Trophy, Clock, Timer } from 'lucide-react'
+import { CheckCircle2, Circle, Plus, AlertTriangle, Trophy, Clock } from 'lucide-react'
 import { format } from 'date-fns'
 import { getTaskUrgency, URGENCY_COLORS } from '../../lib/taskUtils'
 import { getSlaStatus } from '../../lib/slaUtils'
@@ -153,7 +153,7 @@ export default function Operations() {
           {(slaOverdue > 0 || slaWarning > 0) && (
             <div className="card" style={{ padding: 12, marginBottom: 12, borderColor: slaOverdue > 0 ? 'rgba(196,77,77,.4)' : 'rgba(245,158,11,.4)', background: slaOverdue > 0 ? 'rgba(196,77,77,.06)' : 'rgba(245,158,11,.06)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700 }}>
-                <Timer size={14} />
+                <Clock size={14} />
                 {slaOverdue > 0 && <span style={{ color: 'var(--red)' }}>🔴 SLA逾期 {slaOverdue} 筆</span>}
                 {slaWarning > 0 && <span style={{ color: '#f59e0b' }}>🟡 即將到期 {slaWarning} 筆</span>}
               </div>
@@ -169,7 +169,7 @@ export default function Operations() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       {a.status !== '已解決' && (
                         <span style={{ fontSize: 11, fontWeight: 700, color: sla.color, display: 'flex', alignItems: 'center', gap: 3, padding: '3px 8px', borderRadius: 10, background: sla.status === 'overdue' ? 'rgba(196,77,77,.12)' : sla.status === 'warning' ? 'rgba(245,158,11,.12)' : 'rgba(77,168,108,.08)' }}>
-                          <Timer size={11} />{sla.remaining}
+                          <Clock size={11} />{sla.remaining}
                         </span>
                       )}
                       <select value={a.status || '待處理'} onChange={e => updateAbnormalStatus(a.id, e.target.value)} style={{ width: 'auto', fontSize: 12, padding: '4px 8px' }}>
