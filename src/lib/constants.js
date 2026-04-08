@@ -16,11 +16,11 @@ export const HEALTH_INS_RATE = 0.0517
 export const LABOR_PENSION_RATE = 0.06
 
 export function findBracket(salary, brackets) { for (const b of brackets) { if (salary <= b) return b } return brackets[brackets.length - 1] }
-export function calcLaborIns(ms) { return Math.round(findBracket(ms, LABOR_INS_BRACKETS) * LABOR_INS_RATE * 0.2) }
-export function calcHealthIns(ms) { return Math.round(findBracket(ms, HEALTH_INS_BRACKETS) * HEALTH_INS_RATE * 0.3) }
+export function calcLaborIns(ms) { if (!ms || ms <= 0) return 0; return Math.round(findBracket(ms, LABOR_INS_BRACKETS) * LABOR_INS_RATE * 0.2) }
+export function calcHealthIns(ms) { if (!ms || ms <= 0) return 0; return Math.round(findBracket(ms, HEALTH_INS_BRACKETS) * HEALTH_INS_RATE * 0.3) }
 export function calcLaborPension(ms) { return Math.round(findBracket(ms, HEALTH_INS_BRACKETS) * LABOR_PENSION_RATE) }
-export function calcLaborInsER(ms) { return Math.round(findBracket(ms, LABOR_INS_BRACKETS) * LABOR_INS_RATE * 0.7) }
-export function calcHealthInsER(ms) { return Math.round(findBracket(ms, HEALTH_INS_BRACKETS) * HEALTH_INS_RATE * 0.6 * 1.56) }
+export function calcLaborInsER(ms) { if (!ms || ms <= 0) return 0; return Math.round(findBracket(ms, LABOR_INS_BRACKETS) * LABOR_INS_RATE * 0.7) }
+export function calcHealthInsER(ms) { if (!ms || ms <= 0) return 0; return Math.round(findBracket(ms, HEALTH_INS_BRACKETS) * HEALTH_INS_RATE * 0.6) }
 
 // 加班費計算
 export function calcOvertimePay(hourlyRate, otMinutes) {
