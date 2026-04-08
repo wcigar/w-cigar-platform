@@ -31,7 +31,7 @@ export default function BossHome() {
       supabase.from('task_status').select('*').eq('date', today),
       supabase.from('abnormal_reports').select('id', { count: 'exact' }).eq('status', '待處理'),
       supabase.from('task_status').select('completed_by').eq('owner', 'ALL').eq('completed', true).gte('date', month + '-01').lte('date', month + '-31'),
-      supabase.from('leave_requests').select('id', { count: 'exact' }).eq('status', 'pending'),
+      supabase.from('leave_requests').select('id', { count: 'exact' }).eq('status', '待審核'),
       supabase.from('inventory_master').select('id, name, current_stock, safe_stock, unit, category').eq('is_low', true).eq('enabled', true),
       supabase.from('punch_records').select('*').eq('date', today),
       supabase.from('daily_revenue').select('total').gte('date', month + '-01').lte('date', month + '-31'),
