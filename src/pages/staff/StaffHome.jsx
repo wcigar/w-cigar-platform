@@ -6,6 +6,7 @@ import { Clock, CheckCircle2, Circle, AlertCircle, MapPin, AlertTriangle, Trophy
 import { format } from 'date-fns'
 import { zhTW } from 'date-fns/locale'
 import AbnormalReport from '../../components/AbnormalReport'
+import { markNoticesRead } from '../../lib/noticeUtils'
 
 export default function StaffHome() {
   const { user } = useAuth()

@@ -1,3 +1,4 @@
+import NoticesMgmt from './NoticesMgmt'
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { CheckCircle2, Circle, Plus, AlertTriangle, Trophy, Clock } from 'lucide-react'
@@ -198,7 +199,8 @@ export default function Operations() {
         </div>
       )}
 
-      {tab === 'notices' && (
+      {tab === 'notices' && <NoticesMgmt />}
+      {tab === 'notices_OLD' && (
         <div>
           <button className="btn-outline" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => setShowForm(!showForm)}><Plus size={14} /> 新增公告</button>
           {showForm && <div className="card" style={{ marginBottom: 16, padding: 16 }}><textarea placeholder="公告內容" rows={3} value={newNotice} onChange={e => setNewNotice(e.target.value)} style={{ marginBottom: 10, resize: 'none' }} /><button className="btn-gold" onClick={publish}>發布</button></div>}
