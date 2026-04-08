@@ -16,8 +16,6 @@ export default function BossHome() {
   const [lowItems, setLowItems] = useState([])
   const [dangers, setDangers] = useState([])
   const [loading, setLoading] = useState(true)
-  const [monthRevenue, setMonthRevenue] = useState(0)
-  const [pendingHandover, setPendingHandover] = useState(0)
   const today = format(new Date(), 'yyyy-MM-dd')
   const month = format(new Date(), 'yyyy-MM')
 
@@ -25,7 +23,7 @@ export default function BossHome() {
 
   async function load() {
     setLoading(true)
-    const [eR, sR, tR, aR, lbR, leaveR, invR, punchR, revR, hoR, abnR] = await Promise.all([
+    const [eR, sR, tR, aR, lbR, leaveR, invR, punchR, abnR] = await Promise.all([
       supabase.from('employees').select('*').eq('is_active', true),
       supabase.from('schedules').select('*, employees(name)').eq('date', today),
       supabase.from('task_status').select('*').eq('date', today),
@@ -34,8 +32,6 @@ export default function BossHome() {
       supabase.from('leave_requests').select('id', { count: 'exact' }).eq('status', 'pending'),
       supabase.from('inventory_master').select('id, name, current_stock, safe_stock, unit, category').eq('is_low', true).eq('enabled', true),
       supabase.from('punch_records').select('*').eq('date', today),
-      supabase.from('daily_revenue').select('total').gte('date', month + '-01').lte('date', month + '-31'),
-      supabase.from('shift_handover').select('id').eq('date', today).eq('acknowledged', false),
       supabase.from('abnormal_reports').select('*').neq('status', '已解決').order('time', { ascending: false }).limit(10),
     ])
     const tasks = tR.data || [], sc = sR.data || [], emps = eR.data || [], low = invR.data || [], abns = abnR.data || []
@@ -50,8 +46,6 @@ export default function BossHome() {
     setScheds(sc)
     setLowItems(low)
     setPunches(punchR.data || [])
-    setMonthRevenue((revR.data || []).reduce((s, r) => s + (+r.total || 0), 0))
-    setPendingHandover((hoR.data || []).length)
 
     // Build danger list
     const dangerList = []
@@ -117,126 +111,13 @@ export default function BossHome() {
       </div>
 
       {/* Quick stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 16 }}>
         <SB label="在職" value={stats.emps} color="var(--gold)" />
         <SB label="今日出勤" value={stats.working} color="var(--green)" />
         <SB label="SOP完成" value={stats.sop + '%'} color={stats.sop === 100 ? 'var(--green)' : 'var(--gold)'} />
         <SB label="待審假單" value={stats.leavePending} color={stats.leavePending > 0 ? 'var(--red)' : 'var(--text-muted)'} tap={() => navigate('/hr')} />
         <SB label="異常待處理" value={stats.abnPending} color={stats.abnPending > 0 ? 'var(--red)' : 'var(--text-muted)'} tap={() => navigate('/operations')} />
-        <SB label="\u6708\u71df\u6536" value={monthRevenue ? ' value={stats.lowStock} color={stats.lowStock > 0 ? 'var(--red)' : 'var(--green)'} tap={() => navigate('/operations')} />
-      </div>
-
-      {/* 🔥 Today's Top 5 Dangers */}
-      {dangers.length > 0 && (
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--red)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Flame size={16} /> 今日最危險 {dangers.length} 項
-          </div>
-          {dangers.map((d, i) => (
-            <div key={i} className="card" onClick={() => navigate(d.action)} style={{
-              padding: 12, marginBottom: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10,
-              borderColor: d.severity >= 80 ? 'rgba(196,77,77,.4)' : 'rgba(245,158,11,.3)',
-              background: d.severity >= 80 ? 'rgba(196,77,77,.04)' : 'rgba(245,158,11,.03)',
-            }}>
-              <div style={{ fontSize: 20, width: 28, textAlign: 'center', flexShrink: 0 }}>{d.icon}</div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.label}</div>
-                <div style={{ fontSize: 11, color: d.color, fontWeight: 700 }}>{d.detail}</div>
-              </div>
-              <div style={{
-                fontSize: 9, fontWeight: 700, padding: '3px 8px', borderRadius: 10, flexShrink: 0,
-                background: d.type === 'abnormal' ? 'rgba(196,77,77,.15)' : d.type === 'sop' ? 'rgba(245,158,11,.15)' : 'rgba(196,77,77,.1)',
-                color: d.color,
-              }}>{d.type === 'abnormal' ? '異常' : d.type === 'sop' ? 'SOP' : '庫存'}</div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Alert cards */}
-      {(stats.lowStock > 0 || stats.abnPending > 0 || stats.leavePending > 0) && dangers.length === 0 && (
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--red)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <AlertTriangle size={14} /> 需要注意
-          </div>
-          {stats.leavePending > 0 && (
-            <div className="card" onClick={() => navigate('/hr')} style={{ padding: 12, marginBottom: 6, cursor: 'pointer', borderColor: 'rgba(196,77,77,.3)', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <FileText size={16} color="var(--red)" /><div style={{ flex: 1 }}><div style={{ fontSize: 13, fontWeight: 600 }}>待審假單 {stats.leavePending} 筆</div></div><span style={{ color: 'var(--text-muted)', fontSize: 16 }}>›</span>
-            </div>
-          )}
-          {stats.lowStock > 0 && (
-            <div className="card" onClick={() => navigate('/operations')} style={{ padding: 12, marginBottom: 6, cursor: 'pointer', borderColor: 'rgba(196,77,77,.3)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}><Package size={16} color="var(--red)" /><div style={{ fontSize: 13, fontWeight: 600 }}>低庫存警報 {stats.lowStock} 項</div></div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                {lowItems.slice(0, 8).map(item => (
-                  <span key={item.id} style={{ fontSize: 10, padding: '3px 8px', borderRadius: 10, background: 'rgba(196,77,77,.12)', color: 'var(--red)', fontWeight: 600 }}>{item.name} ({item.current_stock ?? 0}/{item.safe_stock}{item.unit})</span>
-                ))}
-                {lowItems.length > 8 && <span style={{ fontSize: 10, color: 'var(--text-dim)', padding: '3px 8px' }}>+{lowItems.length - 8} 項</span>}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* 4 category cards */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
-        {cards.map(c => (
-          <div key={c.path} className="card" style={{ padding: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14 }} onClick={() => navigate(c.path)}>
-            <div style={{ width: 44, height: 44, borderRadius: 12, background: c.color + '15', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><c.icon size={22} color={c.color} /></div>
-            <div style={{ flex: 1 }}><div style={{ fontSize: 15, fontWeight: 600 }}>{c.label}</div><div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>{c.sub}</div></div>
-            <div style={{ color: 'var(--text-muted)', fontSize: 18 }}>›</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Today schedule + punch */}
-      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--gold)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}><Clock size={15} /> 今日出勤狀態</div>
-      {scheds.length === 0 && <div style={{ fontSize: 13, color: 'var(--text-dim)', textAlign: 'center', padding: 16 }}>今日無排班</div>}
-      {scheds.map(s => {
-        const isOff = s.shift_type === '休假' || s.shift_type === '臨時請假'
-        const ps = isOff ? null : getPunchStatus(s.employee_id)
-        return (
-          <div key={s.id} className="card" style={{ padding: 12, marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div><span style={{ fontSize: 14, fontWeight: 500 }}>{s.employees?.name || s.employee_id}</span><span className={'badge ' + (isOff ? 'badge-blue' : 'badge-gold')} style={{ marginLeft: 8 }}>{s.shift_type}</span></div>
-            {ps ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                {ps.status === 'ok' && <CheckCircle2 size={14} color={ps.color} />}
-                {ps.status === 'late' && <AlertTriangle size={14} color={ps.color} />}
-                {ps.status === 'none' && <XCircle size={14} color={ps.color} />}
-                <span style={{ fontSize: 12, fontWeight: 600, color: ps.color }}>{ps.label}</span>
-              </div>
-            ) : <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>休假</span>}
-          </div>
-        )
-      })}
-
-      {/* Leaderboard */}
-      {leaderboard.length > 0 && (
-        <div className="card" style={{ marginTop: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}><Trophy size={16} color="var(--gold)" /><span style={{ fontSize: 14, fontWeight: 600 }}>{month.slice(5)}月搶單排行</span></div>
-          {leaderboard.slice(0, 5).map((x, i) => (
-            <div key={x.name} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: 13, borderBottom: '1px solid var(--border)' }}>
-              <span>{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i+1) + '.'} {x.name}</span>
-              <strong style={{ color: 'var(--gold)' }}>{x.count} 單</strong>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function SB({ label, value, color, tap }) {
-  return (
-    <div className="card" onClick={tap} style={{ padding: 10, textAlign: 'center', cursor: tap ? 'pointer' : 'default' }}>
-      <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{label}</div>
-      <div style={{ fontSize: 20, fontFamily: 'var(--font-mono)', fontWeight: 600, color, marginTop: 2 }}>{value}</div>
-    </div>
-  )
-}
- + monthRevenue.toLocaleString() : '$0'} color="var(--gold)" tap={() => navigate('/operations')} />
-        <SB label="\u5f85\u78ba\u8a8d\u4ea4\u73ed" value={pendingHandover} color={pendingHandover > 0 ? '#f59e0b' : 'var(--text-muted)'} />
-        <SB label="\u4f4e\u5eab\u5b58" value={stats.lowStock} color={stats.lowStock > 0 ? 'var(--red)' : 'var(--green)'} tap={() => navigate('/operations')} />
+        <SB label="低庫存" value={stats.lowStock} color={stats.lowStock > 0 ? 'var(--red)' : 'var(--green)'} tap={() => navigate('/operations')} />
       </div>
 
       {/* 🔥 Today's Top 5 Dangers */}
