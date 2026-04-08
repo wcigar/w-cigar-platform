@@ -18,10 +18,10 @@ export default function NoticesMgmt() {
     setLoading(true)
     const [nR, eR] = await Promise.all([
       supabase.from('notices').select('*').order('created_at', { ascending: false }).limit(20),
-      supabase.from('employees').select('*').eq('is_active', true),
+      supabase.from('employees').select('*').eq('enabled', true),
     ])
     const noticeData = nR.data || []
-    const empData = (eR.data || []).filter(e => !e.is_admin && e.employee_id !== 'ADMIN')
+    const empData = (eR.data || []).filter(e => !e.is_admin && e.id !== 'ADMIN')
     setNotices(noticeData)
     setEmps(empData)
     if (noticeData.length) {
@@ -64,7 +64,7 @@ export default function NoticesMgmt() {
       {notices.map(n => {
         const readers = readMap[n.id] || []
         const readIds = new Set(readers.map(r => r.employee_id))
-        const unread = emps.filter(e => !readIds.has(e.employee_id))
+        const unread = emps.filter(e => !readIds.has(e.id))
         const readCount = readers.length
         const totalStaff = emps.length
         const allRead = totalStaff > 0 && readCount >= totalStaff
@@ -113,7 +113,7 @@ export default function NoticesMgmt() {
                   <div>
                     <div style={{ fontSize: 10, color: 'var(--red)', fontWeight: 700, marginBottom: 4 }}>❌ 未讀</div>
                     {unread.map(e => (
-                      <div key={e.employee_id} style={{ fontSize: 11, color: 'var(--text-muted)', padding: '2px 0' }}>{e.name}</div>
+                      <div key={e.id} style={{ fontSize: 11, color: 'var(--text-muted)', padding: '2px 0' }}>{e.name}</div>
                     ))}
                   </div>
                 )}
