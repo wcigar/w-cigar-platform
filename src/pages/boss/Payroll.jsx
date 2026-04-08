@@ -22,7 +22,7 @@ export default function Payroll() {
         <div style={{ fontSize: 40, marginBottom: 12 }}>🔒</div>
         <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--gold)', marginBottom: 6 }}>薪資管理</div>
         <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 20 }}>請輸入密碼以存取薪資資料</div>
-        <input type="password" inputMode="numeric" maxLength={4} placeholder="請輸入密碼" value={pin} onChange={e => { setPin(e.target.value); setError(false) }} onKeyDown={e => e.key === 'Enter' && handleUnlock()} style={{ width: '100%', textAlign: 'center', fontSize: 24, letterSpacing: 12, fontFamily: 'var(--font-mono)', padding: '12px 8px', marginBottom: 12, borderColor: error ? 'var(--red)' : undefined }} />
+        <input type="password" inputMode="numeric" pattern="[0-9]*" maxLength={4} placeholder="請輸入密碼" value={pin} onChange={e => { setPin(e.target.value); setError(false) }} onKeyDown={e => e.key === 'Enter' && handleUnlock()} style={{ width: '100%', textAlign: 'center', fontSize: 24, letterSpacing: 12, fontFamily: 'var(--font-mono)', padding: '12px 8px', marginBottom: 12, borderColor: error ? 'var(--red)' : undefined }} />
         {error && <div style={{ color: 'var(--red)', fontSize: 12, marginBottom: 10, fontWeight: 600 }}>密碼錯誤</div>}
         <button className="btn-gold" onClick={handleUnlock} style={{ width: '100%', padding: 14, fontSize: 16, fontWeight: 700 }}>解鎖</button>
       </div>

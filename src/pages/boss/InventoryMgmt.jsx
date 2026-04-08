@@ -240,7 +240,7 @@ export default function InventoryMgmt() {
                   <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</div><div style={{ fontSize: 10, color: 'var(--text-muted)' }}>現有:{item.current_stock ?? '—'} {item.unit}</div></div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
                     <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>安全值</span>
-                    <input type="number" inputMode="numeric" min="0" value={safeEdits[item.id] ?? item.safe_stock ?? ''} onChange={e => setSafeEdits(p => ({ ...p, [item.id]: e.target.value }))} style={{ width: 60, fontSize: 14, fontFamily: 'var(--font-mono)', fontWeight: 700, textAlign: 'center', padding: '6px 4px', borderColor: safeEdits[item.id] != null && Number(safeEdits[item.id]) !== (item.safe_stock || 0) ? 'var(--gold)' : undefined }} />
+                    <input type="number" inputMode="numeric" pattern="[0-9]*" min="0" value={safeEdits[item.id] ?? item.safe_stock ?? ''} onChange={e => setSafeEdits(p => ({ ...p, [item.id]: e.target.value }))} style={{ width: 60, fontSize: 14, fontFamily: 'var(--font-mono)', fontWeight: 700, textAlign: 'center', padding: '6px 4px', borderColor: safeEdits[item.id] != null && Number(safeEdits[item.id]) !== (item.safe_stock || 0) ? 'var(--gold)' : undefined }} />
                     <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{item.unit}</span>
                   </div>
                 </div>
@@ -260,7 +260,7 @@ export default function InventoryMgmt() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
               <select value={batchOwner} onChange={e => setBatchOwner(e.target.value)} style={{ fontSize: 11, padding: '6px 4px' }}><option value="">負責人...</option>{empOptions.map(e => <option key={e.employee_id} value={e.employee_id}>{e.name}</option>)}</select>
               <select value={batchDay} onChange={e => setBatchDay(e.target.value)} style={{ fontSize: 11, padding: '6px 4px' }}><option value="">盤點日...</option><option>週一</option><option>週二</option></select>
-              <input type="number" inputMode="numeric" placeholder="安全值" value={batchSafe} onChange={e => setBatchSafe(e.target.value)} style={{ fontSize: 11, padding: '6px 4px', fontFamily: 'var(--font-mono)' }} />
+              <input type="number" inputMode="numeric" pattern="[0-9]*" placeholder="安全值" value={batchSafe} onChange={e => setBatchSafe(e.target.value)} style={{ fontSize: 11, padding: '6px 4px', fontFamily: 'var(--font-mono)' }} />
             </div>
             <button className="btn-gold" onClick={applyBatch} style={{ width: '100%', padding: 10, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><Send size={14} /> 批量套用</button>
           </div>
@@ -323,7 +323,7 @@ export default function InventoryMgmt() {
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span style={{ fontSize: 12, color: 'var(--text-dim)', flexShrink: 0 }}>建議採購：</span>
-                          <input type="number" inputMode="numeric" min="0" value={purchaseEdits[item.id] ?? item.need} onChange={e => setPurchaseEdits(p => ({ ...p, [item.id]: e.target.value }))} style={{ width: 60, fontSize: 16, fontFamily: 'var(--font-mono)', fontWeight: 700, textAlign: 'center', padding: '4px', color: 'var(--gold)' }} />
+                          <input type="number" inputMode="numeric" pattern="[0-9]*" min="0" value={purchaseEdits[item.id] ?? item.need} onChange={e => setPurchaseEdits(p => ({ ...p, [item.id]: e.target.value }))} style={{ width: 60, fontSize: 16, fontFamily: 'var(--font-mono)', fontWeight: 700, textAlign: 'center', padding: '4px', color: 'var(--gold)' }} />
                           <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{item.unit}</span>
                         </div>
                       </div>

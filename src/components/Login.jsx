@@ -49,7 +49,7 @@ export default function Login() {
             <label style={S.label}>登入碼</label>
             <input style={S.input} type="password" placeholder="••••" value={pin}
               onChange={e => setPin(e.target.value)} onKeyDown={e => e.key==='Enter' && handleLogin()}
-              maxLength={6} inputMode="numeric"/>
+              maxLength={6} inputMode="numeric" pattern="[0-9]*"/>
           </div>
           {error && <div style={{color:'#c44d4d',fontSize:13,textAlign:'center'}}>{error}</div>}
           <button style={{...S.loginBtn, opacity: loading?.7:1}} onClick={handleLogin} disabled={loading}>

@@ -139,7 +139,7 @@ export default function StaffInventory() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <input type="number" inputMode="numeric" min="0" placeholder="盤點數量"
+                  <input type="number" inputMode="numeric" pattern="[0-9]*" min="0" placeholder="盤點數量"
                     value={counts[item.id] ?? ''} onChange={e => setCounts(p => ({ ...p, [item.id]: e.target.value }))}
                     style={{ flex: 1, fontSize: 16, padding: '8px 10px', fontFamily: 'var(--font-mono)', fontWeight: 600 }}
                     onKeyDown={e => { if (e.key === 'Enter') { const inputs = [...document.querySelectorAll('input[type=number]')]; const idx = inputs.indexOf(e.target); if (idx < inputs.length - 1) inputs[idx + 1].focus() } }}

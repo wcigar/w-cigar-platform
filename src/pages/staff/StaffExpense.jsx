@@ -162,7 +162,7 @@ export default function StaffExpense() {
           <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 4 }}>金額</div>
           <div style={{ position: 'relative', marginBottom: 10 }}>
             <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 20, color: 'var(--gold)', fontWeight: 700 }}>$</span>
-            <input type="number" inputMode="numeric" placeholder="金額" value={cashForm.amount} onChange={e => setCashForm(p => ({ ...p, amount: e.target.value }))} style={{ width: '100%', paddingLeft: 34, fontSize: 24, fontFamily: 'var(--font-mono)', fontWeight: 700, padding: '12px 12px 12px 34px' }} />
+            <input type="number" inputMode="numeric" pattern="[0-9]*" placeholder="金額" value={cashForm.amount} onChange={e => setCashForm(p => ({ ...p, amount: e.target.value }))} style={{ width: '100%', paddingLeft: 34, fontSize: 24, fontFamily: 'var(--font-mono)', fontWeight: 700, padding: '12px 12px 12px 34px' }} />
           </div>
           <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
             <div style={{ flex: 1 }}>
@@ -215,7 +215,7 @@ export default function StaffExpense() {
           <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
             <div style={{ flex: 1, position: 'relative' }}>
               <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 18, color: 'var(--gold)', fontWeight: 700 }}>$</span>
-              <input type="number" inputMode="numeric" placeholder="金額" value={form.amount} onChange={e => setForm(p => ({ ...p, amount: e.target.value }))} style={{ width: '100%', paddingLeft: 32, fontSize: 22, fontFamily: 'var(--font-mono)', fontWeight: 700, padding: '12px 12px 12px 32px' }} />
+              <input type="number" inputMode="numeric" pattern="[0-9]*" placeholder="金額" value={form.amount} onChange={e => setForm(p => ({ ...p, amount: e.target.value }))} style={{ width: '100%', paddingLeft: 32, fontSize: 22, fontFamily: 'var(--font-mono)', fontWeight: 700, padding: '12px 12px 12px 32px' }} />
             </div>
             <select value={form.payment} onChange={e => setForm(p => ({ ...p, payment: e.target.value }))} style={{ width: 100, fontSize: 13, padding: 12 }}><option>現金</option><option>刷卡</option><option>轉帳</option><option>LINE Pay</option></select>
           </div>

@@ -67,12 +67,16 @@ td{padding:10px 12px;border-bottom:1px solid var(--border)}
 /* Big number input on mobile/iPad */
 @media (max-width: 1024px) {
   input[type="number"], input[inputmode="numeric"], input[inputmode="decimal"] {
-    font-size: 28px !important;
+    font-size: 24px !important;
     font-weight: 700 !important;
     font-family: 'JetBrains Mono', monospace !important;
-    padding: 16px !important;
-    min-height: 60px !important;
-    letter-spacing: 1px;
+    padding: 14px !important;
+    min-height: 56px !important;
+  }
+  input[type="number"]::placeholder, input[inputmode="numeric"]::placeholder {
+    font-size: 15px !important;
+    font-weight: 400 !important;
+    font-family: 'Noto Sans TC', sans-serif !important;
   }
   input[type="password"] {
     font-size: 32px !important;
