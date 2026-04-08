@@ -260,7 +260,7 @@ export default function InventoryMgmt() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
               <select value={batchOwner} onChange={e => setBatchOwner(e.target.value)} style={{ fontSize: 11, padding: '6px 4px' }}><option value="">負責人...</option>{empOptions.map(e => <option key={e.employee_id} value={e.employee_id}>{e.name}</option>)}</select>
               <select value={batchDay} onChange={e => setBatchDay(e.target.value)} style={{ fontSize: 11, padding: '6px 4px' }}><option value="">盤點日...</option><option>週一</option><option>週二</option></select>
-              <input type="number" placeholder="安全值" value={batchSafe} onChange={e => setBatchSafe(e.target.value)} style={{ fontSize: 11, padding: '6px 4px', fontFamily: 'var(--font-mono)' }} />
+              <input type="number" inputMode="numeric" placeholder="安全值" value={batchSafe} onChange={e => setBatchSafe(e.target.value)} style={{ fontSize: 11, padding: '6px 4px', fontFamily: 'var(--font-mono)' }} />
             </div>
             <button className="btn-gold" onClick={applyBatch} style={{ width: '100%', padding: 10, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><Send size={14} /> 批量套用</button>
           </div>

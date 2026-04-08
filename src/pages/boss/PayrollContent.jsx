@@ -278,7 +278,7 @@ export default function Payroll() {
             </div>
             {isE&&<div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
               <select value={editingSal.salary_type} onChange={e => setEditingSal(p=>({...p,salary_type:e.target.value}))} style={{width:80,fontSize:13,padding:8}}><option>月薪</option><option>時薪</option></select>
-              <input type="number" value={editingSal.monthly_salary} onChange={e => setEditingSal(p=>({...p,monthly_salary:e.target.value}))} style={{flex:1,fontSize:13,padding:8}}/>
+              <input type="number" inputMode="numeric" value={editingSal.monthly_salary} onChange={e => setEditingSal(p=>({...p,monthly_salary:e.target.value}))} style={{flex:1,fontSize:13,padding:8}}/>
               <button className="btn-gold" style={{padding:'8px 14px',fontSize:12}} onClick={() => saveSalConfig(emp.id)}><Save size={12}/></button>
               <button className="btn-outline" style={{padding:'8px 14px',fontSize:12}} onClick={() => setEditingSal(null)}>取消</button>
             </div>}
