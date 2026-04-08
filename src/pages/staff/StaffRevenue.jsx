@@ -73,9 +73,9 @@ export default function StaffRevenue() {
     if (total <= 0) return alert('請至少填入一項營收金額')
     setSubmitting(true)
     const avgSpend = (+form.customer_count||0) > 0 ? Math.round(total / +form.customer_count) : 0
-    const payload = { date:today, cash_amount:+form.cash_amount||0, card_amount:(+form.acpay_amount||0)+(+form.teb_amount||0), acpay_amount:+form.acpay_amount||0, teb_amount:+form.teb_amount||0, transfer_amount:+form.transfer_amount||0, wechat_amount:+form.wechat_amount||0, alipay_amount:+form.alipay_amount||0, other_amount:0, total, customer_count:+form.customer_count||0, vip_groups:+form.vip_groups||0, walk_in_groups:+form.walk_in_groups||0, avg_spending:avgSpend, note:form.note||null, recorded_by:user.name }
-    if (existing) { await supabase.from('daily_revenue').update(payload).eq('id', existing.id) }
-    else { await supabase.from('daily_revenue').insert(payload) }
+    const payload = { date:today, cash_amount:+form.cash_amount||0, card_amount:(+form.acpay_amount||0)+(+form.teb_amount||0), acpay_amount:+form.acpay_amount||0, teb_amount:+form.teb_amount||0, transfer_amount:+form.transfer_amount||0, wechat_amount:+form.wechat_amount||0, alipay_amount:+form.alipay_amount||0, other_amount:0, customer_count:+form.customer_count||0, vip_groups:+form.vip_groups||0, walk_in_groups:+form.walk_in_groups||0, avg_spending:avgSpend, note:form.note||null, recorded_by:user.name }
+    const { error } = existing ? await supabase.from('daily_revenue').update(payload).eq('id', existing.id) : await supabase.from('daily_revenue').insert(payload)
+    if (error) { setSubmitting(false); return alert('儲存失敗: ' + error.message) }
     setSubmitting(false)
     alert(existing ? '營收已更新！' : '營收已登記！')
     load()
