@@ -79,10 +79,16 @@ export default function StaffHome() {
     ctx.font = '16px sans-serif'
     ctx.fillText(timeStr, 12, canvas.height - 12)
     // Upload
-    const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.8))
-    const fileName = 'punch/' + user.employee_id + '_' + punchType + '_' + format(now, 'yyyyMMdd_HHmmss') + '.jpg'
-    const { data: upData } = await supabase.storage.from('photos').upload(fileName, blob)
-    const photoUrl = upData?.path ? supabase.storage.from('photos').getPublicUrl(upData.path).data.publicUrl : null
+    let photoUrl = null
+    try {
+      const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.8))
+      if (blob && blob.size > 0) {
+        const fileName = 'punch/' + user.employee_id + '_' + punchType + '_' + format(now, 'yyyyMMdd_HHmmss') + '.jpg'
+        const { data: upData, error: upErr } = await supabase.storage.from('photos').upload(fileName, blob)
+        if (upData?.path) photoUrl = supabase.storage.from('photos').getPublicUrl(upData.path).data.publicUrl
+        if (upErr) console.error('Photo upload error:', upErr)
+      }
+    } catch (e) { console.error('Photo capture error:', e) }
     closePunchCam()
     handlePunch(punchType, photoUrl)
   }
