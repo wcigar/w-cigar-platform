@@ -20,11 +20,15 @@ export async function seedTodayTasks() {
       return true
     })
 
+    // Check who is on leave today - skip their personal tasks
+    const { data: schedData } = await supabase.from('schedules').select('employee_id, shift').eq('date', today)
+    const leaveSet = new Set((schedData || []).filter(s => s.shift === '休假' || s.shift === '臨時請假').map(s => s.employee_id))
     const { data: existing } = await supabase.from('task_status').select('task_id').eq('date', today)
     const existingIds = new Set((existing || []).map(e => e.task_id))
 
     const newRows = todayDefs
       .filter(d => !existingIds.has(d.task_id))
+      .filter(d => d.owner === 'ALL' || !leaveSet.has(d.owner))
       .map(d => ({
         date: today, task_id: d.task_id, category: d.category || '', title: d.title || '',
         owner: d.owner || 'ALL', completed: false, due_time: d.due_time || null
