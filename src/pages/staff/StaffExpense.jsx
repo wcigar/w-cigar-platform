@@ -124,12 +124,13 @@ export default function StaffExpense() {
       if (!error) { const { data } = supabase.storage.from('photos').getPublicUrl(path); sigUrl = data.publicUrl }
     }
     await supabase.from('petty_cash').insert({ date: today, employee_id: 'SHARED', employee_name: '共用零用金', received_by: user.name, amount: +cashForm.amount, method: cashForm.method, given_by: cashForm.given_by, signature_url: sigUrl, note: cashForm.note })
-    setSubmitting(false); setShowSign(false); setShowCashForm(false)
+    setShowSign(false); setShowCashForm(false); setSubmitting(false)
     alert('零用金 $' + (+cashForm.amount).toLocaleString() + ' 已收到！')
     setCashForm({ amount: '', method: '現金', given_by: 'Wilson', note: '' }); load()
   }
 
   function handleCashSubmit() {
+    if (submitting) return
     if (!cashForm.amount || +cashForm.amount <= 0) return alert('請輸入金額')
     if (cashForm.method === '現金') setShowSign(true)
     else { if (confirm('確認收到 $' + (+cashForm.amount).toLocaleString() + ' 匯款？')) submitCashRequest(null) }
@@ -139,7 +140,7 @@ export default function StaffExpense() {
 
   return (
     <div className="page-container fade-in">
-      {showSign && <SignaturePad title={'老闆簽名確認 — $' + (+cashForm.amount).toLocaleString()} onSave={sig => submitCashRequest(sig)} onCancel={() => setShowSign(false)} />}
+      {showSign && <SignaturePad title={'老闆簽名確認 — $' + (+cashForm.amount).toLocaleString()} onSave={sig => { if (!submitting) submitCashRequest(sig) }} onCancel={() => setShowSign(false)} />}
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
         <DollarSign size={20} color="var(--gold)" />
