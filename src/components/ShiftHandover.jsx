@@ -3,11 +3,11 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 import { Send, CheckCircle2, Plus, Trash2, ClipboardList } from 'lucide-react'
 import { format } from 'date-fns'
-import { zhTW } from 'date-fns/locale'
 
 export default function ShiftHandover() {
   const { user } = useAuth()
-  const [items, setItems] = useState([{ text: '', done: false }])
+  const [items, setItems] = useState([{ text: '' }])
+  const [note, setNote] = useState('')
   const [records, setRecords] = useState([])
   const [submitting, setSubmitting] = useState(false)
   const today = format(new Date(), 'yyyy-MM-dd')
@@ -24,7 +24,7 @@ export default function ShiftHandover() {
   }
 
   function addItem() {
-    setItems(prev => [...prev, { text: '', done: false }])
+    setItems(prev => [...prev, { text: '' }])
   }
 
   function removeItem(idx) {
@@ -39,21 +39,28 @@ export default function ShiftHandover() {
     const validItems = items.filter(i => i.text.trim())
     if (!validItems.length) return alert('請填寫至少一項交接事項')
     setSubmitting(true)
-    const content = validItems.map(i => i.text.trim()).join('\n')
-    await supabase.from('shift_handover').insert({
+    const { error } = await supabase.from('shift_handover').insert({
       date: today,
-      employee_id: user.employee_id,
-      employee_name: user.name,
-      content,
+      from_employee: user.employee_id,
+      from_shift: '早班',
+      to_shift: '晚班',
+      items: validItems.map(i => ({ text: i.text.trim(), done: false })),
+      note: note || null,
       acknowledged: false
     })
-    setItems([{ text: '', done: false }])
+    if (error) { alert('送出失敗: ' + error.message); setSubmitting(false); return }
+    setItems([{ text: '' }])
+    setNote('')
     setSubmitting(false)
     load()
   }
 
   async function acknowledge(id) {
-    await supabase.from('shift_handover').update({ acknowledged: true, acknowledged_by: user.name }).eq('id', id)
+    await supabase.from('shift_handover').update({
+      acknowledged: true,
+      acknowledged_by: user.name,
+      acknowledged_at: new Date().toISOString()
+    }).eq('id', id)
     load()
   }
 
@@ -86,8 +93,9 @@ export default function ShiftHandover() {
       </button>
 
       <input
-        placeholder="確認事項（選填）"
-        id="handover-note"
+        placeholder="備註（選填）"
+        value={note}
+        onChange={e => setNote(e.target.value)}
         style={{ width: '100%', fontSize: 14, padding: '10px 12px', marginBottom: 12 }}
       />
 
@@ -107,20 +115,26 @@ export default function ShiftHandover() {
           {records.map(r => (
             <div key={r.id} style={{ background: 'var(--black-card)', border: '1px solid var(--border)', borderRadius: 10, padding: 12, marginBottom: 8 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                <span style={{ fontWeight: 600, fontSize: 13 }}>{r.employee_name}</span>
+                <span style={{ fontWeight: 600, fontSize: 13 }}>{r.from_employee}</span>
                 <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-                  {format(new Date(r.created_at), 'HH:mm')}
+                  {r.created_at ? format(new Date(r.created_at), 'HH:mm') : ''}
                 </span>
               </div>
-              <div style={{ fontSize: 13, whiteSpace: 'pre-line', color: 'var(--text)', lineHeight: 1.6 }}>
-                {r.content}
+              <div style={{ fontSize: 13, lineHeight: 1.6 }}>
+                {(r.items || []).map((item, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
+                    <span style={{ color: 'var(--text-dim)' }}>{i + 1}.</span>
+                    <span>{item.text}</span>
+                  </div>
+                ))}
               </div>
+              {r.note && <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 6 }}>備註: {r.note}</div>}
               {r.acknowledged ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 8, fontSize: 12, color: 'var(--green)' }}>
                   <CheckCircle2 size={14} />已確認 ({r.acknowledged_by})
                 </div>
               ) : (
-                user.employee_id !== r.employee_id && (
+                user.employee_id !== r.from_employee && (
                   <button onClick={() => acknowledge(r.id)} style={{ marginTop: 8, background: 'rgba(77,168,108,.12)', color: 'var(--green)', border: '1px solid rgba(77,168,108,.3)', borderRadius: 8, padding: '6px 14px', fontSize: 12, cursor: 'pointer' }}>
                     <CheckCircle2 size={14} style={{ marginRight: 4 }} />確認已讀
                   </button>
