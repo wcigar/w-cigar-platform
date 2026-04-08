@@ -195,11 +195,11 @@ export default function BossHome() {
       <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--gold)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}><Clock size={15} /> 今日出勤狀態</div>
       {scheds.length === 0 && <div style={{ fontSize: 13, color: 'var(--text-dim)', textAlign: 'center', padding: 16 }}>今日無排班</div>}
       {scheds.map(s => {
-        const isOff = s.shift_type === '休假' || s.shift_type === '臨時請假'
+        const isOff = s.shift === '休假' || s.shift === '臨時請假'
         const ps = isOff ? null : getPunchStatus(s.employee_id)
         return (
           <div key={s.id} className="card" style={{ padding: 12, marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div><span style={{ fontSize: 14, fontWeight: 500 }}>{s.employees?.name || s.employee_id}</span><span className={'badge ' + (isOff ? 'badge-blue' : 'badge-gold')} style={{ marginLeft: 8 }}>{s.shift_type}</span></div>
+            <div><span style={{ fontSize: 14, fontWeight: 500 }}>{s.employees?.name || s.employee_id}</span><span className={'badge ' + (isOff ? 'badge-blue' : 'badge-gold')} style={{ marginLeft: 8 }}>{s.shift}</span></div>
             {ps ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 {ps.status === 'ok' && <CheckCircle2 size={14} color={ps.color} />}

@@ -126,3 +126,39 @@ label { font-size: 13px !important; }
   .btn-gold, .btn-outline, .btn-red { font-size: 15px; min-height: 48px; }
   label { font-size: 13px !important; }
 }
+
+
+/* ===== Bottom Nav Bar Boost ===== */
+nav {
+  font-size: 14px !important;
+}
+nav button, nav a {
+  font-size: 13px !important;
+  padding: 8px 4px !important;
+}
+@media (max-width: 767px) {
+  nav {
+    font-size: 14px !important;
+    padding: 6px 0 !important;
+    padding-bottom: env(safe-area-inset-bottom, 8px) !important;
+  }
+  nav button, nav a {
+    font-size: 12px !important;
+    min-height: 52px !important;
+    gap: 2px !important;
+  }
+  nav svg {
+    width: 22px !important;
+    height: 22px !important;
+  }
+}
+@media (min-width: 768px) and (max-width: 1024px) {
+  nav button, nav a {
+    font-size: 14px !important;
+    min-height: 56px !important;
+  }
+  nav svg {
+    width: 24px !important;
+    height: 24px !important;
+  }
+}

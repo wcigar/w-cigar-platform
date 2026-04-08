@@ -45,7 +45,7 @@ export default function Layout({ children }) {
           return (
             <button key={item.path} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '6px 10px', background: active ? 'rgba(201,168,76,.08)' : 'none', border: 'none', cursor: 'pointer', minWidth: 48, borderRadius: 8 }} onClick={() => navigate(item.path)}>
               <item.icon size={17} style={{ color: active ? '#c9a84c' : '#5a554e' }} />
-              <span style={{ fontSize: 9, fontWeight: 500, color: active ? '#c9a84c' : '#5a554e' }}>{item.label}</span>
+              <span style={{ fontSize: 11, fontWeight: 500, color: active ? '#c9a84c' : '#5a554e' }}>{item.label}</span>
             </button>
           )
         })}
