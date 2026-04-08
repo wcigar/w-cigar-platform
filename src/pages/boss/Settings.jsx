@@ -1,3 +1,4 @@
+import KPIReport from './KPIReport'
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { Plus, Save, Trash2, Lock, Unlock, LogOut, Edit3, Clock } from 'lucide-react'
@@ -9,6 +10,7 @@ export default function Settings() {
     { id: 'employees', l: '員工管理' },
     { id: 'sop', l: 'SOP定義' },
     { id: 'kpi', l: 'KPI考核' },
+    { id: 'kpi_report', l: 'KPI月報' },
   ]
   return (
     <div className="page-container fade-in">
@@ -21,6 +23,7 @@ export default function Settings() {
       {tab === 'employees' && <EmployeeManager />}
       {tab === 'sop' && <SOPManager />}
       {tab === 'kpi' && <KPIManager />}
+      {tab === 'kpi_report' && <KPIReport />}
     </div>
   )
 }
