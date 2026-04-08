@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { format, endOfMonth, subMonths } from 'date-fns'
-import { DollarSign, TrendingUp } from 'lucide-react'
 
 export default function RevenueTracker() {
   const [month, setMonth] = useState(format(new Date(), 'yyyy-MM'))
@@ -23,7 +22,6 @@ export default function RevenueTracker() {
     const expTotal = (expR.data || []).reduce((s, e) => s + (+e.amount || 0), 0)
     const revTotal = revData.reduce((s, r) => s + (+r.total || 0), 0)
     setStats({ revenue: revTotal, expense: expTotal })
-    // Build day list for the month
     const daysInMonth = new Date(+month.split('-')[0], +month.split('-')[1], 0).getDate()
     const today = format(new Date(), 'yyyy-MM-dd')
     const dayList = []
@@ -87,11 +85,11 @@ export default function RevenueTracker() {
           <div>
             <span style={{ fontSize: 14, color: d.isToday ? 'var(--gold)' : 'var(--text)' }}>{d.date.slice(5)} {d.isToday ? '(今天)' : ''}</span>
             {d.rev && <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
-              {+d.rev.cash_amount > 0 && <span style={{ fontSize: 11, color: '#4da86c', background: 'rgba(77,168,108,.1)', padding: '2px 6px', borderRadius: 8 }}>💵{(+d.rev.cash_amount).toLocaleString()}</span>}
-              {+d.rev.acpay_amount > 0 && <span style={{ fontSize: 11, color: '#4d8ac4', background: 'rgba(77,138,196,.1)', padding: '2px 6px', borderRadius: 8 }}>💳ACPAY {(+d.rev.acpay_amount).toLocaleString()}</span>}
-              {+d.rev.teb_amount > 0 && <span style={{ fontSize: 11, color: '#8b6cc4', background: 'rgba(139,108,196,.1)', padding: '2px 6px', borderRadius: 8 }}>🏦企銀 {(+d.rev.teb_amount).toLocaleString()}</span>}
-              {+d.rev.wechat_amount > 0 && <span style={{ fontSize: 11, color: '#07c160', background: 'rgba(7,193,96,.1)', padding: '2px 6px', borderRadius: 8 }}>💚微信 {(+d.rev.wechat_amount).toLocaleString()}</span>}
-              {+d.rev.alipay_amount > 0 && <span style={{ fontSize: 11, color: '#1677ff', background: 'rgba(22,119,255,.1)', padding: '2px 6px', borderRadius: 8 }}>🔵支付寶 {(+d.rev.alipay_amount).toLocaleString()}</span>}
+              {+d.rev.cash_amount > 0 && <span style={{ fontSize: 11, color: '#4da86c', background: 'rgba(77,168,108,.1)', padding: '2px 6px', borderRadius: 8 }}>{'💵'}{(+d.rev.cash_amount).toLocaleString()}</span>}
+              {+d.rev.acpay_amount > 0 && <span style={{ fontSize: 11, color: '#4d8ac4', background: 'rgba(77,138,196,.1)', padding: '2px 6px', borderRadius: 8 }}>{'💳'}ACPAY {(+d.rev.acpay_amount).toLocaleString()}</span>}
+              {+d.rev.teb_amount > 0 && <span style={{ fontSize: 11, color: '#8b6cc4', background: 'rgba(139,108,196,.1)', padding: '2px 6px', borderRadius: 8 }}>{'🏦'}企銀 {(+d.rev.teb_amount).toLocaleString()}</span>}
+              {+d.rev.wechat_amount > 0 && <span style={{ fontSize: 11, color: '#07c160', background: 'rgba(7,193,96,.1)', padding: '2px 6px', borderRadius: 8 }}>{'💚'}微信 {(+d.rev.wechat_amount).toLocaleString()}</span>}
+              {+d.rev.alipay_amount > 0 && <span style={{ fontSize: 11, color: '#1677ff', background: 'rgba(22,119,255,.1)', padding: '2px 6px', borderRadius: 8 }}>{'🔵'}支付寶 {(+d.rev.alipay_amount).toLocaleString()}</span>}
             </div>}
           </div>
           <div style={{ textAlign: 'right' }}>
@@ -101,7 +99,7 @@ export default function RevenueTracker() {
                 <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{d.rev.customer_count||0}組 · {d.rev.recorded_by}</div>
               </div>
             ) : (
-              <span style={{ fontSize: 14, color: 'var(--text-muted)', cursor: 'pointer' }}>點擊登記</span>
+              <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>點擊登記</span>
             )}
           </div>
         </div>
