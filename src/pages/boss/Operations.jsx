@@ -1,3 +1,4 @@
+import RevenueTracker from './RevenueTracker'
 import ExpenseDashboard from './ExpenseDashboard'
 import AbnormalStats from './AbnormalStats'
 import NoticesMgmt from './NoticesMgmt'
@@ -67,7 +68,7 @@ export default function Operations() {
     { id: 'cleaning', l: '大掃除' },
     { id: 'inventory', l: '庫存管理' },
     { id: 'abnormal', l: '異常(' + abnormals.filter(a => a.status === '待處理').length + ')' + (slaOverdue ? ' 🔴' : slaWarning ? ' 🟡' : '') },
-    { id: 'expense', l: '支出分析' },
+    { id: 'expense', l: '支出分析' }, { id: 'revenue', l: '營收' },
     { id: 'abnormal_stats', l: '異常統計' },
     { id: 'ranking', l: '搶單排行' },
     { id: 'notices', l: '公告' },
@@ -192,6 +193,8 @@ export default function Operations() {
       )}
 
       {tab === 'expense' && <ExpenseDashboard />}
+
+      {tab === 'revenue' && <RevenueTracker />}
 
       {tab === 'abnormal_stats' && <AbnormalStats />}
 
