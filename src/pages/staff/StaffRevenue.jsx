@@ -122,27 +122,27 @@ export default function StaffRevenue() {
     load()
   }
 
-  const TB = (label, key, active) => <button onClick={()=>setTab(key)} style={{ flex:1, padding:'8px 4px', fontSize:11, fontWeight:600, cursor:'pointer', background:active?'var(--gold-glow)':'transparent', color:active?'var(--gold)':'var(--text-dim)', border:active?'1px solid var(--border-gold)':'1px solid var(--border)', borderRadius:8, textAlign:'center' }}>{label}</button>
+  const TB = (label, key, active) => <button onClick={()=>setTab(key)} style={{ flex:1, padding:'8px 4px', fontSize:14, fontWeight:600, cursor:'pointer', background:active?'var(--gold-glow)':'transparent', color:active?'var(--gold)':'var(--text-dim)', border:active?'1px solid var(--border-gold)':'1px solid var(--border)', borderRadius:8, textAlign:'center' }}>{label}</button>
 
   return (
     <div className="page-container fade-in">
       <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
         <DollarSign size={20} color="var(--gold)" />
         <span className="section-title" style={{ margin:0 }}>每日營收 & 日結</span>
-        {closing && <span style={{ fontSize:11, background:'rgba(77,168,108,.15)', color:'var(--green)', padding:'3px 8px', borderRadius:10 }}>已日結</span>}
+        {closing && <span style={{ fontSize:14, background:'rgba(77,168,108,.15)', color:'var(--green)', padding:'3px 8px', borderRadius:10 }}>已日結</span>}
       </div>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, marginBottom:12 }}>
         <div className="card" style={{ textAlign:'center', padding:10 }}>
-          <div style={{ fontSize:10, color:'var(--text-dim)' }}>今日營收</div>
-          <div style={{ fontSize:18, fontFamily:'var(--font-mono)', fontWeight:700, color:'var(--gold)', marginTop:2 }}>{"$"}{getTotal().toLocaleString()}</div>
+          <div style={{ fontSize:14, color:'var(--text-dim)' }}>今日營收</div>
+          <div style={{ fontSize:24, fontFamily:'var(--font-mono)', fontWeight:700, color:'var(--gold)', marginTop:2 }}>{"$"}{getTotal().toLocaleString()}</div>
         </div>
         <div className="card" style={{ textAlign:'center', padding:10 }}>
-          <div style={{ fontSize:10, color:'var(--text-dim)' }}>包廂/客組</div>
-          <div style={{ fontSize:18, fontFamily:'var(--font-mono)', fontWeight:700, color:'var(--blue)', marginTop:2 }}>{rooms.length}/{+form.customer_count||0}</div>
+          <div style={{ fontSize:14, color:'var(--text-dim)' }}>包廂/客組</div>
+          <div style={{ fontSize:24, fontFamily:'var(--font-mono)', fontWeight:700, color:'var(--blue)', marginTop:2 }}>{rooms.length}/{+form.customer_count||0}</div>
         </div>
         <div className="card" style={{ textAlign:'center', padding:10 }}>
-          <div style={{ fontSize:10, color:'var(--text-dim)' }}>本月累計</div>
-          <div style={{ fontSize:18, fontFamily:'var(--font-mono)', fontWeight:700, color:'var(--green)', marginTop:2 }}>{"$"}{monthTotal.toLocaleString()}</div>
+          <div style={{ fontSize:14, color:'var(--text-dim)' }}>本月累計</div>
+          <div style={{ fontSize:24, fontFamily:'var(--font-mono)', fontWeight:700, color:'var(--green)', marginTop:2 }}>{"$"}{monthTotal.toLocaleString()}</div>
         </div>
       </div>
 
@@ -156,20 +156,20 @@ export default function StaffRevenue() {
 
       {tab === 'revenue' && (
         <div>
-          {existing && <div style={{ background:'rgba(77,168,108,.1)', border:'1px solid rgba(77,168,108,.3)', borderRadius:8, padding:'8px 12px', marginBottom:12, fontSize:12, color:'var(--green)' }}>已登記（by {existing.recorded_by}），可修改</div>}
+          {existing && <div style={{ background:'rgba(77,168,108,.1)', border:'1px solid rgba(77,168,108,.3)', borderRadius:8, padding:'8px 12px', marginBottom:12, fontSize:14, color:'var(--green)' }}>已登記（by {existing.recorded_by}），可修改</div>}
           {PAYMENTS.map(m => (
             <div key={m.key} style={{ marginBottom:8 }}>
-              <label style={{ fontSize:12, color:m.color, fontWeight:600, display:'flex', alignItems:'center', gap:4 }}>{m.icon} {m.label}</label>
-              <input type="number" inputMode="numeric" placeholder="0" value={form[m.key]} onChange={e => setForm(p=>({...p,[m.key]:e.target.value}))} style={{ fontSize:18, fontFamily:'var(--font-mono)', fontWeight:700, padding:'10px 14px' }} />
+              <label style={{ fontSize:14, color:m.color, fontWeight:600, display:'flex', alignItems:'center', gap:4 }}>{m.icon} {m.label}</label>
+              <input type="number" inputMode="numeric" placeholder="0" value={form[m.key]} onChange={e => setForm(p=>({...p,[m.key]:e.target.value}))} style={{ fontSize:24, fontFamily:'var(--font-mono)', fontWeight:700, padding:'10px 14px' }} />
             </div>
           ))}
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:10 }}>
-            <div><label style={{ fontSize:11, color:'var(--text-dim)' }}>👥 總客組</label><input type="number" inputMode="numeric" placeholder="0" value={form.customer_count} onChange={e => setForm(p=>({...p,customer_count:e.target.value}))} style={{ fontSize:16, fontFamily:'var(--font-mono)', fontWeight:700, padding:'8px' }} /></div>
-            <div><label style={{ fontSize:11, color:'var(--gold)' }}>👑 VIP組</label><input type="number" inputMode="numeric" placeholder="0" value={form.vip_groups} onChange={e => setForm(p=>({...p,vip_groups:e.target.value}))} style={{ fontSize:16, fontFamily:'var(--font-mono)', fontWeight:700, padding:'8px' }} /></div>
-            <div><label style={{ fontSize:11, color:'var(--text-dim)' }}>🚶 散客組</label><input type="number" inputMode="numeric" placeholder="0" value={form.walk_in_groups} onChange={e => setForm(p=>({...p,walk_in_groups:e.target.value}))} style={{ fontSize:16, fontFamily:'var(--font-mono)', fontWeight:700, padding:'8px' }} /></div>
+            <div><label style={{ fontSize:14, color:'var(--text-dim)' }}>👥 總客組</label><input type="number" inputMode="numeric" placeholder="0" value={form.customer_count} onChange={e => setForm(p=>({...p,customer_count:e.target.value}))} style={{ fontSize:17, fontFamily:'var(--font-mono)', fontWeight:700, padding:'8px' }} /></div>
+            <div><label style={{ fontSize:14, color:'var(--gold)' }}>👑 VIP組</label><input type="number" inputMode="numeric" placeholder="0" value={form.vip_groups} onChange={e => setForm(p=>({...p,vip_groups:e.target.value}))} style={{ fontSize:17, fontFamily:'var(--font-mono)', fontWeight:700, padding:'8px' }} /></div>
+            <div><label style={{ fontSize:14, color:'var(--text-dim)' }}>🚶 散客組</label><input type="number" inputMode="numeric" placeholder="0" value={form.walk_in_groups} onChange={e => setForm(p=>({...p,walk_in_groups:e.target.value}))} style={{ fontSize:17, fontFamily:'var(--font-mono)', fontWeight:700, padding:'8px' }} /></div>
           </div>
-          {(+form.customer_count||0) > 0 && <div style={{ fontSize:12, color:'var(--text-dim)', marginBottom:8 }}>客單價約 {"$"}{Math.round(getTotal()/(+form.customer_count)).toLocaleString()}</div>}
-          <input placeholder="備註 — VIP包廂、特殊消費等" value={form.note} onChange={e => setForm(p=>({...p,note:e.target.value}))} style={{ width:'100%', fontSize:13, padding:'10px 12px', marginBottom:12 }} />
+          {(+form.customer_count||0) > 0 && <div style={{ fontSize:14, color:'var(--text-dim)', marginBottom:8 }}>客單價約 {"$"}{Math.round(getTotal()/(+form.customer_count)).toLocaleString()}</div>}
+          <input placeholder="備註 — VIP包廂、特殊消費等" value={form.note} onChange={e => setForm(p=>({...p,note:e.target.value}))} style={{ width:'100%', fontSize:14, padding:'10px 12px', marginBottom:12 }} />
           <button onClick={saveRevenue} disabled={submitting} className="btn-gold" style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
             <Send size={16} /> {existing ? '更新營收' : '登記營收'}
           </button>
@@ -179,25 +179,25 @@ export default function StaffRevenue() {
       {tab === 'cash' && (
         <div>
           <div className="card" style={{ marginBottom:12, padding:14 }}>
-            <div style={{ fontSize:13, fontWeight:600, color:'var(--gold)', marginBottom:8 }}>輸入每種面額的張/枚數</div>
+            <div style={{ fontSize:14, fontWeight:600, color:'var(--gold)', marginBottom:8 }}>輸入每種面額的張/枚數</div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
               {DENOMS.map(d => (
                 <div key={d.v} style={{ display:'flex', alignItems:'center', gap:4, background:'var(--black)', border:'1px solid var(--border)', borderRadius:8, padding:'6px 8px' }}>
-                  <span style={{ fontSize:12, fontWeight:700, color:d.color, minWidth:48 }}>{d.label}</span>
+                  <span style={{ fontSize:14, fontWeight:700, color:d.color, minWidth:48 }}>{d.label}</span>
                   <span style={{ color:'var(--text-dim)', fontSize:11 }}>x</span>
-                  <input type="number" inputMode="numeric" placeholder="0" value={denoms['d'+d.v]||''} onChange={e => setDenoms(p=>({...p,['d'+d.v]:e.target.value}))} style={{ flex:1, fontSize:15, fontFamily:'var(--font-mono)', fontWeight:700, padding:'5px 6px', minHeight:36, textAlign:'center' }} />
-                  <span style={{ fontSize:10, color:'var(--text-dim)', minWidth:48, textAlign:'right', fontFamily:'var(--font-mono)' }}>{"="}{((+(denoms['d'+d.v]||0))*d.v).toLocaleString()}</span>
+                  <input type="number" inputMode="numeric" placeholder="0" value={denoms['d'+d.v]||''} onChange={e => setDenoms(p=>({...p,['d'+d.v]:e.target.value}))} style={{ flex:1, fontSize:17, fontFamily:'var(--font-mono)', fontWeight:700, padding:'5px 6px', minHeight:36, textAlign:'center' }} />
+                  <span style={{ fontSize:14, color:'var(--text-dim)', minWidth:48, textAlign:'right', fontFamily:'var(--font-mono)' }}>{"="}{((+(denoms['d'+d.v]||0))*d.v).toLocaleString()}</span>
                 </div>
               ))}
             </div>
             <div style={{ borderTop:'1px solid var(--border-gold)', marginTop:10, paddingTop:10, display:'flex', justifyContent:'space-between' }}>
               <span style={{ fontSize:14, fontWeight:700, color:'var(--gold)' }}>盤點總計</span>
-              <span style={{ fontSize:20, fontFamily:'var(--font-mono)', fontWeight:700, color:'var(--gold)' }}>{"$"}{getCounted().toLocaleString()}</span>
+              <span style={{ fontSize:24, fontFamily:'var(--font-mono)', fontWeight:700, color:'var(--gold)' }}>{"$"}{getCounted().toLocaleString()}</span>
             </div>
           </div>
           <div className="card" style={{ padding:12, marginBottom:12 }}>
-            <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, marginBottom:4 }}><span style={{ color:'var(--text-dim)' }}>開店備用金</span><span style={{ fontFamily:'var(--font-mono)', fontWeight:600 }}>{"$"}{DRAWER_BASE.toLocaleString()}</span></div>
-            <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, marginBottom:4 }}><span style={{ color:'var(--text-dim)' }}>+ 今日現金</span><span style={{ fontFamily:'var(--font-mono)', fontWeight:600, color:'var(--green)' }}>{"$"}{(+form.cash_amount||0).toLocaleString()}</span></div>
+            <div style={{ display:'flex', justifyContent:'space-between', fontSize:14, marginBottom:4 }}><span style={{ color:'var(--text-dim)' }}>開店備用金</span><span style={{ fontFamily:'var(--font-mono)', fontWeight:600 }}>{"$"}{DRAWER_BASE.toLocaleString()}</span></div>
+            <div style={{ display:'flex', justifyContent:'space-between', fontSize:14, marginBottom:4 }}><span style={{ color:'var(--text-dim)' }}>+ 今日現金</span><span style={{ fontFamily:'var(--font-mono)', fontWeight:600, color:'var(--green)' }}>{"$"}{(+form.cash_amount||0).toLocaleString()}</span></div>
             <div style={{ borderTop:'1px solid var(--border)', paddingTop:6, display:'flex', justifyContent:'space-between', fontWeight:700 }}><span>= 應有</span><span style={{ fontFamily:'var(--font-mono)', color:'var(--gold)' }}>{"$"}{getCashExpected().toLocaleString()}</span></div>
           </div>
           {getCounted() > 0 && (() => { const diff = getCounted() - getCashExpected(); return (
@@ -216,32 +216,32 @@ export default function StaffRevenue() {
       {tab === 'room' && (
         <div>
           <div className="card" style={{ padding:14, marginBottom:12 }}>
-            <div style={{ fontSize:13, fontWeight:600, color:'var(--gold)', marginBottom:10 }}>新增包廂紀錄</div>
+            <div style={{ fontSize:14, fontWeight:600, color:'var(--gold)', marginBottom:10 }}>新增包廂紀錄</div>
             <select value={roomForm.room_name} onChange={e => setRoomForm(p=>({...p,room_name:e.target.value}))} style={{ marginBottom:8 }}>
               <option value="">選擇包廂</option>
               {ROOMS.map(r => <option key={r}>{r}</option>)}
             </select>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
-              <div><label style={{ fontSize:11, color:'var(--text-dim)' }}>開始</label><input type="time" value={roomForm.start_time} onChange={e => setRoomForm(p=>({...p,start_time:e.target.value}))} /></div>
-              <div><label style={{ fontSize:11, color:'var(--text-dim)' }}>結束</label><input type="time" value={roomForm.end_time} onChange={e => setRoomForm(p=>({...p,end_time:e.target.value}))} /></div>
+              <div><label style={{ fontSize:14, color:'var(--text-dim)' }}>開始</label><input type="time" value={roomForm.start_time} onChange={e => setRoomForm(p=>({...p,start_time:e.target.value}))} /></div>
+              <div><label style={{ fontSize:14, color:'var(--text-dim)' }}>結束</label><input type="time" value={roomForm.end_time} onChange={e => setRoomForm(p=>({...p,end_time:e.target.value}))} /></div>
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
-              <div><label style={{ fontSize:11, color:'var(--text-dim)' }}>人數</label><input type="number" inputMode="numeric" placeholder="0" value={roomForm.guest_count} onChange={e => setRoomForm(p=>({...p,guest_count:e.target.value}))} /></div>
-              <div><label style={{ fontSize:11, color:'var(--text-dim)' }}>消費金額</label><input type="number" inputMode="numeric" placeholder="0" value={roomForm.amount} onChange={e => setRoomForm(p=>({...p,amount:e.target.value}))} style={{ fontFamily:'var(--font-mono)' }} /></div>
+              <div><label style={{ fontSize:14, color:'var(--text-dim)' }}>人數</label><input type="number" inputMode="numeric" placeholder="0" value={roomForm.guest_count} onChange={e => setRoomForm(p=>({...p,guest_count:e.target.value}))} /></div>
+              <div><label style={{ fontSize:14, color:'var(--text-dim)' }}>消費金額</label><input type="number" inputMode="numeric" placeholder="0" value={roomForm.amount} onChange={e => setRoomForm(p=>({...p,amount:e.target.value}))} style={{ fontFamily:'var(--font-mono)' }} /></div>
             </div>
             <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
               <input type="checkbox" checked={roomForm.is_vip} onChange={e => setRoomForm(p=>({...p,is_vip:e.target.checked}))} style={{ width:20, height:20, accentColor:'var(--gold)' }} />
-              <span style={{ fontSize:12, color:'var(--gold)' }}>VIP客人</span>
-              {roomForm.is_vip && <input placeholder="VIP姓名" value={roomForm.vip_name} onChange={e => setRoomForm(p=>({...p,vip_name:e.target.value}))} style={{ flex:1, fontSize:12, padding:'6px 8px' }} />}
+              <span style={{ fontSize:14, color:'var(--gold)' }}>VIP客人</span>
+              {roomForm.is_vip && <input placeholder="VIP姓名" value={roomForm.vip_name} onChange={e => setRoomForm(p=>({...p,vip_name:e.target.value}))} style={{ flex:1, fontSize:14, padding:'6px 8px' }} />}
             </div>
             <button onClick={addRoom} className="btn-gold" style={{ width:'100%' }}><Plus size={14} /> 新增</button>
           </div>
-          {rooms.length > 0 && <div style={{ fontSize:13, color:'var(--text-dim)', marginBottom:6 }}>今日 {rooms.length} 筆</div>}
+          {rooms.length > 0 && <div style={{ fontSize:14, color:'var(--text-dim)', marginBottom:6 }}>今日 {rooms.length} 筆</div>}
           {rooms.map(r => (
             <div key={r.id} className="card" style={{ padding:10, marginBottom:6, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
               <div>
-                <div style={{ fontSize:13, fontWeight:600 }}>{r.room_name} {r.is_vip && <span style={{ fontSize:10, color:'var(--gold)' }}>👑 {r.vip_name}</span>}</div>
-                <div style={{ fontSize:11, color:'var(--text-dim)' }}>{r.start_time}-{r.end_time} · {r.guest_count}人</div>
+                <div style={{ fontSize:14, fontWeight:600 }}>{r.room_name} {r.is_vip && <span style={{ fontSize:14, color:'var(--gold)' }}>👑 {r.vip_name}</span>}</div>
+                <div style={{ fontSize:14, color:'var(--text-dim)' }}>{r.start_time}-{r.end_time} · {r.guest_count}人</div>
               </div>
               <span style={{ fontFamily:'var(--font-mono)', fontWeight:700, color:'var(--gold)' }}>{"$"}{(+r.amount).toLocaleString()}</span>
             </div>
@@ -252,40 +252,40 @@ export default function StaffRevenue() {
       {tab === 'tips' && (
         <div>
           <div className="card" style={{ padding:14, marginBottom:12 }}>
-            <div style={{ fontSize:13, fontWeight:600, color:'var(--gold)', marginBottom:10 }}>登記小費</div>
+            <div style={{ fontSize:14, fontWeight:600, color:'var(--gold)', marginBottom:10 }}>登記小費</div>
             <select value={tipForm.employee_id} onChange={e => setTipForm(p=>({...p,employee_id:e.target.value}))} style={{ marginBottom:8 }}>
               <option value="">選擇員工</option>
               {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
             </select>
-            <input type="number" inputMode="numeric" placeholder="小費金額" value={tipForm.amount} onChange={e => setTipForm(p=>({...p,amount:e.target.value}))} style={{ marginBottom:8, fontSize:16, fontFamily:'var(--font-mono)', fontWeight:700 }} />
+            <input type="number" inputMode="numeric" placeholder="小費金額" value={tipForm.amount} onChange={e => setTipForm(p=>({...p,amount:e.target.value}))} style={{ marginBottom:8, fontSize:17, fontFamily:'var(--font-mono)', fontWeight:700 }} />
             <button onClick={addTip} className="btn-gold" style={{ width:'100%' }}><Plus size={14} /> 登記小費</button>
           </div>
-          {tips.length > 0 && <div style={{ fontSize:13, color:'var(--text-dim)', marginBottom:6 }}>今日小費 {"$"}{tips.reduce((s,t)=>s+(+t.amount||0),0).toLocaleString()}</div>}
+          {tips.length > 0 && <div style={{ fontSize:14, color:'var(--text-dim)', marginBottom:6 }}>今日小費 {"$"}{tips.reduce((s,t)=>s+(+t.amount||0),0).toLocaleString()}</div>}
           {tips.map(t => (
             <div key={t.id} className="card" style={{ padding:10, marginBottom:6, display:'flex', justifyContent:'space-between' }}>
-              <span style={{ fontSize:13 }}>{employees.find(e=>e.id===t.employee_id)?.name||t.employee_id}</span>
+              <span style={{ fontSize:14 }}>{employees.find(e=>e.id===t.employee_id)?.name||t.employee_id}</span>
               <span style={{ fontFamily:'var(--font-mono)', fontWeight:700, color:'var(--green)' }}>{"$"}{(+t.amount).toLocaleString()}</span>
             </div>
           ))}
 
           <div className="card" style={{ padding:14, marginTop:16 }}>
-            <div style={{ fontSize:13, fontWeight:600, color:'#f59e0b', marginBottom:10 }}>掛帳登記</div>
+            <div style={{ fontSize:14, fontWeight:600, color:'#f59e0b', marginBottom:10 }}>掛帳登記</div>
             <input placeholder="客人姓名" value={creditForm.customer_name} onChange={e => setCreditForm(p=>({...p,customer_name:e.target.value}))} style={{ marginBottom:8 }} />
-            <input type="number" inputMode="numeric" placeholder="掛帳金額" value={creditForm.amount} onChange={e => setCreditForm(p=>({...p,amount:e.target.value}))} style={{ marginBottom:8, fontSize:16, fontFamily:'var(--font-mono)', fontWeight:700 }} />
+            <input type="number" inputMode="numeric" placeholder="掛帳金額" value={creditForm.amount} onChange={e => setCreditForm(p=>({...p,amount:e.target.value}))} style={{ marginBottom:8, fontSize:17, fontFamily:'var(--font-mono)', fontWeight:700 }} />
             <input placeholder="原因（選填）" value={creditForm.reason} onChange={e => setCreditForm(p=>({...p,reason:e.target.value}))} style={{ marginBottom:8 }} />
             <button onClick={addCredit} className="btn-outline" style={{ width:'100%', borderColor:'rgba(245,158,11,.4)', color:'#f59e0b' }}><Plus size={14} /> 登記掛帳</button>
           </div>
           {credits.length > 0 && (
             <div style={{ marginTop:12 }}>
-              <div style={{ fontSize:13, color:'#f59e0b', fontWeight:600, marginBottom:6 }}>未結掛帳 ({credits.length}筆)</div>
+              <div style={{ fontSize:14, color:'#f59e0b', fontWeight:600, marginBottom:6 }}>未結掛帳 ({credits.length}筆)</div>
               {credits.map(c => (
                 <div key={c.id} className="card" style={{ padding:10, marginBottom:6 }}>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                    <div><span style={{ fontSize:13, fontWeight:600 }}>{c.customer_name}</span><span style={{ fontSize:11, color:'var(--text-dim)', marginLeft:6 }}>{c.date}</span></div>
+                    <div><span style={{ fontSize:14, fontWeight:600 }}>{c.customer_name}</span><span style={{ fontSize:14, color:'var(--text-dim)', marginLeft:6 }}>{c.date}</span></div>
                     <span style={{ fontFamily:'var(--font-mono)', fontWeight:700, color:'#f59e0b' }}>{"$"}{(+c.amount).toLocaleString()}</span>
                   </div>
-                  {c.reason && <div style={{ fontSize:11, color:'var(--text-dim)' }}>{c.reason}</div>}
-                  <button onClick={()=>settleCredit(c.id)} style={{ marginTop:6, background:'rgba(77,168,108,.12)', color:'var(--green)', border:'1px solid rgba(77,168,108,.3)', borderRadius:8, padding:'4px 12px', fontSize:11, cursor:'pointer' }}>結清</button>
+                  {c.reason && <div style={{ fontSize:14, color:'var(--text-dim)' }}>{c.reason}</div>}
+                  <button onClick={()=>settleCredit(c.id)} style={{ marginTop:6, background:'rgba(77,168,108,.12)', color:'var(--green)', border:'1px solid rgba(77,168,108,.3)', borderRadius:8, padding:'4px 12px', fontSize:14, cursor:'pointer' }}>結清</button>
                 </div>
               ))}
             </div>
@@ -295,26 +295,26 @@ export default function StaffRevenue() {
 
       {tab === 'close' && (
         <div>
-          {closing && <div style={{ background:'rgba(77,168,108,.1)', border:'1px solid rgba(77,168,108,.3)', borderRadius:8, padding:'10px 14px', marginBottom:12, fontSize:13, color:'var(--green)' }}>✅ 今日已完成日結（by {closing.closed_by}）</div>}
+          {closing && <div style={{ background:'rgba(77,168,108,.1)', border:'1px solid rgba(77,168,108,.3)', borderRadius:8, padding:'10px 14px', marginBottom:12, fontSize:14, color:'var(--green)' }}>✅ 今日已完成日結（by {closing.closed_by}）</div>}
           <div className="card" style={{ padding:14, marginBottom:12 }}>
-            <div style={{ fontSize:13, fontWeight:600, color:'var(--gold)', marginBottom:10 }}>🌡️ 雪茄房溫濕度確認</div>
+            <div style={{ fontSize:14, fontWeight:600, color:'var(--gold)', marginBottom:10 }}>🌡️ 雪茄房溫濕度確認</div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
               <div>
-                <label style={{ fontSize:11, color:'var(--text-dim)' }}>溫度 (°C)</label>
-                <input type="number" inputMode="numeric" placeholder="16-20" value={cigarTemp} onChange={e => setCigarTemp(e.target.value)} style={{ fontSize:20, fontFamily:'var(--font-mono)', fontWeight:700, textAlign:'center', padding:'10px' }} />
-                {cigarTemp && <div style={{ fontSize:11, textAlign:'center', marginTop:4, color:(+cigarTemp>=16&&+cigarTemp<=20)?'var(--green)':'var(--red)' }}>{(+cigarTemp>=16&&+cigarTemp<=20)?'✅ 正常':'❌ 異常 (16-20°C)'}</div>}
+                <label style={{ fontSize:14, color:'var(--text-dim)' }}>溫度 (°C)</label>
+                <input type="number" inputMode="numeric" placeholder="16-20" value={cigarTemp} onChange={e => setCigarTemp(e.target.value)} style={{ fontSize:24, fontFamily:'var(--font-mono)', fontWeight:700, textAlign:'center', padding:'10px' }} />
+                {cigarTemp && <div style={{ fontSize:14, textAlign:'center', marginTop:4, color:(+cigarTemp>=16&&+cigarTemp<=20)?'var(--green)':'var(--red)' }}>{(+cigarTemp>=16&&+cigarTemp<=20)?'✅ 正常':'❌ 異常 (16-20°C)'}</div>}
               </div>
               <div>
-                <label style={{ fontSize:11, color:'var(--text-dim)' }}>濕度 (%)</label>
-                <input type="number" inputMode="numeric" placeholder="62-72" value={cigarHumidity} onChange={e => setCigarHumidity(e.target.value)} style={{ fontSize:20, fontFamily:'var(--font-mono)', fontWeight:700, textAlign:'center', padding:'10px' }} />
-                {cigarHumidity && <div style={{ fontSize:11, textAlign:'center', marginTop:4, color:(+cigarHumidity>=62&&+cigarHumidity<=72)?'var(--green)':'var(--red)' }}>{(+cigarHumidity>=62&&+cigarHumidity<=72)?'✅ 正常':'❌ 異常 (62-72%)'}</div>}
+                <label style={{ fontSize:14, color:'var(--text-dim)' }}>濕度 (%)</label>
+                <input type="number" inputMode="numeric" placeholder="62-72" value={cigarHumidity} onChange={e => setCigarHumidity(e.target.value)} style={{ fontSize:24, fontFamily:'var(--font-mono)', fontWeight:700, textAlign:'center', padding:'10px' }} />
+                {cigarHumidity && <div style={{ fontSize:14, textAlign:'center', marginTop:4, color:(+cigarHumidity>=62&&+cigarHumidity<=72)?'var(--green)':'var(--red)' }}>{(+cigarHumidity>=62&&+cigarHumidity<=72)?'✅ 正常':'❌ 異常 (62-72%)'}</div>}
               </div>
             </div>
           </div>
 
           <div className="card" style={{ padding:14, marginBottom:12 }}>
-            <div style={{ fontSize:13, fontWeight:600, color:'var(--gold)', marginBottom:10 }}>📋 日結摘要</div>
-            <div style={{ fontSize:13, lineHeight:2 }}>
+            <div style={{ fontSize:14, fontWeight:600, color:'var(--gold)', marginBottom:10 }}>📋 日結摘要</div>
+            <div style={{ fontSize:14, lineHeight:2 }}>
               <div style={{ display:'flex', justifyContent:'space-between' }}><span>💰 今日營收</span><span style={{ fontFamily:'var(--font-mono)', fontWeight:700, color:'var(--gold)' }}>{"$"}{getTotal().toLocaleString()}</span></div>
               <div style={{ display:'flex', justifyContent:'space-between' }}><span>🏧 現金盤點</span><span style={{ fontFamily:'var(--font-mono)', fontWeight:700, color:getCounted()===getCashExpected()?'var(--green)':getCounted()>0?'var(--red)':'var(--text-dim)' }}>{getCounted()>0 ? '$'+getCounted().toLocaleString()+' ('+(getCounted()-getCashExpected()>=0?'+':'')+( getCounted()-getCashExpected()).toLocaleString()+')' : '未盤點'}</span></div>
               <div style={{ display:'flex', justifyContent:'space-between' }}><span>🚪 包廂使用</span><span style={{ fontFamily:'var(--font-mono)', fontWeight:600 }}>{rooms.length} 間</span></div>

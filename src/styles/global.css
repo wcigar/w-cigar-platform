@@ -89,3 +89,40 @@ td{padding:10px 12px;border-bottom:1px solid var(--border)}
     min-height: 52px !important;
   }
 }
+
+
+/* ===== Global Font Size Boost ===== */
+body { font-size: 15px; }
+input, select, textarea { font-size: 15px !important; }
+.btn-gold, .btn-outline, .btn-red { font-size: 15px; }
+.section-title { font-size: 22px; }
+.badge { font-size: 13px; }
+table { font-size: 14px; }
+th, td { padding: 12px; }
+label { font-size: 13px !important; }
+
+/* Desktop boost */
+@media (min-width: 1025px) {
+  body { font-size: 16px; }
+  input, select, textarea { font-size: 16px !important; padding: 12px 16px !important; }
+  .btn-gold, .btn-outline, .btn-red { font-size: 16px; padding: 14px 24px; }
+  .section-title { font-size: 24px; }
+  label { font-size: 14px !important; }
+  table { font-size: 15px; }
+}
+
+/* iPad */
+@media (min-width: 768px) and (max-width: 1024px) {
+  body { font-size: 16px; }
+  input, select, textarea { font-size: 16px !important; min-height: 48px; }
+  .btn-gold, .btn-outline, .btn-red { font-size: 16px; min-height: 48px; }
+  label { font-size: 14px !important; }
+}
+
+/* Phone */
+@media (max-width: 767px) {
+  body { font-size: 15px; }
+  input, select, textarea { font-size: 16px !important; min-height: 48px; }
+  .btn-gold, .btn-outline, .btn-red { font-size: 15px; min-height: 48px; }
+  label { font-size: 13px !important; }
+}
