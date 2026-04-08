@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useNavigate } from 'react-router-dom'
-import { Briefcase, Users, DollarSign, Settings, AlertTriangle, Trophy, Clock, Package, FileText, CheckCircle2, XCircle } from 'lucide-react'
+import { Briefcase, Users, DollarSign, Settings, AlertTriangle, Trophy, Clock, Package, FileText, CheckCircle2, XCircle, Flame } from 'lucide-react'
 import { format } from 'date-fns'
 import { zhTW } from 'date-fns/locale'
+import { getTaskUrgency } from '../../lib/taskUtils'
+import { getSlaStatus } from '../../lib/slaUtils'
 
 export default function BossHome() {
   const navigate = useNavigate()
@@ -12,6 +14,7 @@ export default function BossHome() {
   const [punches, setPunches] = useState([])
   const [leaderboard, setLeaderboard] = useState([])
   const [lowItems, setLowItems] = useState([])
+  const [dangers, setDangers] = useState([])
   const [loading, setLoading] = useState(true)
   const today = format(new Date(), 'yyyy-MM-dd')
   const month = format(new Date(), 'yyyy-MM')
@@ -20,17 +23,18 @@ export default function BossHome() {
 
   async function load() {
     setLoading(true)
-    const [eR, sR, tR, aR, lbR, leaveR, invR, punchR] = await Promise.all([
+    const [eR, sR, tR, aR, lbR, leaveR, invR, punchR, abnR] = await Promise.all([
       supabase.from('employees').select('*').eq('is_active', true),
       supabase.from('schedules').select('*, employees(name)').eq('date', today),
-      supabase.from('task_status').select('completed').eq('date', today),
+      supabase.from('task_status').select('*').eq('date', today),
       supabase.from('abnormal_reports').select('id', { count: 'exact' }).eq('status', '待處理'),
       supabase.from('task_status').select('completed_by').eq('owner', 'ALL').eq('completed', true).gte('date', month + '-01').lte('date', month + '-31'),
       supabase.from('leave_requests').select('id', { count: 'exact' }).eq('status', 'pending'),
       supabase.from('inventory_master').select('id, name, current_stock, safe_stock, unit, category').eq('is_low', true).eq('enabled', true),
       supabase.from('punch_records').select('*').eq('date', today),
+      supabase.from('abnormal_reports').select('*').neq('status', '已解決').order('time', { ascending: false }).limit(10),
     ])
-    const tasks = tR.data || [], sc = sR.data || [], emps = eR.data || [], low = invR.data || []
+    const tasks = tR.data || [], sc = sR.data || [], emps = eR.data || [], low = invR.data || [], abns = abnR.data || []
     setStats({
       emps: emps.length,
       working: sc.filter(s => s.shift_type !== '休假' && s.shift_type !== '臨時請假').length,
@@ -42,6 +46,41 @@ export default function BossHome() {
     setScheds(sc)
     setLowItems(low)
     setPunches(punchR.data || [])
+
+    // Build danger list
+    const dangerList = []
+
+    // 1. SLA overdue abnormals (highest priority)
+    abns.forEach(a => {
+      const sla = getSlaStatus(a)
+      if (sla.status === 'overdue') dangerList.push({ type: 'abnormal', severity: 100, icon: '🚨', label: a.description?.slice(0, 20) || '異常報告', detail: sla.remaining, color: 'var(--red)', action: '/operations' })
+      else if (sla.status === 'warning') dangerList.push({ type: 'abnormal', severity: 80, icon: '⚠️', label: a.description?.slice(0, 20) || '異常報告', detail: sla.remaining, color: '#f59e0b', action: '/operations' })
+    })
+
+    // 2. Overdue SOP tasks
+    tasks.forEach(t => {
+      const urg = getTaskUrgency(t)
+      if (urg === 'overdue') dangerList.push({ type: 'sop', severity: 90, icon: '🔴', label: t.title?.slice(0, 20), detail: t.due_time + ' 已逾時', color: 'var(--red)', action: '/operations' })
+      else if (urg === 'warning') dangerList.push({ type: 'sop', severity: 70, icon: '🟡', label: t.title?.slice(0, 20), detail: t.due_time + ' 即將到期', color: '#f59e0b', action: '/operations' })
+    })
+
+    // 3. Lowest stock items (sort by how far below safe stock)
+    low.sort((a, b) => {
+      const aRatio = (a.current_stock || 0) / (a.safe_stock || 1)
+      const bRatio = (b.current_stock || 0) / (b.safe_stock || 1)
+      return aRatio - bRatio
+    }).slice(0, 5).forEach(item => {
+      const ratio = (item.current_stock || 0) / (item.safe_stock || 1)
+      dangerList.push({
+        type: 'stock', severity: ratio === 0 ? 60 : 40, icon: '📦',
+        label: item.name, detail: (item.current_stock ?? 0) + '/' + item.safe_stock + item.unit,
+        color: ratio === 0 ? 'var(--red)' : '#f59e0b', action: '/operations'
+      })
+    })
+
+    dangerList.sort((a, b) => b.severity - a.severity)
+    setDangers(dangerList.slice(0, 5))
+
     const counts = {}
     ;(lbR.data || []).forEach(r => { if (r.completed_by) counts[r.completed_by] = (counts[r.completed_by] || 0) + 1 })
     setLeaderboard(Object.entries(counts).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count))
@@ -49,17 +88,16 @@ export default function BossHome() {
   }
 
   const cards = [
-    { icon: Briefcase, label: '營運管理', sub: `SOP ${stats.sop}%・異常 ${stats.abnPending}`, path: '/operations', color: 'var(--gold)' },
-    { icon: Users, label: '人事排班', sub: `今日 ${stats.working} 人・假單 ${stats.leavePending}`, path: '/hr', color: '#4da86c' },
+    { icon: Briefcase, label: '營運管理', sub: 'SOP ' + stats.sop + '%・異常 ' + stats.abnPending, path: '/operations', color: 'var(--gold)' },
+    { icon: Users, label: '人事排班', sub: '今日 ' + stats.working + ' 人・假單 ' + stats.leavePending, path: '/hr', color: '#4da86c' },
     { icon: DollarSign, label: '薪資財務', sub: '薪資・支出・勞健保', path: '/payroll', color: '#4d8ac4' },
     { icon: Settings, label: '系統設定', sub: '員工・SOP定義・KPI考核', path: '/settings', color: '#c44d4d' },
   ]
 
-  // Punch status logic
-  function getPunchStatus(empId, shift) {
+  function getPunchStatus(empId) {
     const punch = punches.find(p => p.employee_id === empId)
     if (!punch) return { status: 'none', label: '未打卡', color: 'var(--text-muted)' }
-    if (punch.is_late) return { status: 'late', label: `遲到 ${punch.clock_in?.slice(11,16) || ''}`, color: 'var(--red)' }
+    if (punch.is_late) return { status: 'late', label: '遲到 ' + (punch.clock_in?.slice(11,16) || ''), color: 'var(--red)' }
     return { status: 'ok', label: punch.clock_in?.slice(11,16) || '已打卡', color: 'var(--green)' }
   }
 
@@ -72,7 +110,7 @@ export default function BossHome() {
         <p style={{ color: 'var(--text-dim)', fontSize: 13, marginTop: 4 }}>{format(new Date(), 'yyyy年M月d日 EEEE', { locale: zhTW })}</p>
       </div>
 
-      {/* Quick stats - 6 cards */}
+      {/* Quick stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 16 }}>
         <SB label="在職" value={stats.emps} color="var(--gold)" />
         <SB label="今日出勤" value={stats.working} color="var(--green)" />
@@ -82,46 +120,50 @@ export default function BossHome() {
         <SB label="低庫存" value={stats.lowStock} color={stats.lowStock > 0 ? 'var(--red)' : 'var(--green)'} tap={() => navigate('/operations')} />
       </div>
 
-      {/* ⚠️ Alerts section */}
-      {(stats.lowStock > 0 || stats.abnPending > 0 || stats.leavePending > 0) && (
+      {/* 🔥 Today's Top 5 Dangers */}
+      {dangers.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--red)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Flame size={16} /> 今日最危險 {dangers.length} 項
+          </div>
+          {dangers.map((d, i) => (
+            <div key={i} className="card" onClick={() => navigate(d.action)} style={{
+              padding: 12, marginBottom: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10,
+              borderColor: d.severity >= 80 ? 'rgba(196,77,77,.4)' : 'rgba(245,158,11,.3)',
+              background: d.severity >= 80 ? 'rgba(196,77,77,.04)' : 'rgba(245,158,11,.03)',
+            }}>
+              <div style={{ fontSize: 20, width: 28, textAlign: 'center', flexShrink: 0 }}>{d.icon}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.label}</div>
+                <div style={{ fontSize: 11, color: d.color, fontWeight: 700 }}>{d.detail}</div>
+              </div>
+              <div style={{
+                fontSize: 9, fontWeight: 700, padding: '3px 8px', borderRadius: 10, flexShrink: 0,
+                background: d.type === 'abnormal' ? 'rgba(196,77,77,.15)' : d.type === 'sop' ? 'rgba(245,158,11,.15)' : 'rgba(196,77,77,.1)',
+                color: d.color,
+              }}>{d.type === 'abnormal' ? '異常' : d.type === 'sop' ? 'SOP' : '庫存'}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Alert cards */}
+      {(stats.lowStock > 0 || stats.abnPending > 0 || stats.leavePending > 0) && dangers.length === 0 && (
         <div style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--red)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
             <AlertTriangle size={14} /> 需要注意
           </div>
-
           {stats.leavePending > 0 && (
             <div className="card" onClick={() => navigate('/hr')} style={{ padding: 12, marginBottom: 6, cursor: 'pointer', borderColor: 'rgba(196,77,77,.3)', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <FileText size={16} color="var(--red)" />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>待審假單 {stats.leavePending} 筆</div>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>點擊前往審核</div>
-              </div>
-              <span style={{ color: 'var(--text-muted)', fontSize: 16 }}>›</span>
+              <FileText size={16} color="var(--red)" /><div style={{ flex: 1 }}><div style={{ fontSize: 13, fontWeight: 600 }}>待審假單 {stats.leavePending} 筆</div></div><span style={{ color: 'var(--text-muted)', fontSize: 16 }}>›</span>
             </div>
           )}
-
-          {stats.abnPending > 0 && (
-            <div className="card" onClick={() => navigate('/operations')} style={{ padding: 12, marginBottom: 6, cursor: 'pointer', borderColor: 'rgba(196,77,77,.3)', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <AlertTriangle size={16} color="var(--red)" />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>異常待處理 {stats.abnPending} 筆</div>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>點擊前往處理</div>
-              </div>
-              <span style={{ color: 'var(--text-muted)', fontSize: 16 }}>›</span>
-            </div>
-          )}
-
           {stats.lowStock > 0 && (
             <div className="card" onClick={() => navigate('/operations')} style={{ padding: 12, marginBottom: 6, cursor: 'pointer', borderColor: 'rgba(196,77,77,.3)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                <Package size={16} color="var(--red)" />
-                <div style={{ fontSize: 13, fontWeight: 600 }}>低庫存警報 {stats.lowStock} 項</div>
-              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}><Package size={16} color="var(--red)" /><div style={{ fontSize: 13, fontWeight: 600 }}>低庫存警報 {stats.lowStock} 項</div></div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                 {lowItems.slice(0, 8).map(item => (
-                  <span key={item.id} style={{ fontSize: 10, padding: '3px 8px', borderRadius: 10, background: 'rgba(196,77,77,.12)', color: 'var(--red)', fontWeight: 600 }}>
-                    {item.name} ({item.current_stock ?? 0}/{item.safe_stock}{item.unit})
-                  </span>
+                  <span key={item.id} style={{ fontSize: 10, padding: '3px 8px', borderRadius: 10, background: 'rgba(196,77,77,.12)', color: 'var(--red)', fontWeight: 600 }}>{item.name} ({item.current_stock ?? 0}/{item.safe_stock}{item.unit})</span>
                 ))}
                 {lowItems.length > 8 && <span style={{ fontSize: 10, color: 'var(--text-dim)', padding: '3px 8px' }}>+{lowItems.length - 8} 項</span>}
               </div>
@@ -141,20 +183,15 @@ export default function BossHome() {
         ))}
       </div>
 
-      {/* Today schedule + punch status */}
-      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--gold)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-        <Clock size={15} /> 今日出勤狀態
-      </div>
+      {/* Today schedule + punch */}
+      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--gold)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}><Clock size={15} /> 今日出勤狀態</div>
       {scheds.length === 0 && <div style={{ fontSize: 13, color: 'var(--text-dim)', textAlign: 'center', padding: 16 }}>今日無排班</div>}
       {scheds.map(s => {
         const isOff = s.shift_type === '休假' || s.shift_type === '臨時請假'
-        const ps = isOff ? null : getPunchStatus(s.employee_id, s.shift_type)
+        const ps = isOff ? null : getPunchStatus(s.employee_id)
         return (
           <div key={s.id} className="card" style={{ padding: 12, marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <span style={{ fontSize: 14, fontWeight: 500 }}>{s.employees?.name || s.employee_id}</span>
-              <span className={`badge ${isOff ? 'badge-blue' : 'badge-gold'}`} style={{ marginLeft: 8 }}>{s.shift_type}</span>
-            </div>
+            <div><span style={{ fontSize: 14, fontWeight: 500 }}>{s.employees?.name || s.employee_id}</span><span className={'badge ' + (isOff ? 'badge-blue' : 'badge-gold')} style={{ marginLeft: 8 }}>{s.shift_type}</span></div>
             {ps ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 {ps.status === 'ok' && <CheckCircle2 size={14} color={ps.color} />}
@@ -162,9 +199,7 @@ export default function BossHome() {
                 {ps.status === 'none' && <XCircle size={14} color={ps.color} />}
                 <span style={{ fontSize: 12, fontWeight: 600, color: ps.color }}>{ps.label}</span>
               </div>
-            ) : (
-              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>休假</span>
-            )}
+            ) : <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>休假</span>}
           </div>
         )
       })}
@@ -175,7 +210,7 @@ export default function BossHome() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}><Trophy size={16} color="var(--gold)" /><span style={{ fontSize: 14, fontWeight: 600 }}>{month.slice(5)}月搶單排行</span></div>
           {leaderboard.slice(0, 5).map((x, i) => (
             <div key={x.name} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: 13, borderBottom: '1px solid var(--border)' }}>
-              <span>{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`} {x.name}</span>
+              <span>{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i+1) + '.'} {x.name}</span>
               <strong style={{ color: 'var(--gold)' }}>{x.count} 單</strong>
             </div>
           ))}
