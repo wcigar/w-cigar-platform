@@ -43,7 +43,7 @@ function ScheduleContent() {
   }
 
   async function loadPunches() {
-    const { data } = await supabase.from('punch_records').select('*').eq('employee_id', user.employee_id).gte('date', punchMonth + '-01').lte('date', punchMonth + '-31').order('date', { ascending: false }).order('time', { ascending: false })
+    const { data } = await supabase.from('punch_records').select('*').eq('employee_id', user.employee_id).gte('date', punchMonth + '-01').lte('date', format(endOfMonth(new Date(punchMonth + '-01')), 'yyyy-MM-dd')).order('date', { ascending: false }).order('time', { ascending: false })
     setPunches(data || [])
   }
 

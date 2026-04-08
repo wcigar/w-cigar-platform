@@ -5,7 +5,7 @@ import NoticesMgmt from './NoticesMgmt'
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { CheckCircle2, Circle, Plus, AlertTriangle, Trophy, Clock } from 'lucide-react'
-import { format } from 'date-fns'
+import { format, endOfMonth } from 'date-fns'
 import { getTaskUrgency, URGENCY_COLORS } from '../../lib/taskUtils'
 import { getSlaStatus } from '../../lib/slaUtils'
 import CleaningMgmt from './CleaningMgmt'
@@ -34,7 +34,7 @@ export default function Operations() {
       supabase.from('task_status').select('*').eq('date', today).order('owner').order('task_id'),
       supabase.from('notices').select('*').order('created_at', { ascending: false }).limit(20),
       supabase.from('abnormal_reports').select('*').order('time', { ascending: false }).limit(20),
-      supabase.from('task_status').select('completed_by').eq('owner', 'ALL').eq('completed', true).gte('date', month + '-01').lte('date', month + '-31'),
+      supabase.from('task_status').select('completed_by').eq('owner', 'ALL').eq('completed', true).gte('date', month + '-01').lte('date', format(endOfMonth(new Date(month + '-01')), 'yyyy-MM-dd')),
     ])
     setTasks(tR.data || []); setNotices(nR.data || []); setAbnormals(aR.data || [])
     const counts = {}

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useNavigate } from 'react-router-dom'
 import { Briefcase, Users, DollarSign, Settings, AlertTriangle, Trophy, Clock, Package, FileText, CheckCircle2, XCircle, Flame } from 'lucide-react'
-import { format } from 'date-fns'
+import { format, endOfMonth } from 'date-fns'
 import { zhTW } from 'date-fns/locale'
 import { getTaskUrgency } from '../../lib/taskUtils'
 import { getSlaStatus } from '../../lib/slaUtils'
@@ -30,11 +30,11 @@ export default function BossHome() {
       supabase.from('schedules').select('*, employees(name)').eq('date', today),
       supabase.from('task_status').select('*').eq('date', today),
       supabase.from('abnormal_reports').select('id', { count: 'exact' }).eq('status', '待處理'),
-      supabase.from('task_status').select('completed_by').eq('owner', 'ALL').eq('completed', true).gte('date', month + '-01').lte('date', month + '-31'),
+      supabase.from('task_status').select('completed_by').eq('owner', 'ALL').eq('completed', true).gte('date', month + '-01').lte('date', format(endOfMonth(new Date(month + '-01')), 'yyyy-MM-dd')),
       supabase.from('leave_requests').select('id', { count: 'exact' }).eq('status', '待審核'),
       supabase.from('inventory_master').select('id, name, current_stock, safe_stock, unit, category').eq('is_low', true).eq('enabled', true),
       supabase.from('punch_records').select('*').eq('date', today),
-      supabase.from('daily_revenue').select('total').gte('date', month + '-01').lte('date', month + '-31'),
+      supabase.from('daily_revenue').select('total').gte('date', month + '-01').lte('date', format(endOfMonth(new Date(month + '-01')), 'yyyy-MM-dd')),
       supabase.from('shift_handover').select('id').eq('date', today).eq('acknowledged', false),
       supabase.from('abnormal_reports').select('*').neq('status', '已解決').order('time', { ascending: false }).limit(10),
     ])

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { Star, TrendingUp, Trophy, Target } from 'lucide-react'
-import { format, subMonths } from 'date-fns'
+import { format, subMonths, endOfMonth } from 'date-fns'
 
 export default function StaffKPI() {
   const { user } = useAuth()
@@ -20,8 +20,8 @@ export default function StaffKPI() {
     // 修復 #9: 用 Promise.all 一次查 3 個月
     const m3 = [0, 1, 2].map(i => format(subMonths(new Date(), i), 'yyyy-MM'))
     const queries = m3.flatMap(m => [
-      supabase.from('task_status').select('completed').eq('owner', user.employee_id).gte('date', m + '-01').lte('date', m + '-31'),
-      supabase.from('task_status').select('completed_by').eq('owner', 'ALL').eq('completed', true).gte('date', m + '-01').lte('date', m + '-31'),
+      supabase.from('task_status').select('completed').eq('owner', user.employee_id).gte('date', m + '-01').lte('date', format(endOfMonth(new Date(m + '-01')), 'yyyy-MM-dd')),
+      supabase.from('task_status').select('completed_by').eq('owner', 'ALL').eq('completed', true).gte('date', m + '-01').lte('date', format(endOfMonth(new Date(m + '-01')), 'yyyy-MM-dd')),
     ])
     const [kR, ...results] = await Promise.all([
       supabase.from('kpi_evaluations').select('*').eq('employee_id', user.employee_id).eq('month', month).maybeSingle(),

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { FileText, Printer, Star } from 'lucide-react'
-import { format, subMonths } from 'date-fns'
+import { format, subMonths, endOfMonth } from 'date-fns'
 
 export default function KPIReport() {
   const [month, setMonth] = useState(format(new Date(), 'yyyy-MM'))
@@ -15,7 +15,7 @@ export default function KPIReport() {
 
   async function load() {
     setLoading(true)
-    const start = month + '-01', end = month + '-31'
+    const start = month + '-01', end = format(endOfMonth(new Date(month + '-01')), 'yyyy-MM-dd')
     const [eR, tR, kR, pR, lR] = await Promise.all([
       supabase.from('employees').select('*').eq('enabled', true),
       supabase.from('task_status').select('*').gte('date', start).lte('date', end),

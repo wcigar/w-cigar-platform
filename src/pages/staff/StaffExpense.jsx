@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { compressImage } from '../../lib/imageUtils'
 import { DollarSign, Camera, Send, History, Wallet, Pen, RotateCcw } from 'lucide-react'
-import { format } from 'date-fns'
+import { format, endOfMonth } from 'date-fns'
 
 function SignaturePad({ title, onSave, onCancel }) {
   const canvasRef = useRef(null)
@@ -66,7 +66,7 @@ export default function StaffExpense() {
 
   async function load() {
     setLoading(true)
-    const s = month + '-01', e = month + '-31'
+    const s = month + '-01', e = format(endOfMonth(new Date(month + '-01')), 'yyyy-MM-dd')
     const [cR, vR, xR, pR] = await Promise.all([
       supabase.from('expense_categories').select('*').eq('enabled', true).order('sort_order'),
       supabase.from('expense_vendors').select('*').eq('enabled', true).order('name'),

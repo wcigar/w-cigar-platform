@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
 import { BarChart3, TrendingUp, Plus, Trash2, Image } from 'lucide-react'
-import { format, subMonths } from 'date-fns'
+import { format, subMonths, endOfMonth } from 'date-fns'
 
 const COLORS = ['#c9a84c','#4da86c','#4d8ac4','#c44d4d','#f59e0b','#8b5cf6','#ec4899','#14b8a6','#f97316','#6366f1','#84cc16','#a855f7']
 
@@ -48,7 +48,7 @@ export default function ExpenseDashboard() {
 
   async function load() {
     setLoading(true)
-    const s = month + '-01', e = month + '-31'
+    const s = month + '-01', e = format(endOfMonth(new Date(month + '-01')), 'yyyy-MM-dd')
     const sixAgo = format(subMonths(new Date(), 5), 'yyyy-MM-01')
     const [xR, aR, cR, vR] = await Promise.all([
       supabase.from('expenses').select('*').gte('date', s).lte('date', e).order('date', { ascending: false }),

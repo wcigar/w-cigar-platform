@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { Printer, FileText } from 'lucide-react'
-import { format, subMonths } from 'date-fns'
+import { format, subMonths, endOfMonth } from 'date-fns'
 import { calcLaborIns, calcHealthIns, calcLaborPension, calcLaborInsER, calcHealthInsER, findBracket, calcOvertimePay, LABOR_INS_BRACKETS, HEALTH_INS_BRACKETS, SHIFTS, LATE_GRACE_MIN, OT_GRACE_MIN } from '../../lib/constants'
 
 export default function PayrollExport() {
@@ -18,7 +18,7 @@ export default function PayrollExport() {
 
   async function load() {
     setLoading(true)
-    const s = month + '-01', e = month + '-31'
+    const s = month + '-01', e = format(endOfMonth(new Date(month + '-01')), 'yyyy-MM-dd')
     const [eR, sR, bR, scR, pR] = await Promise.all([
       supabase.from('employees').select('*').eq('enabled', true).order('name'),
       supabase.from('salary_config').select('*'),

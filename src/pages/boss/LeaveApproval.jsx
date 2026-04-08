@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { CheckCircle2, XCircle, AlertCircle, Calendar, Users } from 'lucide-react'
-import { format, subMonths } from 'date-fns'
+import { format, subMonths, endOfMonth } from 'date-fns'
 
 export default function LeaveApproval() {
   const [requests, setRequests] = useState([])
@@ -16,7 +16,7 @@ export default function LeaveApproval() {
 
   async function load() {
     setLoading(true)
-    const s = month + '-01', e = month + '-31'
+    const s = month + '-01', e = format(endOfMonth(new Date(month + '-01')), 'yyyy-MM-dd')
     const { data } = await supabase.from('leave_requests').select('*').gte('date', s).lte('date', e).order('created_at', { ascending: false })
     setRequests(data || [])
     setLoading(false)

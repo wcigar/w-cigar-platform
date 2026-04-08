@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { SHIFTS } from '../../lib/constants'
 import { Clock, CheckCircle2, Circle, AlertCircle, MapPin, AlertTriangle, Trophy } from 'lucide-react'
-import { format } from 'date-fns'
+import { format, endOfMonth } from 'date-fns'
 import { zhTW } from 'date-fns/locale'
 import AbnormalReport from '../../components/AbnormalReport'
 import { markNoticesRead } from '../../lib/noticeUtils'
@@ -31,7 +31,7 @@ export default function StaffHome() {
       supabase.from('task_status').select('*').eq('owner', user.employee_id).eq('date', today).order('task_id'),
       supabase.from('punch_records').select('*').eq('employee_id', user.employee_id).eq('date', today).order('time', { ascending: false }).limit(1).maybeSingle(),
       supabase.from('notices').select('*').eq('enabled', true).order('created_at', { ascending: false }).limit(3),
-      supabase.from('task_status').select('completed_by').eq('owner', 'ALL').eq('completed', true).gte('date', month + '-01').lte('date', month + '-31'),
+      supabase.from('task_status').select('completed_by').eq('owner', 'ALL').eq('completed', true).gte('date', month + '-01').lte('date', format(endOfMonth(new Date(month + '-01')), 'yyyy-MM-dd')),
     ])
     setShift(sRes.data); setTasks(tRes.data || []); setPunch(pRes.data); setNotices(nRes.data || [])
     const counts = {}

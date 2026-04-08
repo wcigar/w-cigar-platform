@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { Wallet, Users, ChevronDown, ChevronUp, Image } from 'lucide-react'
-import { format, subMonths } from 'date-fns'
+import { format, subMonths, endOfMonth } from 'date-fns'
 
 export default function PettyCash() {
   const [month, setMonth] = useState(format(new Date(), 'yyyy-MM'))
@@ -16,7 +16,7 @@ export default function PettyCash() {
 
   async function load() {
     setLoading(true)
-    const s = month + '-01', e = month + '-31'
+    const s = month + '-01', e = format(endOfMonth(new Date(month + '-01')), 'yyyy-MM-dd')
     const [pR, xR] = await Promise.all([
       supabase.from('petty_cash').select('*').gte('date', s).lte('date', e).order('date', { ascending: false }),
       supabase.from('expenses').select('*').gte('date', s).lte('date', e).order('date', { ascending: false }),

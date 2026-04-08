@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { ChevronLeft, ChevronRight, Clock } from 'lucide-react'
-import { format, subDays, addDays, subMonths } from 'date-fns'
+import { format, subDays, addDays, subMonths, endOfMonth } from 'date-fns'
 
 export default function PunchHistory() {
   const { user } = useAuth()
@@ -14,7 +14,7 @@ export default function PunchHistory() {
 
   async function load() {
     setLoading(true)
-    const s = month + '-01', e = month + '-31'
+    const s = month + '-01', e = format(endOfMonth(new Date(month + '-01')), 'yyyy-MM-dd')
     const { data } = await supabase.from('punch_records').select('*')
       .eq('employee_id', user.employee_id)
       .gte('date', s).lte('date', e)

@@ -17,7 +17,7 @@ export default function RevenueTracker() {
 
   async function load() {
     setLoading(true)
-    const s = month + '-01', e = month + '-31'
+    const s = month + '-01', e = format(endOfMonth(new Date(month + '-01')), 'yyyy-MM-dd')
     const [rR, xR] = await Promise.all([
       supabase.from('daily_revenue').select('*').gte('date', s).lte('date', e).order('date'),
       supabase.from('expenses').select('date, amount').gte('date', s).lte('date', e),
