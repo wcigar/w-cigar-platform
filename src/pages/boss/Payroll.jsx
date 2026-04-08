@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import PayrollContent from './PayrollContent'
 import PayrollExport from './PayrollExport'
+import PettyCash from './PettyCash'
 
 const PAYROLL_PIN = '1986'
 
@@ -32,9 +33,11 @@ export default function Payroll() {
     <div className="page-container fade-in">
       <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
         <button onClick={() => setView('main')} style={{ padding: '8px 16px', borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: 'pointer', background: view === 'main' ? 'var(--gold-glow)' : 'transparent', color: view === 'main' ? 'var(--gold)' : 'var(--text-dim)', border: view === 'main' ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>薪資計算</button>
+        <button onClick={() => setView('petty')} style={{ padding: '8px 16px', borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: 'pointer', background: view === 'petty' ? 'var(--gold-glow)' : 'transparent', color: view === 'petty' ? 'var(--gold)' : 'var(--text-dim)', border: view === 'petty' ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>零用金</button>
         <button onClick={() => setView('export')} style={{ padding: '8px 16px', borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: 'pointer', background: view === 'export' ? 'var(--gold-glow)' : 'transparent', color: view === 'export' ? 'var(--gold)' : 'var(--text-dim)', border: view === 'export' ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>薪資匯出</button>
       </div>
       {view === 'main' && <PayrollContent />}
+      {view === 'petty' && <PettyCash />}
       {view === 'export' && <PayrollExport />}
     </div>
   )
