@@ -7,6 +7,7 @@ const STAFF_NAV = [
   { path: '/sop', icon: ClipboardList, label: '任務' },
   { path: '/inventory', icon: Package, label: '盤點' },
   { path: '/schedule', icon: Calendar, label: '排班' },
+  { path: '/expense', icon: DollarSign, label: '支出' },
   { path: '/kpi', icon: BarChart3, label: 'KPI' },
 ]
 const BOSS_NAV = [
