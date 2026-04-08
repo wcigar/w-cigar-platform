@@ -18,7 +18,10 @@ export async function seedTodayTasks() {
         if (wm[f] !== undefined) return dow === wm[f]
         const mm = f.match(/每月(\d+)/); if (mm) return dom === Number(mm[1])
         return true
-      }).map(d => ({ date: today, task_id: d.task_id, category: d.category || '', title: d.title || '', owner: d.owner || 'ALL', completed: false }))
+      }).map(d => ({
+        date: today, task_id: d.task_id, category: d.category || '', title: d.title || '',
+        owner: d.owner || 'ALL', completed: false, due_time: d.due_time || null
+      }))
       if (rows.length) await supabase.from('task_status').insert(rows)
     }
   }
@@ -32,7 +35,6 @@ export async function seedTodayTasks() {
     }
   }
 
-  // Log seed event
   try {
     await supabase.from('audit_logs').insert({ event: 'DailySeed', description: '每日任務自動播種 ' + today, operator: 'SYSTEM' })
   } catch (e) {}
