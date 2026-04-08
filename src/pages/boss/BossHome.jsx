@@ -16,6 +16,8 @@ export default function BossHome() {
   const [lowItems, setLowItems] = useState([])
   const [dangers, setDangers] = useState([])
   const [loading, setLoading] = useState(true)
+  const [monthRevenue, setMonthRevenue] = useState(0)
+  const [pendingHandover, setPendingHandover] = useState(0)
   const today = format(new Date(), 'yyyy-MM-dd')
   const month = format(new Date(), 'yyyy-MM')
 
@@ -23,7 +25,7 @@ export default function BossHome() {
 
   async function load() {
     setLoading(true)
-    const [eR, sR, tR, aR, lbR, leaveR, invR, punchR, abnR] = await Promise.all([
+    const [eR, sR, tR, aR, lbR, leaveR, invR, punchR, revR, hoR, abnR] = await Promise.all([
       supabase.from('employees').select('*').eq('is_active', true),
       supabase.from('schedules').select('*, employees(name)').eq('date', today),
       supabase.from('task_status').select('*').eq('date', today),
@@ -32,6 +34,8 @@ export default function BossHome() {
       supabase.from('leave_requests').select('id', { count: 'exact' }).eq('status', 'pending'),
       supabase.from('inventory_master').select('id, name, current_stock, safe_stock, unit, category').eq('is_low', true).eq('enabled', true),
       supabase.from('punch_records').select('*').eq('date', today),
+      supabase.from('daily_revenue').select('total').gte('date', month + '-01').lte('date', month + '-31'),
+      supabase.from('shift_handover').select('id').eq('date', today).eq('acknowledged', false),
       supabase.from('abnormal_reports').select('*').neq('status', '已解決').order('time', { ascending: false }).limit(10),
     ])
     const tasks = tR.data || [], sc = sR.data || [], emps = eR.data || [], low = invR.data || [], abns = abnR.data || []
@@ -46,6 +50,8 @@ export default function BossHome() {
     setScheds(sc)
     setLowItems(low)
     setPunches(punchR.data || [])
+    setMonthRevenue((revR.data || []).reduce((s, r) => s + (+r.total || 0), 0))
+    setPendingHandover((hoR.data || []).length)
 
     // Build danger list
     const dangerList = []
@@ -111,12 +117,14 @@ export default function BossHome() {
       </div>
 
       {/* Quick stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 16 }}>
         <SB label="在職" value={stats.emps} color="var(--gold)" />
         <SB label="今日出勤" value={stats.working} color="var(--green)" />
         <SB label="SOP完成" value={stats.sop + '%'} color={stats.sop === 100 ? 'var(--green)' : 'var(--gold)'} />
         <SB label="待審假單" value={stats.leavePending} color={stats.leavePending > 0 ? 'var(--red)' : 'var(--text-muted)'} tap={() => navigate('/hr')} />
         <SB label="異常待處理" value={stats.abnPending} color={stats.abnPending > 0 ? 'var(--red)' : 'var(--text-muted)'} tap={() => navigate('/operations')} />
+        <SB label="月營收" value={monthRevenue ? '$' + monthRevenue.toLocaleString() : '$0'} color="var(--gold)" tap={() => navigate('/operations')} />
+        <SB label="待確認交班" value={pendingHandover} color={pendingHandover > 0 ? '#f59e0b' : 'var(--text-muted)'} />
         <SB label="低庫存" value={stats.lowStock} color={stats.lowStock > 0 ? 'var(--red)' : 'var(--green)'} tap={() => navigate('/operations')} />
       </div>
 
