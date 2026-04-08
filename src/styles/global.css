@@ -55,3 +55,33 @@ td{padding:10px 12px;border-bottom:1px solid var(--border)}
   button, a, [role="button"] { min-height: 44px; min-width: 44px; }
   input[type="checkbox"] { width: 28px !important; height: 28px !important; }
 }
+
+/* Force minimum font sizes on mobile */
+@media (max-width: 480px) {
+  .card, .card * { min-font-size: 13px; }
+  .page-container div[style] { font-size: inherit; }
+  nav button { font-size: 13px !important; min-height: 50px !important; }
+  nav { padding: 8px 4px !important; }
+}
+
+/* Big number input on mobile/iPad */
+@media (max-width: 1024px) {
+  input[type="number"], input[inputmode="numeric"], input[inputmode="decimal"] {
+    font-size: 28px !important;
+    font-weight: 700 !important;
+    font-family: 'JetBrains Mono', monospace !important;
+    padding: 16px !important;
+    min-height: 60px !important;
+    letter-spacing: 1px;
+  }
+  input[type="password"] {
+    font-size: 32px !important;
+    letter-spacing: 8px;
+    min-height: 56px !important;
+    padding: 14px !important;
+  }
+  input[type="date"] {
+    font-size: 18px !important;
+    min-height: 52px !important;
+  }
+}
