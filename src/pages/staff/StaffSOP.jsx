@@ -1,3 +1,4 @@
+import ShiftHandover from '../../components/ShiftHandover'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
@@ -12,8 +13,9 @@ export default function StaffSOP() {
       <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
         <button onClick={() => setMode('sop')} style={{ padding: '8px 16px', borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: 'pointer', background: mode === 'sop' ? 'var(--gold-glow)' : 'transparent', color: mode === 'sop' ? 'var(--gold)' : 'var(--text-dim)', border: mode === 'sop' ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>每日 SOP</button>
         <button onClick={() => setMode('clean')} style={{ padding: '8px 16px', borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: 'pointer', background: mode === 'clean' ? 'var(--gold-glow)' : 'transparent', color: mode === 'clean' ? 'var(--gold)' : 'var(--text-dim)', border: mode === 'clean' ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}><Sparkles size={12} style={{ marginRight: 4 }} />大掃除</button>
+        <button onClick={() => setMode('handover')} style={{ padding: '8px 16px', borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: 'pointer', background: mode === 'handover' ? 'var(--gold-glow)' : 'transparent', color: mode === 'handover' ? 'var(--gold)' : 'var(--text-dim)', border: mode === 'handover' ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>交班</button>
       </div>
-      {mode === 'sop' ? <SOPView /> : <CleanView />}
+      {mode === 'sop' ? <SOPView /> : mode === 'clean' ? <CleanView /> : <ShiftHandover />}
     </div>
   )
 }
