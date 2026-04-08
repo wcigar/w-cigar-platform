@@ -1,6 +1,7 @@
+import InventoryTrend from './InventoryTrend'
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
-import { Package, Save, Send, Search, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Users, Settings, ClipboardList, History, ShoppingCart, Copy, Check } from 'lucide-react'
+import { Package, Save, Send, Search, TrendingUp, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Users, Settings, ClipboardList, History, ShoppingCart, Copy, Check } from 'lucide-react'
 import { format } from 'date-fns'
 
 const REASON_LABELS = { normal: '正常消耗', damage: '損耗報廢', restock: '進貨入庫', error: '盤點誤差', gift: '贈送客戶', other: '其他' }
@@ -169,6 +170,7 @@ export default function InventoryMgmt() {
     { id: 'overview', icon: <Package size={13} />, label: '品項總覽' },
     { id: 'safe', icon: <Settings size={13} />, label: '安全庫存' },
     { id: 'assign', icon: <Users size={13} />, label: '盤點指派' },
+    { id: 'trend', icon: <TrendingUp size={13} />, label: '庫存走勢' },
     { id: 'purchase', icon: <ShoppingCart size={13} />, label: '採購建議(' + purchaseItems.length + ')' },
     { id: 'records', icon: <History size={13} />, label: '盤點紀錄' },
   ]
@@ -281,6 +283,8 @@ export default function InventoryMgmt() {
           {Object.keys(assignEdits).length > 0 && <button className="btn-gold" onClick={saveAssignments} disabled={savingAssign} style={{ width: '100%', padding: 14, fontSize: 16, marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: savingAssign ? .5 : 1 }}><Save size={18} /> {savingAssign ? '儲存中...' : '儲存指派 (' + Object.keys(assignEdits).length + ' 筆)'}</button>}
         </div>
       )}
+
+      {tab === 'trend' && <InventoryTrend />}
 
       {/* PURCHASE SUGGESTIONS */}
       {tab === 'purchase' && (
