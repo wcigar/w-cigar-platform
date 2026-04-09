@@ -17,6 +17,7 @@ import BossOperations from './pages/boss/Operations'
 import BossHR from './pages/boss/HRSchedule'
 import BossPayroll from './pages/boss/Payroll'
 import BossSettings from './pages/boss/Settings'
+import BossInventory from './pages/boss/BossInventory'
 
 export default function App() {
   const { user, loading } = useAuth()
@@ -43,6 +44,7 @@ export default function App() {
           <Route path="/operations" element={<BossOperations />} />
           <Route path="/hr" element={<BossHR />} />
           <Route path="/payroll" element={<BossPayroll />} />
+          <Route path="/boss-inventory" element={<BossInventory />} />
           <Route path="/settings" element={<BossSettings />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
