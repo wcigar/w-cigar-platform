@@ -3,14 +3,21 @@ import { supabase } from '../../lib/supabase'
 import { CheckCircle2, XCircle, AlertCircle, Calendar, Users } from 'lucide-react'
 import { format, subMonths, endOfMonth } from 'date-fns'
 
+const TYPE_COLORS = {
+  '事假': '#ffd700', '病假': '#ffb347', '特休': '#64c8ff',
+  '調班': '#c896ff', '臨時請假': '#ff6b6b', '休假': '#e74c3c',
+}
+
 export default function LeaveApproval() {
   const [requests, setRequests] = useState([])
+  const [loading, setLoading] = useState(true)
   const [month, setMonth] = useState(format(new Date(), 'yyyy-MM'))
-  const [filter, setFilter] = useState('pending')
   const [rejectId, setRejectId] = useState(null)
   const [rejectReason, setRejectReason] = useState('')
-  const [loading, setLoading] = useState(true)
-  const months = Array.from({ length: 6 }, (_, i) => format(subMonths(new Date(), i), 'yyyy-MM'))
+
+  const months = Array.from({ length: 3 }, (_, i) => format(subMonths(new Date(), i), 'yyyy-MM'))
+  const pending = requests.filter(r => r.status === '待審核' || r.status === 'pending')
+  const processed = requests.filter(r => r.status !== '待審核' && r.status !== 'pending')
 
   useEffect(() => { load() }, [month])
 
@@ -38,71 +45,80 @@ export default function LeaveApproval() {
     setRejectId(null); setRejectReason('')
     load()
   }
+  const typeBadge = (type) => {
+    const color = TYPE_COLORS[type] || '#8a8278'
+    return <span style={{ background: color + '22', color, padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600 }}>{type}</span>
+  }
 
-  const pending = requests.filter(r => r.status === '待審核')
-  const approved = requests.filter(r => r.status === '已核准')
-  const rejected = requests.filter(r => r.status === '已駁回')
-  const shown = filter === 'pending' ? pending : filter === 'approved' ? approved : filter === 'rejected' ? rejected : requests
+  const statusBadge = (s) => {
+    const m = { '待審核': { c: '#ff9800', t: '待審核' }, pending: { c: '#ff9800', t: '待審核' }, '已核准': { c: '#4caf50', t: '已核准' }, approved: { c: '#4caf50', t: '已核准' }, '已駁回': { c: '#e74c3c', t: '已駁回' }, rejected: { c: '#e74c3c', t: '已駁回' } }
+    const v = m[s] || { c: '#8a8278', t: s }
+    return <span style={{ color: v.c, fontWeight: 600, fontSize: 11 }}>{v.t}</span>
+  }
 
-  if (loading) return <div>{[1,2].map(i => <div key={i} className="loading-shimmer" style={{ height: 60, marginBottom: 8 }} />)}</div>
-
+  const renderCard = (r, showActions) => (
+    <div key={r.id} style={{ background: '#1a1714', border: '1px solid ' + (showActions ? '#ff980044' : '#2a2520'), borderRadius: 10, padding: 14, marginBottom: 10 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontWeight: 600, color: '#e8dcc8' }}>{r.employee_name}</span>
+          {typeBadge(r.leave_type)}
+        </div>
+        {statusBadge(r.status)}
+      </div>
+      <div style={{ fontSize: 12, color: '#8a8278', display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 6 }}>
+        <span>日期: {r.date}</span>
+        {r.original_shift && <span>原班: {r.original_shift}</span>}
+        {r.swap_to_date && <span>調往: {r.swap_to_date}</span>}
+      </div>
+      {r.reason && <div style={{ fontSize: 12, color: '#a09888', marginBottom: 6 }}>原因: {r.reason}</div>}
+      {r.reject_reason && <div style={{ fontSize: 12, color: '#e74c3c' }}>駁回: {r.reject_reason}</div>}
+      {showActions && (
+        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+          <button onClick={() => approve(r.id)} style={{ flex: 1, padding: '8px', borderRadius: 6, border: 'none', background: '#4caf50', color: '#fff', fontWeight: 600, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+            <CheckCircle2 size={14} /> 核准
+          </button>
+          {rejectId === r.id ? (
+            <div style={{ flex: 2, display: 'flex', gap: 4 }}>
+              <input value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder='駁回原因...' style={{ flex: 1, padding: '6px 8px', background: '#0a0a0a', border: '1px solid #2a2520', borderRadius: 6, color: '#e8dcc8', fontSize: 12 }} />
+              <button onClick={() => reject(r.id)} style={{ padding: '6px 12px', borderRadius: 6, border: 'none', background: '#e74c3c', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>確定</button>
+              <button onClick={() => { setRejectId(null); setRejectReason('') }} style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid #2a2520', background: 'none', color: '#8a8278', fontSize: 12, cursor: 'pointer' }}>取消</button>
+            </div>
+          ) : (
+            <button onClick={() => setRejectId(r.id)} style={{ flex: 1, padding: '8px', borderRadius: 6, border: '1px solid #e74c3c44', background: 'transparent', color: '#e74c3c', fontWeight: 600, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+              <XCircle size={14} /> 駁回
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
   return (
     <div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 12, overflowX: 'auto' }}>
-        {months.map(m => <button key={m} onClick={() => setMonth(m)} style={{ padding: '6px 10px', borderRadius: 20, fontSize: 11, fontWeight: 500, whiteSpace: 'nowrap', cursor: 'pointer', background: m === month ? 'var(--gold-glow)' : 'transparent', color: m === month ? 'var(--gold)' : 'var(--text-dim)', border: m === month ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>{parseInt(m.slice(5))}月</button>)}
+        {months.map(m => <button key={m} onClick={() => setMonth(m)} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid ' + (m === month ? '#c9a84c' : '#2a2520'), background: m === month ? '#c9a84c22' : 'transparent', color: m === month ? '#c9a84c' : '#8a8278', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>{m}</button>)}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 6, marginBottom: 14 }}>
-        <div className="card" style={{ padding: 10, textAlign: 'center', cursor: 'pointer', borderColor: filter === 'pending' ? 'var(--border-gold)' : undefined }} onClick={() => setFilter('pending')}>
-          <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>待審核</div>
-          <div style={{ fontSize: 20, fontFamily: 'var(--font-mono)', fontWeight: 700, color: pending.length ? '#f59e0b' : 'var(--text-dim)' }}>{pending.length}</div>
-        </div>
-        <div className="card" style={{ padding: 10, textAlign: 'center', cursor: 'pointer', borderColor: filter === 'approved' ? 'rgba(77,168,108,.3)' : undefined }} onClick={() => setFilter('approved')}>
-          <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>已核准</div>
-          <div style={{ fontSize: 20, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--green)' }}>{approved.length}</div>
-        </div>
-        <div className="card" style={{ padding: 10, textAlign: 'center', cursor: 'pointer', borderColor: filter === 'rejected' ? 'rgba(239,68,68,.3)' : undefined }} onClick={() => setFilter('rejected')}>
-          <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>已駁回</div>
-          <div style={{ fontSize: 20, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--red)' }}>{rejected.length}</div>
-        </div>
-      </div>
-
-      {shown.length === 0 ? <div className="card" style={{ textAlign: 'center', padding: 30, color: 'var(--text-dim)' }}>無{filter === 'pending' ? '待審核' : filter === 'approved' ? '已核准' : '已駁回'}假單</div> :
-        shown.map(r => {
-          const isPending = r.status === '待審核'
-          const stColor = r.status === '已核准' ? 'var(--green)' : r.status === '已駁回' ? 'var(--red)' : '#f59e0b'
-          return (
-            <div key={r.id} className="card" style={{ padding: 14, marginBottom: 8, borderColor: isPending ? '#f59e0b30' : undefined }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <div>
-                  <div style={{ fontSize: 16, fontWeight: 700 }}>{r.employee_name}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{r.date} · {r.leave_type}</div>
-                </div>
-                <div style={{ padding: '4px 12px', borderRadius: 12, fontSize: 12, fontWeight: 700, color: stColor, background: stColor + '15' }}>{r.status}</div>
+      {loading ? <div style={{ textAlign: 'center', padding: 30, color: '#8a8278' }}>載入中...</div> : (
+        <>
+          {pending.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: '#ff9800', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <AlertCircle size={16} /> 待審核 ({pending.length})
               </div>
-              <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 8, padding: '6px 10px', background: 'var(--black)', borderRadius: 8 }}>事由：{r.reason}</div>
-              {r.reject_reason && <div style={{ fontSize: 12, color: 'var(--red)', marginBottom: 6 }}>駁回原因：{r.reject_reason}</div>}
-              {r.reviewed_by && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 6 }}>審核：{r.reviewed_by} {r.reviewed_at ? format(new Date(r.reviewed_at), 'MM/dd HH:mm') : ''}</div>}
-              
-              {isPending && (
-                <div>
-                  {rejectId === r.id ? (
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <input placeholder="駁回原因" value={rejectReason} onChange={e => setRejectReason(e.target.value)} style={{ flex: 1, fontSize: 12, padding: 8 }} />
-                      <button className="btn-outline" style={{ padding: '6px 12px', fontSize: 12, color: 'var(--red)', borderColor: 'rgba(239,68,68,.3)' }} onClick={() => reject(r.id)}>確認駁回</button>
-                      <button className="btn-outline" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => { setRejectId(null); setRejectReason('') }}>取消</button>
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button className="btn-gold" style={{ flex: 1, padding: 10, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }} onClick={() => approve(r.id)}><CheckCircle2 size={16} /> 核准</button>
-                      <button className="btn-outline" style={{ flex: 1, padding: 10, fontSize: 14, color: 'var(--red)', borderColor: 'rgba(239,68,68,.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }} onClick={() => setRejectId(r.id)}><XCircle size={16} /> 駁回</button>
-                    </div>
-                  )}
-                </div>
-              )}
+              {pending.map(r => renderCard(r, true))}
             </div>
-          )
-        })}
+          )}
+
+          {pending.length === 0 && <div style={{ textAlign: 'center', padding: 20, color: '#4caf50', fontSize: 13 }}>✔ 無待審核假單</div>}
+
+          {processed.length > 0 && (
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#8a8278', marginBottom: 8 }}>已處理 ({processed.length})</div>
+              {processed.map(r => renderCard(r, false))}
+            </div>
+          )}
+        </>
+      )}
     </div>
   )
 }
