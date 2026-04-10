@@ -48,9 +48,26 @@ function ScheduleContent() {
   }
 
   async function requestLeave(dateStr, leaveType) {
-    const existing = schedules.find(s => s.date === dateStr)
-    if (existing) await supabase.from('schedules').update({ shift: leaveType }).eq('id', existing.id)
-    else await supabase.from('schedules').insert({ date: dateStr, employee_id: user.employee_id, shift: leaveType })
+    const needsApproval = ['臨時請假','病假','事假','特休','調班']
+    if (needsApproval.includes(leaveType)) {
+      const existing = await supabase.from('leave_requests').select('id').eq('employee_id', user.employee_id).eq('date', dateStr).eq('status', '待審核').maybeSingle()
+      if (existing?.data) { alert('該日已有待審核申請'); return }
+      const { error } = await supabase.from('leave_requests').insert({
+        employee_id: user.employee_id,
+        employee_name: user.name,
+        date: dateStr,
+        leave_type: leaveType,
+        original_shift: getMyShift(dateStr) || '',
+        reason: leaveType === '調班' ? prompt('請輸入調班原因：') || '' : prompt('請輸入請假原因：') || '',
+        status: '待審核'
+      })
+      if (error) { alert('申請失敗: ' + error.message); return }
+      alert('已送出' + leaveType + '申請，等待老闆審核')
+    } else {
+      const existing = schedules.find(s => s.date === dateStr)
+      if (existing) await supabase.from('schedules').update({ shift: leaveType }).eq('id', existing.id)
+      else await supabase.from('schedules').insert({ date: dateStr, employee_id: user.employee_id, shift: leaveType })
+    }
     load()
   }
 
