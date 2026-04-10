@@ -103,6 +103,7 @@ label { font-size: 13px !important; }
 
 /* Desktop boost */
 @media (min-width: 1025px) {
+  #root { zoom: 1.2; }
   body { font-size: 16px; }
   input, select, textarea { font-size: 16px !important; padding: 12px 16px !important; }
   .btn-gold, .btn-outline, .btn-red { font-size: 16px; padding: 14px 24px; }
