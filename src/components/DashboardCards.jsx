@@ -19,13 +19,14 @@ export default function DashboardCards() {
   if (loading) return <div style={{ padding: 20, color: '#8a8278', textAlign: 'center' }}>載入儀表板...</div>
   if (!d) return null
 
-  const { today, this_month, pending, low_stock_top5, recent_orders, payment_breakdown } = d
+  const { today, this_month, pending, low_stock_top5, recent_orders, payment_breakdown, month_expenses } = d
 
   const cardStyle = { background: '#1a1714', border: '1px solid #2a2520', borderRadius: 10, padding: '14px 16px' }
   const labelStyle = { fontSize: 11, color: '#8a8278', marginBottom: 4 }
   const valStyle = { fontSize: 22, fontWeight: 700, color: '#c9a84c' }
   const subStyle = { fontSize: 11, color: '#5a554e', marginTop: 4 }
   const badge = count => count > 0 ? <span style={{ background: '#e74c3c', color: '#fff', borderRadius: 10, padding: '1px 7px', fontSize: 11, fontWeight: 600, marginLeft: 6 }}>{count}</span> : null
+
   return (
     <div style={{ padding: '0 20px 20px' }}>
       {/* 今日銷售 */}
@@ -87,6 +88,28 @@ export default function DashboardCards() {
           <div style={{ ...valStyle, fontSize: 18, color: '#2196f3' }}>${fmt(this_month.dealer_sales)}</div>
         </div>
       </div>
+
+      {/* 月支出 */}
+      {month_expenses && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 20 }}>
+          <div style={cardStyle}>
+            <div style={labelStyle}>月支出</div>
+            <div style={{ ...valStyle, color: '#e74c3c' }}>${fmt(month_expenses.total_expenses)}</div>
+            <div style={subStyle}>{month_expenses.expense_count} 筆</div>
+          </div>
+          <div style={cardStyle}>
+            <div style={labelStyle}>今日支出</div>
+            <div style={{ ...valStyle, fontSize: 18, color: '#ff9800' }}>${fmt(month_expenses.today_expenses)}</div>
+          </div>
+          <div style={cardStyle}>
+            <div style={labelStyle}>淨利潤</div>
+            <div style={{ ...valStyle, fontSize: 18, color: (this_month.total_sales - (month_expenses.total_expenses || 0)) >= 0 ? '#4caf50' : '#e74c3c' }}>
+              ${fmt(this_month.total_sales - (month_expenses.total_expenses || 0))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 低庫存前5 */}
       {low_stock_top5 && low_stock_top5.length > 0 && (
         <>
