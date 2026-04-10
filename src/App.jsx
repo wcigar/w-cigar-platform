@@ -18,6 +18,7 @@ import BossHR from './pages/boss/HRSchedule'
 import BossPayroll from './pages/boss/Payroll'
 import BossSettings from './pages/boss/Settings'
 import BossInventory from './pages/boss/BossInventory'
+import AmbassadorApp from './pages/ambassador/AmbassadorApp'
 
 export default function App() {
   const { user, loading } = useAuth()
@@ -30,6 +31,13 @@ export default function App() {
     <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a0a' }}>
       <div className="loading-shimmer" style={{ width: 120, height: 120, borderRadius: '50%' }} />
     </div>
+  )
+
+  // Ambassador system has its own auth
+  if (window.location.pathname.startsWith('/ambassador')) return (
+    <Routes>
+      <Route path="/ambassador/*" element={<AmbassadorApp />} />
+    </Routes>
   )
 
   if (!user) return <Login />
