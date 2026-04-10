@@ -34,7 +34,7 @@ export default function InventoryMgmt() {
     setLoading(true)
     const [itemRes, empRes, recRes] = await Promise.all([
       supabase.from('inventory_master').select('*').order('category').order('sub_category').order('name'),
-      supabase.from('employees').select('*').eq('is_active', true).order('name'),
+      supabase.from('employees').select('*').eq('enabled', true).order('name'),
       supabase.from('inventory_records').select('*').order('time', { ascending: false }).limit(100),
     ])
     setItems(itemRes.data || [])
