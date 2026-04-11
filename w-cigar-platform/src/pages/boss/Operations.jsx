@@ -56,10 +56,10 @@ export default function BossOperations() {
       <div className="section-title">營運管理</div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20, overflowX: 'auto', paddingBottom: 4 }}>
         {tabs.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)} style={{
-            padding: '8px 16px', borderRadius: 20, fontSize: 13, fontWeight: 500, cursor: 'pointer',
+            padding: '8px 16px', borderRadius: 20, fontSize: 13, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
             background: tab === t.id ? 'var(--gold-glow)' : 'transparent',
             color: tab === t.id ? 'var(--gold)' : 'var(--text-dim)',
             border: tab === t.id ? '1px solid var(--border-gold)' : '1px solid var(--border)',
