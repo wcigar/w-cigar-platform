@@ -2,11 +2,11 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { logAudit } from '../../lib/audit'
 import { calcLaborIns, calcHealthIns, calcLaborPension, calcLaborInsER, calcHealthInsER, findBracket, calcOvertimePay, LABOR_INS_BRACKETS, HEALTH_INS_BRACKETS, SHIFTS, LATE_GRACE_MIN, OT_GRACE_MIN } from '../../lib/constants'
-import { ChevronDown, ChevronUp, Plus, Trash2, Save, FileText, Printer, Edit3, Clock } from 'lucide-react'
+import { ChevronDown, ChevronUp, Plus, Trash2, Save, FileText, Printer, Edit3, Clock, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react'
 import { format, subMonths, endOfMonth } from 'date-fns'
 
 /* ================================================================
-   resolveAttendance — 若有人工修正，優先使用修正值
+   resolvePunch — 人工修正優先
    ================================================================ */
 function resolvePunch(punch) {
   if (punch.manual_override) {
@@ -24,21 +24,15 @@ function resolvePunch(punch) {
     }
   }
   return {
-    clockIn: punch.clock_in,
-    clockOut: punch.clock_out,
-    isLate: punch.is_late,
-    isEarly: false,
-    isPayable: true,
-    countsAsWorked: true,
-    lateDeduction: punch.late_deduction ?? 0,
-    earlyDeduction: punch.early_deduction ?? 0,
-    overrideReason: '',
-    overridden: false,
+    clockIn: punch.clock_in, clockOut: punch.clock_out,
+    isLate: punch.is_late, isEarly: false,
+    isPayable: true, countsAsWorked: true,
+    lateDeduction: 0, earlyDeduction: 0, overrideReason: '', overridden: false,
   }
 }
 
 /* ================================================================
-   核心純函式 — 出勤統計（統一用實際出勤天數）
+   出勤統計
    ================================================================ */
 function getAttendanceData(eid, schedules, punches) {
   const es = schedules.filter(s => s.employee_id === eid)
@@ -56,27 +50,20 @@ function getAttendanceData(eid, schedules, punches) {
       const dayPunches = ep.filter(p => p.date === s.date)
       const clockInPunch = dayPunches.find(p => p.punch_type === '上班')
       const clockOutPunch = dayPunches.find(p => p.punch_type === '下班')
-
-      // 解析（支援人工修正）
       const resolved = clockInPunch ? resolvePunch(clockInPunch) : null
       const resolvedOut = clockOutPunch ? resolvePunch(clockOutPunch) : null
       if (resolved?.overridden || resolvedOut?.overridden) overrideCount++
-
-      // 判斷是否計為出勤天數
       const countsAsWorked = resolved ? (resolved.countsAsWorked !== false) : true
       if (countsAsWorked) work++
 
-      // 遲到判定
       if (resolved?.clockIn) {
         const timeStr = typeof resolved.clockIn === 'string' ? resolved.clockIn : ''
         const timePart = timeStr.includes('T') ? timeStr.slice(11, 16) : timeStr.slice(0, 5)
         if (timePart) {
           const [h, m] = timePart.split(':').map(Number)
           const pm = h * 60 + m, sm = shift.startH * 60 + shift.startM + LATE_GRACE_MIN
-          // 若人工修正為非遲到，跳過
-          if (resolved.overridden && resolved.isLate === false) {
-            // 已被後台取消遲到，不計
-          } else if (pm > sm) {
+          if (resolved.overridden && resolved.isLate === false) { /* 已取消遲到 */ }
+          else if (pm > sm) {
             const mins = pm - sm
             lateCount++; lateMinutes += mins
             lateDetails.push({ date: s.date, minutes: mins, time: timePart, overridden: resolved.overridden })
@@ -84,7 +71,6 @@ function getAttendanceData(eid, schedules, punches) {
         }
       }
 
-      // 早退 + 加班判定
       if (resolvedOut?.clockOut || clockOutPunch?.time) {
         const timeStr = resolvedOut?.clockOut || clockOutPunch?.time || ''
         const timePart = timeStr.includes('T') ? timeStr.slice(11, 16) : timeStr.slice(0, 5)
@@ -93,17 +79,12 @@ function getAttendanceData(eid, schedules, punches) {
           let pm = h * 60 + m
           if (v === '晚班' && h < 12) pm += 1440
           const endMin = shift.endH * 60 + shift.endM
-
-          // 早退
-          if (resolvedOut?.overridden && resolvedOut.isEarly === false) {
-            // 已被後台取消早退，不計
-          } else if (pm < endMin) {
+          if (resolvedOut?.overridden && resolvedOut.isEarly === false) { /* 已取消早退 */ }
+          else if (pm < endMin) {
             const mins = endMin - pm
             earlyCount++; earlyMinutes += mins
             earlyDetails.push({ date: s.date, minutes: mins, time: timePart, overridden: resolvedOut?.overridden })
           }
-
-          // 加班
           const graceMin = endMin + OT_GRACE_MIN
           if (pm > graceMin) {
             const otMin = pm - endMin
@@ -122,26 +103,20 @@ function getAttendanceData(eid, schedules, punches) {
 }
 
 /* ================================================================
-   核心純函式 — 截至今日薪資（統一用實際出勤天數）
-   公式：dailyBase × actualWorkedDays + 獎金 - 扣款
+   薪資計算（統一實際出勤天數）
    ================================================================ */
 function calcSalaryToDate(emp, cfg, bonusDefs, att, isCurrentMonth, targetDate) {
-  const year = targetDate.getFullYear()
-  const monthNum = targetDate.getMonth() + 1
+  const year = targetDate.getFullYear(), monthNum = targetDate.getMonth() + 1
   const daysInMonth = new Date(year, monthNum, 0).getDate()
   const dayOfMonth = targetDate.getDate()
   const monthlyBase = cfg.monthly_salary || 0
   const dailyBase = monthlyBase > 0 ? Math.round(monthlyBase / daysInMonth) : 0
   const hourlyBase = dailyBase > 0 ? Math.round(dailyBase / 8) : 0
-
-  // ✅ 統一用實際出勤天數計算底薪
   const proratedBase = dailyBase * att.work
 
-  // 加班費
   let otPay = 0
   att.otDetails.forEach(d => { d.pay = calcOvertimePay(hourlyBase, d.minutes); otPay += d.pay })
 
-  // 獎金
   const empBonuses = bonusDefs.filter(b => b.employee_id === emp.id && b.enabled)
   const attendanceBonusDef = empBonuses.find(b => b.bonus_name && b.bonus_name.includes('全勤'))
   const otherBonuses = empBonuses.filter(b => !b.bonus_name?.includes('全勤'))
@@ -153,7 +128,6 @@ function calcSalaryToDate(emp, cfg, bonusDefs, att, isCurrentMonth, targetDate) 
   const otherBonusTotal = otherBonuses.reduce((s, b) => s + (b.amount || 0), 0)
   const totalBonuses = effectiveAttendanceBonus + otherBonusTotal + otPay
 
-  // 扣款
   const sickDeduct = Math.round(att.sick * dailyBase * 0.5)
   const personalDeduct = att.personal * dailyBase
   const absentDeduct = att.absent * dailyBase
@@ -174,7 +148,7 @@ function calcSalaryToDate(emp, cfg, bonusDefs, att, isCurrentMonth, targetDate) 
 }
 
 /* ================================================================
-   薪資頁主元件
+   主元件
    ================================================================ */
 export default function Payroll() {
   const [tab, setTab] = useState('payroll')
@@ -193,6 +167,9 @@ export default function Payroll() {
   const [showExpForm, setShowExpForm] = useState(false)
   const [payslip, setPayslip] = useState(null)
   const [loading, setLoading] = useState(true)
+  // 出勤修正
+  const [overrideEmp, setOverrideEmp] = useState('')
+  const [overrideSaving, setOverrideSaving] = useState(null)
 
   const isCurrentMonth = month === format(new Date(), 'yyyy-MM')
   const today = new Date()
@@ -252,53 +229,44 @@ export default function Payroll() {
   }
   async function deleteExpense(id) { if (!confirm('刪除？')) return; await supabase.from('expenses').delete().eq('id', id); load() }
 
+  /* === 出勤修正操作 === */
+  async function overridePunch(punchId, updates) {
+    setOverrideSaving(punchId)
+    await supabase.from('punch_records').update({
+      manual_override: true,
+      ...updates,
+      override_by: 'ADMIN',
+      override_at: new Date().toISOString(),
+    }).eq('id', punchId)
+    await logAudit('AttendanceOverride', `修正打卡 #${punchId}: ${JSON.stringify(updates)}`, 'ADMIN')
+    setOverrideSaving(null)
+    load()
+  }
+
+  async function cancelOverride(punchId) {
+    setOverrideSaving(punchId)
+    await supabase.from('punch_records').update({
+      manual_override: false,
+      corrected_clock_in: null, corrected_clock_out: null,
+      corrected_is_late: null, corrected_is_early: null,
+      corrected_late_deduction: 0, corrected_early_deduction: 0,
+      override_reason: null, override_by: null, override_at: null,
+    }).eq('id', punchId)
+    setOverrideSaving(null)
+    load()
+  }
+
   function printPayslip() {
     if (!payslip) return
     const { emp, p } = payslip
     const label = isCurrentMonth ? `（截至${todayDay}日）` : ''
     const abLabel = p.attendanceBonus.status === 'lost' ? '❌已失效' : p.attendanceBonus.status === 'pending' ? '⏳暫符合' : '✅已確認'
     const w = window.open('', '_blank', 'width=520,height=900')
-    w.document.write(`<html><head><title>薪資條 ${emp.name}</title><style>
-body{font-family:'Noto Sans TC',sans-serif;padding:30px;color:#333;max-width:500px;margin:0 auto}
-h1{font-size:20px;border-bottom:2px solid #c9a84c;padding-bottom:8px}
-h2{font-size:13px;color:#666;margin:14px 0 6px;border-bottom:1px solid #eee;padding-bottom:4px}
-.r{display:flex;justify-content:space-between;padding:3px 0;font-size:13px;border-bottom:1px dotted #eee}
-.r.bold{font-weight:700;font-size:14px;border-bottom:2px solid #333;padding:6px 0}
-.g{color:#2d8a4e}.rd{color:#c44d4d}.gl{color:#9a7d2e}.dim{color:#999}
-.ft{margin-top:20px;font-size:10px;color:#999;text-align:center;border-top:1px solid #ddd;padding-top:10px}
-</style></head><body>
-<h1>W Cigar Bar — ${month} 薪資條${label}</h1>
-<div class="r bold"><span>${emp.name} (${emp.id})</span><span>${emp.emp_type}</span></div>
-<h2>📅 出勤</h2>
-<div class="r"><span>實際出勤</span><span>${p.actualWorkedDays} 天</span></div>
-<div class="r"><span>休假</span><span>${p.att.off} 天</span></div>
-${p.att.sick?`<div class="r"><span>病假</span><span>${p.att.sick} 天</span></div>`:''}
-${p.att.personal?`<div class="r"><span>事假</span><span>${p.att.personal} 天</span></div>`:''}
-${p.att.absent?`<div class="r rd"><span>曠職</span><span>${p.att.absent} 天</span></div>`:''}
-${p.att.lateCount?`<div class="r rd"><span>遲到</span><span>${p.att.lateCount}次 ${p.att.lateMinutes}分</span></div>`:''}
-${p.att.earlyCount?`<div class="r rd"><span>早退</span><span>${p.att.earlyCount}次 ${p.att.earlyMinutes}分</span></div>`:''}
-${p.att.overrideCount?`<div class="r"><span>⚙️ 人工修正</span><span>${p.att.overrideCount} 筆</span></div>`:''}
-<h2>💰 薪資計算（依實際出勤）</h2>
-<div class="r dim"><span>月底薪</span><span>$${p.monthlyBase.toLocaleString()}</span></div>
-<div class="r dim"><span>當月${p.daysInMonth}天 · 日薪</span><span>$${p.dailyBase.toLocaleString()}</span></div>
-<div class="r"><span>實際出勤${p.actualWorkedDays}天 底薪</span><span>$${p.proratedBase.toLocaleString()}</span></div>
-${p.attendanceBonus.amount?`<div class="r ${p.attendanceBonus.status==='lost'?'rd':'g'}"><span>全勤獎金 ${abLabel}</span><span>${p.attendanceBonus.status==='lost'?'$0':'+$'+p.attendanceBonus.effective.toLocaleString()}</span></div>`:''}
-${p.otherBonuses.map(b=>`<div class="r g"><span>+ ${b.bonus_name}</span><span>+$${b.amount.toLocaleString()}</span></div>`).join('')}
-${p.otPay?`<div class="r g"><span>+ 加班費</span><span>+$${p.otPay.toLocaleString()}</span></div>`:''}
-<div class="r rd"><span>勞保自付20%</span><span>-$${p.li.toLocaleString()}</span></div>
-<div class="r rd"><span>健保自付30%</span><span>-$${p.hi.toLocaleString()}</span></div>
-${p.sickDeduct?`<div class="r rd"><span>病假扣薪</span><span>-$${p.sickDeduct.toLocaleString()}</span></div>`:''}
-${p.personalDeduct?`<div class="r rd"><span>事假扣薪</span><span>-$${p.personalDeduct.toLocaleString()}</span></div>`:''}
-${p.absentDeduct?`<div class="r rd"><span>曠職扣薪</span><span>-$${p.absentDeduct.toLocaleString()}</span></div>`:''}
-<div class="r bold gl"><span>✦ 截至今日可領</span><span>$${p.currentPayable.toLocaleString()}</span></div>
-<h2>🏢 雇主負擔</h2>
-<div class="r"><span>勞保70%+健保60%+勞退6%</span><span>$${(p.liER+p.hiER+p.lp).toLocaleString()}</span></div>
-<div class="r bold"><span>雇主總成本</span><span>$${p.erCost.toLocaleString()}</span></div>
-${p.att.lateDetails.length?`<h2>⚠️ 遲到明細</h2>${p.att.lateDetails.map(d=>`<div class="r"><span>${d.date} 打卡${d.time}${d.overridden?' ⚙️修正':''}</span><span class="rd">遲${d.minutes}分</span></div>`).join('')}`:''}
-${p.att.earlyDetails.length?`<h2>⚠️ 早退明細</h2>${p.att.earlyDetails.map(d=>`<div class="r"><span>${d.date} 下班${d.time}${d.overridden?' ⚙️修正':''}</span><span class="rd">早${d.minutes}分</span></div>`).join('')}`:''}
-${p.otDetails.length?`<h2>⏰ 加班明細</h2>${p.otDetails.map(d=>`<div class="r"><span>${d.date} ${d.hours}hr</span><span class="g">+$${d.pay.toLocaleString()}</span></div>`).join('')}`:''}
-<div class="ft">W Cigar Bar 紳士雪茄館<br>${format(new Date(),'yyyy-MM-dd HH:mm')}<br>${isCurrentMonth?'⚠️ 依實際出勤計算，非月底應發':'本月已結算'}</div>
-</body></html>`)
+    w.document.write(`<html><head><title>薪資條 ${emp.name}</title><style>body{font-family:'Noto Sans TC',sans-serif;padding:30px;color:#333;max-width:500px;margin:0 auto}h1{font-size:20px;border-bottom:2px solid #c9a84c;padding-bottom:8px}h2{font-size:13px;color:#666;margin:14px 0 6px;border-bottom:1px solid #eee;padding-bottom:4px}.r{display:flex;justify-content:space-between;padding:3px 0;font-size:13px;border-bottom:1px dotted #eee}.r.bold{font-weight:700;font-size:14px;border-bottom:2px solid #333;padding:6px 0}.g{color:#2d8a4e}.rd{color:#c44d4d}.gl{color:#9a7d2e}.dim{color:#999}.ft{margin-top:20px;font-size:10px;color:#999;text-align:center;border-top:1px solid #ddd;padding-top:10px}</style></head><body><h1>W Cigar Bar — ${month} 薪資條${label}</h1><div class="r bold"><span>${emp.name} (${emp.id})</span><span>${emp.emp_type}</span></div><h2>📅 出勤</h2><div class="r"><span>實際出勤</span><span>${p.actualWorkedDays} 天</span></div><div class="r"><span>休假</span><span>${p.att.off} 天</span></div>${p.att.sick?`<div class="r"><span>病假</span><span>${p.att.sick} 天</span></div>`:''}${p.att.lateCount?`<div class="r rd"><span>遲到</span><span>${p.att.lateCount}次 ${p.att.lateMinutes}分</span></div>`:''}${p.att.earlyCount?`<div class="r rd"><span>早退</span><span>${p.att.earlyCount}次 ${p.att.earlyMinutes}分</span></div>`:''}${p.att.overrideCount?`<div class="r"><span>⚙️ 人工修正</span><span>${p.att.overrideCount} 筆</span></div>`:''}
+<h2>💰 薪資（依實際出勤）</h2><div class="r dim"><span>月底薪</span><span>$${p.monthlyBase.toLocaleString()}</span></div><div class="r dim"><span>當月${p.daysInMonth}天 · 日薪</span><span>$${p.dailyBase.toLocaleString()}</span></div><div class="r"><span>出勤${p.actualWorkedDays}天 底薪</span><span>$${p.proratedBase.toLocaleString()}</span></div>${p.attendanceBonus.amount?`<div class="r ${p.attendanceBonus.status==='lost'?'rd':'g'}"><span>全勤獎金 ${abLabel}</span><span>${p.attendanceBonus.status==='lost'?'$0':'+$'+p.attendanceBonus.effective.toLocaleString()}</span></div>`:''}${p.otherBonuses.map(b=>`<div class="r g"><span>+ ${b.bonus_name}</span><span>+$${b.amount.toLocaleString()}</span></div>`).join('')}${p.otPay?`<div class="r g"><span>+ 加班費</span><span>+$${p.otPay.toLocaleString()}</span></div>`:''}
+<div class="r rd"><span>勞保20%</span><span>-$${p.li.toLocaleString()}</span></div><div class="r rd"><span>健保30%</span><span>-$${p.hi.toLocaleString()}</span></div>${p.sickDeduct?`<div class="r rd"><span>病假扣薪</span><span>-$${p.sickDeduct.toLocaleString()}</span></div>`:''}${p.personalDeduct?`<div class="r rd"><span>事假扣薪</span><span>-$${p.personalDeduct.toLocaleString()}</span></div>`:''}
+<div class="r bold gl"><span>✦ 截至今日可領</span><span>$${p.currentPayable.toLocaleString()}</span></div><div class="r bold"><span>雇主總成本</span><span>$${p.erCost.toLocaleString()}</span></div>
+<div class="ft">W Cigar Bar · ${format(new Date(),'yyyy-MM-dd HH:mm')}<br>${isCurrentMonth?'⚠️ 依實際出勤，非月底應發':'已結算'}</div></body></html>`)
     w.document.close(); setTimeout(() => w.print(), 300)
   }
 
@@ -307,9 +275,56 @@ ${p.otDetails.length?`<h2>⏰ 加班明細</h2>${p.otDetails.map(d=>`<div class=
   const allCalcs = emps.map(e => ({ emp: e, calc: getCalc(e) }))
   const totalPayable = allCalcs.reduce((s, { calc }) => s + calc.currentPayable, 0)
   const totalER = allCalcs.reduce((s, { calc }) => s + calc.erCost, 0)
-  const tabList = [{ id: 'payroll', l: '薪資明細' }, { id: 'config', l: '薪資設定' }, { id: 'bonus', l: '加給管理' }, { id: 'expenses', l: '支出管理' }]
+  const tabList = [
+    { id: 'payroll', l: '薪資明細' },
+    { id: 'override', l: '⚙️出勤修正' },
+    { id: 'config', l: '薪資設定' },
+    { id: 'bonus', l: '加給管理' },
+    { id: 'expenses', l: '支出管理' },
+  ]
 
   if (loading) return <div className="page-container">{[1,2,3].map(i => <div key={i} className="loading-shimmer" style={{height:80,marginBottom:10}}/>)}</div>
+
+  /* === 出勤修正 — 組合日資料 === */
+  function getDayRows(eid) {
+    const empScheds = schedules.filter(s => s.employee_id === eid).sort((a, b) => a.date.localeCompare(b.date))
+    const empPunches = punches.filter(p => p.employee_id === eid)
+    return empScheds.map(s => {
+      const dayP = empPunches.filter(p => p.date === s.date && p.is_valid)
+      const clockIn = dayP.find(p => p.punch_type === '上班')
+      const clockOut = dayP.find(p => p.punch_type === '下班')
+      const shift = SHIFTS[s.shift]
+      let autoLate = false, autoEarly = false, lateMins = 0, earlyMins = 0
+
+      if (shift && clockIn?.time) {
+        const t = clockIn.time.slice(11, 16)
+        const [h, m] = t.split(':').map(Number)
+        const pm = h * 60 + m, sm = shift.startH * 60 + shift.startM + LATE_GRACE_MIN
+        if (pm > sm) { autoLate = true; lateMins = pm - sm }
+      }
+      if (shift && clockOut?.time) {
+        const t = clockOut.time.slice(11, 16)
+        const [h, m] = t.split(':').map(Number)
+        let pm = h * 60 + m
+        if (s.shift === '晚班' && h < 12) pm += 1440
+        const endMin = shift.endH * 60 + shift.endM
+        if (pm < endMin) { autoEarly = true; earlyMins = endMin - pm }
+      }
+
+      return {
+        date: s.date, shift: s.shift,
+        clockInTime: clockIn?.time?.slice(11, 16) || null,
+        clockOutTime: clockOut?.time?.slice(11, 16) || null,
+        clockInId: clockIn?.id, clockOutId: clockOut?.id,
+        clockInPunch: clockIn, clockOutPunch: clockOut,
+        autoLate, autoEarly, lateMins, earlyMins,
+        inOverridden: clockIn?.manual_override || false,
+        outOverridden: clockOut?.manual_override || false,
+        inCorrectedLate: clockIn?.corrected_is_late,
+        outCorrectedEarly: clockOut?.corrected_is_early,
+      }
+    })
+  }
 
   return (
     <div className="page-container fade-in">
@@ -318,14 +333,12 @@ ${p.otDetails.length?`<h2>⏰ 加班明細</h2>${p.otDetails.map(d=>`<div class=
           <div style={{background:'var(--black-card)',border:'1px solid var(--border-gold)',borderRadius:20,padding:24,width:'100%',maxWidth:440,maxHeight:'90vh',overflowY:'auto'}} onClick={e => e.stopPropagation()}>
             <div style={{fontSize:18,fontWeight:700,color:'var(--gold)',marginBottom:4}}>薪資條 — {payslip.emp.name}</div>
             <div style={{fontSize:12,color:'var(--text-muted)',marginBottom:12}}>{month}{isCurrentMonth?` (截至${todayDay}日)`:''}</div>
-            <R label={`實際出勤${payslip.p.actualWorkedDays}天 底薪`} value={payslip.p.proratedBase}/>
+            <R label={`出勤${payslip.p.actualWorkedDays}天 底薪`} value={payslip.p.proratedBase}/>
             {payslip.p.attendanceBonus.amount>0&&<R label={`全勤獎金（${payslip.p.attendanceBonus.status==='lost'?'已失效':'暫符合'}）`} value={payslip.p.attendanceBonus.effective} positive={payslip.p.attendanceBonus.status!=='lost'}/>}
             {payslip.p.otherBonuses.map(b=><R key={b.id} label={`+ ${b.bonus_name}`} value={b.amount} positive/>)}
             {payslip.p.otPay>0&&<R label="+ 加班費" value={payslip.p.otPay} positive/>}
             <R label="- 勞保" value={-payslip.p.li} negative/><R label="- 健保" value={-payslip.p.hi} negative/>
             {payslip.p.sickDeduct>0&&<R label="- 病假" value={-payslip.p.sickDeduct} negative/>}
-            {payslip.p.personalDeduct>0&&<R label="- 事假" value={-payslip.p.personalDeduct} negative/>}
-            {payslip.p.absentDeduct>0&&<R label="- 曠職" value={-payslip.p.absentDeduct} negative/>}
             <div style={{height:2,background:'var(--gold)',margin:'10px 0'}}/>
             <R label="截至今日可領" value={payslip.p.currentPayable} highlight/>
             <div style={{display:'flex',gap:8,marginTop:16}}>
@@ -340,17 +353,12 @@ ${p.otDetails.length?`<h2>⏰ 加班明細</h2>${p.otDetails.map(d=>`<div class=
       <div style={{display:'flex',gap:6,marginBottom:10,overflowX:'auto',paddingBottom:4}}>
         {months.map(m=><button key={m} onClick={()=>setMonth(m)} style={{padding:'6px 10px',borderRadius:20,fontSize:11,fontWeight:500,whiteSpace:'nowrap',flexShrink:0,cursor:'pointer',background:m===month?'var(--gold-glow)':'transparent',color:m===month?'var(--gold)':'var(--text-dim)',border:m===month?'1px solid var(--border-gold)':'1px solid var(--border)'}}>{parseInt(m.slice(5))}月</button>)}
       </div>
-
-      {isCurrentMonth&&(
-        <div style={{fontSize:11,color:'var(--gold)',background:'var(--gold-glow)',padding:'6px 12px',borderRadius:8,marginBottom:10,display:'flex',alignItems:'center',gap:4,border:'1px solid var(--border-gold)'}}>
-          <Clock size={12}/> 依實際出勤天數計算：截至{todayDay}日已累積可領薪資（每日更新）
-        </div>
-      )}
-
+      {isCurrentMonth&&<div style={{fontSize:11,color:'var(--gold)',background:'var(--gold-glow)',padding:'6px 12px',borderRadius:8,marginBottom:10,display:'flex',alignItems:'center',gap:4,border:'1px solid var(--border-gold)'}}><Clock size={12}/> 依實際出勤天數計算：截至{todayDay}日（每日更新）</div>}
       <div style={{display:'flex',gap:4,marginBottom:16,overflowX:'auto'}}>
         {tabList.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{padding:'7px 12px',borderRadius:20,fontSize:11,fontWeight:600,cursor:'pointer',whiteSpace:'nowrap',flexShrink:0,background:tab===t.id?'var(--gold-glow)':'transparent',color:tab===t.id?'var(--gold)':'var(--text-dim)',border:tab===t.id?'1px solid var(--border-gold)':'1px solid var(--border)'}}>{t.l}</button>)}
       </div>
 
+      {/* ===== 薪資明細 ===== */}
       {tab==='payroll'&&(<div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,marginBottom:14}}>
           <SB label={isCurrentMonth?'累積實領':'員工實領'} value={'$'+totalPayable.toLocaleString()} color="var(--gold)"/>
@@ -358,10 +366,8 @@ ${p.otDetails.length?`<h2>⏰ 加班明細</h2>${p.otDetails.map(d=>`<div class=
           <SB label="本月支出" value={'$'+totalExp.toLocaleString()} color="var(--red)"/>
         </div>
         <div style={{fontSize:10,color:'var(--text-muted)',marginBottom:10}}>薪資 = 日薪 × 實際出勤天數 + 加給 - 扣款 · 當月{daysInMonth}天</div>
-
         {allCalcs.map(({emp,calc:p})=>{
-          const ex = expanded===emp.id
-          const abStatus = p.attendanceBonus.status
+          const ex=expanded===emp.id, abStatus=p.attendanceBonus.status
           return <div key={emp.id} className="card" style={{marginBottom:8,padding:0,overflow:'hidden'}}>
             <div style={{padding:14,display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer'}} onClick={()=>setExpanded(ex?null:emp.id)}>
               <div>
@@ -372,7 +378,7 @@ ${p.otDetails.length?`<h2>⏰ 加班明細</h2>${p.otDetails.map(d=>`<div class=
                   {p.att.lateCount>0&&<span style={{color:'var(--red)',fontWeight:700}}>🔴遲到{p.att.lateCount}</span>}
                   {p.att.earlyCount>0&&<span style={{color:'#f59e0b',fontWeight:700}}>🟡早退{p.att.earlyCount}</span>}
                   {p.attendanceBonus.amount>0&&<span style={{color:abStatus==='lost'?'var(--red)':'var(--green)',fontSize:10}}>{abStatus==='lost'?'全勤❌':'全勤✓'}</span>}
-                  {p.att.overrideCount>0&&<span style={{color:'var(--blue)',fontSize:10}}>⚙️修正{p.att.overrideCount}</span>}
+                  {p.att.overrideCount>0&&<span style={{color:'var(--blue)',fontSize:10}}>⚙️{p.att.overrideCount}</span>}
                 </div>
               </div>
               <div style={{display:'flex',alignItems:'center',gap:8}}>
@@ -387,114 +393,140 @@ ${p.otDetails.length?`<h2>⏰ 加班明細</h2>${p.otDetails.map(d=>`<div class=
               <SH>出勤統計</SH>
               <div style={{display:'flex',gap:6,marginBottom:6,fontSize:12,flexWrap:'wrap'}}>
                 <span style={{color:'var(--green)'}}>上班{p.actualWorkedDays}天</span>
-                {p.att.sick>0&&<span style={{color:'#ffb347'}}>病假{p.att.sick}天</span>}
-                {p.att.personal>0&&<span style={{color:'#ffd700'}}>事假{p.att.personal}天</span>}
-                {p.att.special>0&&<span style={{color:'var(--blue)'}}>特休{p.att.special}天</span>}
-                {p.att.absent>0&&<span style={{color:'var(--red)'}}>曠職{p.att.absent}天</span>}
-                <span style={{color:'var(--text-muted)'}}>休假{p.att.off}天</span>
-                {p.att.lateCount>0&&<span style={{color:'var(--red)'}}>遲到{p.att.lateCount}次({p.att.lateMinutes}分)</span>}
-                {p.att.earlyCount>0&&<span style={{color:'#f59e0b'}}>早退{p.att.earlyCount}次({p.att.earlyMinutes}分)</span>}
-                {p.att.overrideCount>0&&<span style={{color:'var(--blue)'}}>⚙️人工修正{p.att.overrideCount}筆</span>}
+                {p.att.sick>0&&<span style={{color:'#ffb347'}}>病假{p.att.sick}</span>}
+                {p.att.personal>0&&<span style={{color:'#ffd700'}}>事假{p.att.personal}</span>}
+                <span style={{color:'var(--text-muted)'}}>休假{p.att.off}</span>
+                {p.att.lateCount>0&&<span style={{color:'var(--red)'}}>遲到{p.att.lateCount}({p.att.lateMinutes}分)</span>}
+                {p.att.earlyCount>0&&<span style={{color:'#f59e0b'}}>早退{p.att.earlyCount}({p.att.earlyMinutes}分)</span>}
               </div>
               {p.att.lateDetails.length>0&&<div style={{marginBottom:8}}><div style={{fontSize:11,color:'var(--red)',fontWeight:600,marginBottom:4}}>⚠️ 遲到明細</div>{p.att.lateDetails.map((d,i)=><div key={i} style={{fontSize:11,color:'var(--text-dim)',display:'flex',justifyContent:'space-between',padding:'2px 0'}}><span>{d.date} 打卡{d.time}{d.overridden?' ⚙️':''}</span><span style={{color:'var(--red)'}}>遲{d.minutes}分</span></div>)}</div>}
               {p.att.earlyDetails.length>0&&<div style={{marginBottom:8}}><div style={{fontSize:11,color:'#f59e0b',fontWeight:600,marginBottom:4}}>⚠️ 早退明細</div>{p.att.earlyDetails.map((d,i)=><div key={i} style={{fontSize:11,color:'var(--text-dim)',display:'flex',justifyContent:'space-between',padding:'2px 0'}}><span>{d.date} 下班{d.time}{d.overridden?' ⚙️':''}</span><span style={{color:'#f59e0b'}}>早{d.minutes}分</span></div>)}</div>}
-              {p.otDetails.length>0&&<div style={{marginBottom:8}}><div style={{fontSize:11,color:'var(--green)',fontWeight:600,marginBottom:4}}>⏰ 加班明細（時薪${p.hourlyBase}）</div>{p.otDetails.map((d,i)=><div key={i} style={{fontSize:11,color:'var(--text-dim)',display:'flex',justifyContent:'space-between',padding:'2px 0'}}><span>{d.date} · {d.hours}hr</span><span style={{color:'var(--green)'}}>+${d.pay.toLocaleString()}</span></div>)}<div style={{fontSize:12,fontWeight:600,color:'var(--green)',marginTop:4}}>合計 +${p.otPay.toLocaleString()}</div></div>}
-
-              <SH>薪資明細（依實際出勤）</SH>
-              <R label="月底薪" value={p.monthlyBase} dim/>
-              <R label={`當月天數`} value={`${p.daysInMonth} 天`} dim/>
-              <R label="每日底薪" value={p.dailyBase} dim/>
+              {p.otDetails.length>0&&<div style={{marginBottom:8}}><div style={{fontSize:11,color:'var(--green)',fontWeight:600,marginBottom:4}}>⏰ 加班（時薪${p.hourlyBase}）</div>{p.otDetails.map((d,i)=><div key={i} style={{fontSize:11,color:'var(--text-dim)',display:'flex',justifyContent:'space-between',padding:'2px 0'}}><span>{d.date} {d.hours}hr</span><span style={{color:'var(--green)'}}>+${d.pay.toLocaleString()}</span></div>)}</div>}
+              <SH>薪資明細</SH>
+              <R label="月底薪" value={p.monthlyBase} dim/><R label={`當月天數`} value={`${p.daysInMonth} 天`} dim/><R label="每日底薪" value={p.dailyBase} dim/>
               <R label="實際出勤天數" value={`${p.actualWorkedDays} 天`} dim/>
               <div style={{height:1,background:'var(--border)',margin:'4px 0'}}/>
-              <R label={`出勤${p.actualWorkedDays}天 × 日薪$${p.dailyBase.toLocaleString()}`} value={p.proratedBase}/>
-              {p.attendanceBonus.amount>0&&(
-                <div style={{display:'flex',justifyContent:'space-between',padding:'3px 0',fontSize:13}}>
-                  <span style={{color:'var(--text-dim)',display:'flex',alignItems:'center',gap:4}}>+ 全勤獎金 <span style={{fontSize:10,padding:'1px 6px',borderRadius:6,background:abStatus==='lost'?'rgba(196,77,77,.15)':'rgba(77,168,108,.15)',color:abStatus==='lost'?'var(--red)':'var(--green)',fontWeight:700}}>{abStatus==='lost'?'已失效':abStatus==='pending'?'暫符合':'已確認'}</span></span>
-                  <span style={{fontFamily:'var(--font-mono)',color:abStatus==='lost'?'var(--red)':'var(--green)',textDecoration:abStatus==='lost'?'line-through':'none'}}>{abStatus==='lost'?`$${p.attendanceBonus.amount.toLocaleString()}`:`+$${p.attendanceBonus.effective.toLocaleString()}`}</span>
-                </div>
-              )}
+              <R label={`出勤${p.actualWorkedDays}天 × $${p.dailyBase.toLocaleString()}`} value={p.proratedBase}/>
+              {p.attendanceBonus.amount>0&&<div style={{display:'flex',justifyContent:'space-between',padding:'3px 0',fontSize:13}}><span style={{color:'var(--text-dim)',display:'flex',alignItems:'center',gap:4}}>+ 全勤獎金 <span style={{fontSize:10,padding:'1px 6px',borderRadius:6,background:abStatus==='lost'?'rgba(196,77,77,.15)':'rgba(77,168,108,.15)',color:abStatus==='lost'?'var(--red)':'var(--green)',fontWeight:700}}>{abStatus==='lost'?'已失效':abStatus==='pending'?'暫符合':'已確認'}</span></span><span style={{fontFamily:'var(--font-mono)',color:abStatus==='lost'?'var(--red)':'var(--green)',textDecoration:abStatus==='lost'?'line-through':'none'}}>{abStatus==='lost'?`$${p.attendanceBonus.amount.toLocaleString()}`:`+$${p.attendanceBonus.effective.toLocaleString()}`}</span></div>}
               {p.otherBonuses.map(b=><R key={b.id} label={`+ ${b.bonus_name}`} value={b.amount} positive/>)}
               {p.otPay>0&&<R label="+ 加班費" value={p.otPay} positive/>}
               <div style={{height:1,background:'var(--border)',margin:'6px 0'}}/>
               <R label={`投保 $${p.lb.toLocaleString()}`} value={p.lb} dim/>
-              <R label="- 勞保自付(20%)" value={-p.li} negative/>
-              <R label="- 健保自付(30%)" value={-p.hi} negative/>
-              {p.sickDeduct>0&&<R label={`- 病假${p.att.sick}天(半薪)`} value={-p.sickDeduct} negative/>}
+              <R label="- 勞保(20%)" value={-p.li} negative/><R label="- 健保(30%)" value={-p.hi} negative/>
+              {p.sickDeduct>0&&<R label={`- 病假${p.att.sick}天`} value={-p.sickDeduct} negative/>}
               {p.personalDeduct>0&&<R label={`- 事假${p.att.personal}天`} value={-p.personalDeduct} negative/>}
               {p.absentDeduct>0&&<R label={`- 曠職${p.att.absent}天`} value={-p.absentDeduct} negative/>}
               <div style={{height:2,background:'var(--gold)',margin:'8px 0'}}/>
               <R label="＝ 截至今日可領" value={p.currentPayable} highlight/>
-              {isCurrentMonth&&<div style={{fontSize:10,color:'var(--text-muted)',marginTop:4,textAlign:'center'}}>⚠️ 依實際出勤天數計算，非月底應發薪資</div>}
+              {isCurrentMonth&&<div style={{fontSize:10,color:'var(--text-muted)',marginTop:4,textAlign:'center'}}>⚠️ 依實際出勤，非月底應發</div>}
               <div style={{height:1,background:'var(--border)',margin:'8px 0'}}/>
               <SH>雇主負擔</SH>
-              <R label="勞保(70%)" value={p.liER} dim/><R label="健保(60%)" value={p.hiER} dim/><R label="勞退6%" value={p.lp} dim/>
+              <R label="勞保70%" value={p.liER} dim/><R label="健保60%" value={p.hiER} dim/><R label="勞退6%" value={p.lp} dim/>
               <R label="雇主總成本" value={p.erCost} highlight/>
               <button className="btn-outline" style={{width:'100%',marginTop:10,display:'flex',alignItems:'center',justifyContent:'center',gap:6,fontSize:13}} onClick={()=>setPayslip({emp,p})}><FileText size={14}/> 生成薪資條</button>
             </div>}
           </div>
         })}
-        {isCurrentMonth&&<div style={{fontSize:10,color:'var(--text-muted)',textAlign:'center',padding:'8px 0'}}>薪資依實際出勤天數計算 · 後台可人工修正出勤紀錄</div>}
       </div>)}
 
-      {tab==='config'&&(<div>
-        {emps.map(emp=>{
-          const c=getCfg(emp.id),isE=editingSal?.eid===emp.id
-          return <div key={emp.id} className="card" style={{padding:14,marginBottom:8}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:isE?10:0}}>
-              <div><div style={{fontSize:14,fontWeight:600}}>{emp.name} <span style={{fontSize:10,color:'var(--text-muted)'}}>{emp.emp_type}</span></div><div style={{fontSize:11,color:'var(--text-muted)'}}>{c.salary_type||'月薪'} · ${(c.monthly_salary||0).toLocaleString()}</div></div>
-              {!isE&&<button style={ib} onClick={()=>setEditingSal({eid:emp.id,salary_type:c.salary_type||'月薪',monthly_salary:c.monthly_salary||0})}><Edit3 size={14} color="var(--gold)"/></button>}
+      {/* ===== ⚙️ 出勤修正 ===== */}
+      {tab==='override'&&(<div>
+        <div style={{fontSize:13,color:'var(--text-dim)',marginBottom:12}}>選擇員工查看每日出勤紀錄，可修正遲到/早退/出勤狀態。修正後薪資立即重算。</div>
+        <select value={overrideEmp} onChange={e=>setOverrideEmp(e.target.value)} style={{width:'100%',fontSize:14,padding:10,marginBottom:16}}>
+          <option value="">— 選擇員工 —</option>
+          {emps.map(e=><option key={e.id} value={e.id}>{e.name} ({e.id})</option>)}
+        </select>
+        {overrideEmp && getDayRows(overrideEmp).map(day => {
+          const isWorkDay = day.shift === '早班' || day.shift === '晚班'
+          const hasIssue = day.autoLate || day.autoEarly
+          const isFixed = day.inOverridden || day.outOverridden
+          const lateFixed = day.inOverridden && day.inCorrectedLate === false
+          const earlyFixed = day.outOverridden && day.outCorrectedEarly === false
+
+          return <div key={day.date} className="card" style={{padding:12,marginBottom:6,borderColor:isFixed?'rgba(77,138,196,.3)':hasIssue?'rgba(196,77,77,.3)':'var(--border)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:isWorkDay&&(hasIssue||isFixed)?8:0}}>
+              <div>
+                <div style={{fontSize:13,fontWeight:600,display:'flex',alignItems:'center',gap:6}}>
+                  {day.date.slice(5)}
+                  <span style={{fontSize:10,padding:'2px 6px',borderRadius:6,background: !isWorkDay?'rgba(138,130,120,.1)':hasIssue&&!isFixed?'rgba(196,77,77,.1)':isFixed?'rgba(77,138,196,.1)':'rgba(77,168,108,.1)', color: !isWorkDay?'var(--text-muted)':hasIssue&&!isFixed?'var(--red)':isFixed?'var(--blue)':'var(--green)'}}>{!isWorkDay?day.shift:isFixed?'⚙️已修正':hasIssue?'異常':'正常'}</span>
+                </div>
+                {isWorkDay&&<div style={{fontSize:11,color:'var(--text-muted)',marginTop:2}}>
+                  {day.shift} · 上班 {day.clockInTime||'未打'} · 下班 {day.clockOutTime||'未打'}
+                </div>}
+              </div>
+              {isWorkDay && !hasIssue && !isFixed && <CheckCircle2 size={16} color="var(--green)"/>}
+              {isWorkDay && hasIssue && !isFixed && <AlertTriangle size={16} color="var(--red)"/>}
+              {isFixed && <span style={{fontSize:10,color:'var(--blue)',fontWeight:700}}>⚙️</span>}
             </div>
-            {isE&&<div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
-              <select value={editingSal.salary_type} onChange={e=>setEditingSal(p=>({...p,salary_type:e.target.value}))} style={{width:80,fontSize:13,padding:8}}><option>月薪</option><option>時薪</option></select>
-              <input type="number" inputMode="numeric" value={editingSal.monthly_salary} onChange={e=>setEditingSal(p=>({...p,monthly_salary:e.target.value}))} style={{flex:1,fontSize:13,padding:8}}/>
-              <button className="btn-gold" style={{padding:'8px 14px',fontSize:12}} onClick={()=>saveSalConfig(emp.id)}><Save size={12}/></button>
-              <button className="btn-outline" style={{padding:'8px 14px',fontSize:12}} onClick={()=>setEditingSal(null)}>取消</button>
-            </div>}
+
+            {/* 遲到修正 */}
+            {isWorkDay && day.autoLate && (
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 0',borderTop:'1px solid var(--border)'}}>
+                <div style={{fontSize:12}}>
+                  <span style={{color:'var(--red)'}}>🔴 遲到 {day.lateMins} 分鐘</span>
+                  {lateFixed && <span style={{color:'var(--blue)',marginLeft:6,fontSize:11}}>→ 已改正常</span>}
+                </div>
+                {!lateFixed ? (
+                  <button onClick={()=>overridePunch(day.clockInId, { corrected_is_late: false, override_reason: '測試期間取消遲到' })} disabled={overrideSaving===day.clockInId} style={{fontSize:11,padding:'4px 10px',borderRadius:8,cursor:'pointer',background:'rgba(77,168,108,.12)',color:'var(--green)',border:'1px solid rgba(77,168,108,.3)',fontWeight:600}}>
+                    {overrideSaving===day.clockInId?'...':'✅ 改正常'}
+                  </button>
+                ) : (
+                  <button onClick={()=>cancelOverride(day.clockInId)} disabled={overrideSaving===day.clockInId} style={{fontSize:11,padding:'4px 10px',borderRadius:8,cursor:'pointer',background:'rgba(196,77,77,.08)',color:'var(--red)',border:'1px solid rgba(196,77,77,.2)',fontWeight:600}}>
+                    {overrideSaving===day.clockInId?'...':'↩️ 還原'}
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* 早退修正 */}
+            {isWorkDay && day.autoEarly && (
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 0',borderTop:'1px solid var(--border)'}}>
+                <div style={{fontSize:12}}>
+                  <span style={{color:'#f59e0b'}}>🟡 早退 {day.earlyMins} 分鐘</span>
+                  {earlyFixed && <span style={{color:'var(--blue)',marginLeft:6,fontSize:11}}>→ 已改正常</span>}
+                </div>
+                {!earlyFixed ? (
+                  <button onClick={()=>overridePunch(day.clockOutId, { corrected_is_early: false, override_reason: '測試期間取消早退' })} disabled={overrideSaving===day.clockOutId} style={{fontSize:11,padding:'4px 10px',borderRadius:8,cursor:'pointer',background:'rgba(77,168,108,.12)',color:'var(--green)',border:'1px solid rgba(77,168,108,.3)',fontWeight:600}}>
+                    {overrideSaving===day.clockOutId?'...':'✅ 改正常'}
+                  </button>
+                ) : (
+                  <button onClick={()=>cancelOverride(day.clockOutId)} disabled={overrideSaving===day.clockOutId} style={{fontSize:11,padding:'4px 10px',borderRadius:8,cursor:'pointer',background:'rgba(196,77,77,.08)',color:'var(--red)',border:'1px solid rgba(196,77,77,.2)',fontWeight:600}}>
+                    {overrideSaving===day.clockOutId?'...':'↩️ 還原'}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         })}
+        {overrideEmp && getDayRows(overrideEmp).length === 0 && <div style={{textAlign:'center',color:'var(--text-muted)',padding:20}}>本月無排班紀錄</div>}
       </div>)}
 
+      {/* ===== 薪資設定 ===== */}
+      {tab==='config'&&(<div>
+        {emps.map(emp=>{const c=getCfg(emp.id),isE=editingSal?.eid===emp.id;return <div key={emp.id} className="card" style={{padding:14,marginBottom:8}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:isE?10:0}}><div><div style={{fontSize:14,fontWeight:600}}>{emp.name} <span style={{fontSize:10,color:'var(--text-muted)'}}>{emp.emp_type}</span></div><div style={{fontSize:11,color:'var(--text-muted)'}}>{c.salary_type||'月薪'} · ${(c.monthly_salary||0).toLocaleString()}</div></div>{!isE&&<button style={ib} onClick={()=>setEditingSal({eid:emp.id,salary_type:c.salary_type||'月薪',monthly_salary:c.monthly_salary||0})}><Edit3 size={14} color="var(--gold)"/></button>}</div>{isE&&<div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}><select value={editingSal.salary_type} onChange={e=>setEditingSal(p=>({...p,salary_type:e.target.value}))} style={{width:80,fontSize:13,padding:8}}><option>月薪</option><option>時薪</option></select><input type="number" inputMode="numeric" value={editingSal.monthly_salary} onChange={e=>setEditingSal(p=>({...p,monthly_salary:e.target.value}))} style={{flex:1,fontSize:13,padding:8}}/><button className="btn-gold" style={{padding:'8px 14px',fontSize:12}} onClick={()=>saveSalConfig(emp.id)}><Save size={12}/></button><button className="btn-outline" style={{padding:'8px 14px',fontSize:12}} onClick={()=>setEditingSal(null)}>取消</button></div>}</div>})}
+      </div>)}
+
+      {/* ===== 加給管理 ===== */}
       {tab==='bonus'&&(<div>
         <button className="btn-outline" style={{marginBottom:16,display:'flex',alignItems:'center',gap:6}} onClick={()=>setShowBonusForm(!showBonusForm)}><Plus size={14}/> 新增加給</button>
-        {showBonusForm&&<div className="card" style={{marginBottom:16,padding:16}}>
-          <select value={newBonus.employee_id} onChange={e=>setNewBonus(p=>({...p,employee_id:e.target.value}))} style={{marginBottom:8}}><option value="">選擇員工</option>{emps.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select>
-          <input value={newBonus.bonus_name} onChange={e=>setNewBonus(p=>({...p,bonus_name:e.target.value}))} placeholder="加給名稱（含「全勤」自動判斷資格）" style={{marginBottom:8}}/>
-          <input type="number" inputMode="numeric" value={newBonus.amount} onChange={e=>setNewBonus(p=>({...p,amount:e.target.value}))} placeholder="金額" style={{marginBottom:8}} pattern="[0-9]*"/>
-          <button className="btn-gold" onClick={addBonus}>新增</button>
-        </div>}
-        {emps.map(emp=>{
-          const eb=bonuses.filter(b=>b.employee_id===emp.id);if(!eb.length)return null
-          return <div key={emp.id} style={{marginBottom:12}}>
-            <div style={{fontSize:13,fontWeight:700,color:'var(--gold)',marginBottom:4}}>{emp.name}</div>
-            {eb.map(b=><div key={b.id} className="card" style={{padding:12,marginBottom:4,display:'flex',justifyContent:'space-between',alignItems:'center',opacity:b.enabled?1:.5}}>
-              <span style={{fontSize:13}}>{b.bonus_name} <strong style={{color:'var(--green)'}}>+${(b.amount||0).toLocaleString()}</strong></span>
-              <div style={{display:'flex',gap:4}}><button style={{...ib,color:b.enabled?'var(--red)':'var(--green)'}} onClick={()=>toggleBonus(b.id,!b.enabled)}>{b.enabled?'停':'啟'}</button><button style={{...ib,color:'var(--red)'}} onClick={()=>deleteBonus(b.id)}><Trash2 size={12}/></button></div>
-            </div>)}
-          </div>
-        })}
+        {showBonusForm&&<div className="card" style={{marginBottom:16,padding:16}}><select value={newBonus.employee_id} onChange={e=>setNewBonus(p=>({...p,employee_id:e.target.value}))} style={{marginBottom:8}}><option value="">選擇員工</option>{emps.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select><input value={newBonus.bonus_name} onChange={e=>setNewBonus(p=>({...p,bonus_name:e.target.value}))} placeholder="加給名稱（含「全勤」自動判斷）" style={{marginBottom:8}}/><input type="number" inputMode="numeric" value={newBonus.amount} onChange={e=>setNewBonus(p=>({...p,amount:e.target.value}))} placeholder="金額" style={{marginBottom:8}} pattern="[0-9]*"/><button className="btn-gold" onClick={addBonus}>新增</button></div>}
+        {emps.map(emp=>{const eb=bonuses.filter(b=>b.employee_id===emp.id);if(!eb.length)return null;return <div key={emp.id} style={{marginBottom:12}}><div style={{fontSize:13,fontWeight:700,color:'var(--gold)',marginBottom:4}}>{emp.name}</div>{eb.map(b=><div key={b.id} className="card" style={{padding:12,marginBottom:4,display:'flex',justifyContent:'space-between',alignItems:'center',opacity:b.enabled?1:.5}}><span style={{fontSize:13}}>{b.bonus_name} <strong style={{color:'var(--green)'}}>+${(b.amount||0).toLocaleString()}</strong></span><div style={{display:'flex',gap:4}}><button style={{...ib,color:b.enabled?'var(--red)':'var(--green)'}} onClick={()=>toggleBonus(b.id,!b.enabled)}>{b.enabled?'停':'啟'}</button><button style={{...ib,color:'var(--red)'}} onClick={()=>deleteBonus(b.id)}><Trash2 size={12}/></button></div></div>)}</div>})}
       </div>)}
 
+      {/* ===== 支出管理 ===== */}
       {tab==='expenses'&&(<div>
         <div className="card" style={{padding:14,marginBottom:16}}><div style={{fontSize:11,color:'var(--text-dim)'}}>本月支出</div><div style={{fontSize:22,fontFamily:'var(--font-mono)',color:'var(--red)',fontWeight:600}}>${totalExp.toLocaleString()}</div></div>
         <button className="btn-outline" style={{marginBottom:16,display:'flex',alignItems:'center',gap:6}} onClick={()=>setShowExpForm(!showExpForm)}><Plus size={14}/> 新增</button>
-        {showExpForm&&<div className="card" style={{marginBottom:16,padding:16}}>
-          <div style={{display:'flex',gap:8,marginBottom:8}}><input type="date" value={newExp.date} onChange={e=>setNewExp(p=>({...p,date:e.target.value}))} style={{flex:1,fontSize:13,padding:8}}/><select value={newExp.category} onChange={e=>setNewExp(p=>({...p,category:e.target.value}))} style={{flex:1,fontSize:13,padding:8}}><option value="">分類</option>{['食材','酒水','雪茄進貨','設備','房租','水電','人事','行銷','雜支'].map(c=><option key={c}>{c}</option>)}</select></div>
-          <input value={newExp.item} onChange={e=>setNewExp(p=>({...p,item:e.target.value}))} placeholder="項目" style={{marginBottom:8}}/>
-          <div style={{display:'flex',gap:8,marginBottom:8}}><input type="number" inputMode="numeric" value={newExp.amount} onChange={e=>setNewExp(p=>({...p,amount:e.target.value}))} placeholder="金額" style={{flex:1}} pattern="[0-9]*"/><select value={newExp.payment} onChange={e=>setNewExp(p=>({...p,payment:e.target.value}))} style={{width:100,fontSize:13,padding:8}}>{['現金','刷卡','轉帳','LINE Pay'].map(p=><option key={p}>{p}</option>)}</select></div>
-          <button className="btn-gold" onClick={addExpense}>儲存</button>
-        </div>}
-        {expenses.map(e=><div key={e.id} className="card" style={{padding:12,marginBottom:6,display:'flex',justifyContent:'space-between'}}>
-          <div><div style={{fontSize:13,fontWeight:500}}>{e.item||e.category}</div><div style={{fontSize:11,color:'var(--text-muted)'}}>{e.date} · {e.category} · {e.payment}</div></div>
-          <div style={{display:'flex',alignItems:'center',gap:6}}><span style={{fontSize:15,fontFamily:'var(--font-mono)',color:'var(--red)',fontWeight:600}}>-${(e.amount||0).toLocaleString()}</span><button style={{...ib,color:'var(--red)'}} onClick={()=>deleteExpense(e.id)}><Trash2 size={12}/></button></div>
-        </div>)}
+        {showExpForm&&<div className="card" style={{marginBottom:16,padding:16}}><div style={{display:'flex',gap:8,marginBottom:8}}><input type="date" value={newExp.date} onChange={e=>setNewExp(p=>({...p,date:e.target.value}))} style={{flex:1,fontSize:13,padding:8}}/><select value={newExp.category} onChange={e=>setNewExp(p=>({...p,category:e.target.value}))} style={{flex:1,fontSize:13,padding:8}}><option value="">分類</option>{['食材','酒水','雪茄進貨','設備','房租','水電','人事','行銷','雜支'].map(c=><option key={c}>{c}</option>)}</select></div><input value={newExp.item} onChange={e=>setNewExp(p=>({...p,item:e.target.value}))} placeholder="項目" style={{marginBottom:8}}/><div style={{display:'flex',gap:8,marginBottom:8}}><input type="number" inputMode="numeric" value={newExp.amount} onChange={e=>setNewExp(p=>({...p,amount:e.target.value}))} placeholder="金額" style={{flex:1}} pattern="[0-9]*"/><select value={newExp.payment} onChange={e=>setNewExp(p=>({...p,payment:e.target.value}))} style={{width:100,fontSize:13,padding:8}}>{['現金','刷卡','轉帳','LINE Pay'].map(p=><option key={p}>{p}</option>)}</select></div><button className="btn-gold" onClick={addExpense}>儲存</button></div>}
+        {expenses.map(e=><div key={e.id} className="card" style={{padding:12,marginBottom:6,display:'flex',justifyContent:'space-between'}}><div><div style={{fontSize:13,fontWeight:500}}>{e.item||e.category}</div><div style={{fontSize:11,color:'var(--text-muted)'}}>{e.date} · {e.category} · {e.payment}</div></div><div style={{display:'flex',alignItems:'center',gap:6}}><span style={{fontSize:15,fontFamily:'var(--font-mono)',color:'var(--red)',fontWeight:600}}>-${(e.amount||0).toLocaleString()}</span><button style={{...ib,color:'var(--red)'}} onClick={()=>deleteExpense(e.id)}><Trash2 size={12}/></button></div></div>)}
       </div>)}
     </div>
   )
 }
 
 function R({label,value,positive,negative,highlight,dim}) {
-  const c = highlight?'var(--gold)':positive?'var(--green)':negative?'var(--red)':dim?'var(--text-muted)':'var(--text)'
-  const display = typeof value==='number'?(value<0?`-$${Math.abs(value).toLocaleString()}`:`$${value.toLocaleString()}`):value
+  const c=highlight?'var(--gold)':positive?'var(--green)':negative?'var(--red)':dim?'var(--text-muted)':'var(--text)'
+  const display=typeof value==='number'?(value<0?`-$${Math.abs(value).toLocaleString()}`:`$${value.toLocaleString()}`):value
   return <div style={{display:'flex',justifyContent:'space-between',padding:'3px 0',fontSize:13}}><span style={{color:dim?'var(--text-muted)':'var(--text-dim)'}}>{label}</span><span style={{fontFamily:'var(--font-mono)',fontWeight:highlight?600:400,color:c}}>{display}</span></div>
 }
 function SH({children}){return<div style={{fontSize:12,fontWeight:600,color:'var(--gold)',marginBottom:4,marginTop:8}}>{children}</div>}
