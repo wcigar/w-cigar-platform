@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { Plus, Save, Trash2, Lock, Unlock, LogOut, Edit3, Clock } from 'lucide-react'
 import { format, subMonths, endOfMonth } from 'date-fns'
+import { seedTodayTasks } from '../../lib/seeder'
 
 export default function Settings() {
   const [tab, setTab] = useState('employees')
@@ -12,12 +13,18 @@ export default function Settings() {
     { id: 'kpi', l: 'KPI考核' },
     { id: 'kpi_report', l: 'KPI月報' },
   ]
+
   return (
     <div className="page-container fade-in">
       <div className="section-title">系統設定</div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 20, overflowX: 'auto' }}>
         {tabs.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)} style={{ padding: '8px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', background: tab === t.id ? 'var(--gold-glow)' : 'transparent', color: tab === t.id ? 'var(--gold)' : 'var(--text-dim)', border: tab === t.id ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>{t.l}</button>
+          <button key={t.id} onClick={() => setTab(t.id)} style={{
+            padding: '8px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
+            background: tab === t.id ? 'var(--gold-glow)' : 'transparent',
+            color: tab === t.id ? 'var(--gold)' : 'var(--text-dim)',
+            border: tab === t.id ? '1px solid var(--border-gold)' : '1px solid var(--border)'
+          }}>{t.l}</button>
         ))}
       </div>
       {tab === 'employees' && <EmployeeManager />}
@@ -37,18 +44,26 @@ function EmployeeManager() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => { load() }, [])
+
   async function load() {
     setLoading(true)
     const { data } = await supabase.from('employees').select('*').order('name')
     setEmps((data || []).filter(e => !e.is_admin))
     setLoading(false)
   }
-  async function toggleEmp(emp) { await supabase.from('employees').update({ enabled: !emp.enabled }).eq('id', emp.id); load() }
+
+  async function toggleEmp(emp) {
+    await supabase.from('employees').update({ enabled: !emp.enabled }).eq('id', emp.id); load()
+  }
+
   async function saveEdit() {
     if (!editing) return
-    await supabase.from('employees').update({ name: editing.name, title: editing.title, login_code: editing.login_code, emp_type: editing.emp_type }).eq('id', editing.id)
+    await supabase.from('employees').update({
+      name: editing.name, title: editing.title, login_code: editing.login_code, emp_type: editing.emp_type
+    }).eq('id', editing.id)
     setEditing(null); load()
   }
+
   async function addEmployee() {
     if (!newEmp.id || !newEmp.name || !newEmp.login_code) return alert('ID、名稱、登入碼必填')
     if (newEmp.login_code.length < 4) return alert('登入碼至少4碼')
@@ -56,7 +71,9 @@ function EmployeeManager() {
     await supabase.from('employees').insert({ ...newEmp, id: newEmp.id.toUpperCase(), enabled: true, is_admin: false })
     setNewEmp({ id: '', name: '', title: '', login_code: '', emp_type: '正職' }); setAdding(false); load()
   }
+
   if (loading) return <Loading />
+
   return (
     <div>
       {emps.map(emp => (
@@ -79,7 +96,13 @@ function EmployeeManager() {
           ) : (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 36, height: 36, borderRadius: 8, background: emp.enabled ? 'var(--gold-glow)' : 'var(--black)', border: `1px solid ${emp.enabled ? 'var(--border-gold)' : 'var(--border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, color: emp.enabled ? 'var(--gold)' : 'var(--text-muted)' }}>{emp.name?.charAt(0)}</div>
+                <div style={{
+                  width: 36, height: 36, borderRadius: 8,
+                  background: emp.enabled ? 'var(--gold-glow)' : 'var(--black)',
+                  border: `1px solid ${emp.enabled ? 'var(--border-gold)' : 'var(--border)'}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontWeight: 700, fontSize: 14, color: emp.enabled ? 'var(--gold)' : 'var(--text-muted)'
+                }}>{emp.name?.charAt(0)}</div>
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 500, color: emp.enabled ? 'var(--text)' : 'var(--text-muted)' }}>{emp.name}</div>
                   <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{emp.id} · {emp.title} · <span style={{ color: emp.emp_type === '正職' ? 'var(--green)' : 'var(--blue)' }}>{emp.emp_type}</span></div>
@@ -122,6 +145,7 @@ function SOPManager() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => { load() }, [])
+
   async function load() {
     setLoading(true)
     const [dR, eR] = await Promise.all([
@@ -132,23 +156,46 @@ function SOPManager() {
     setEmps([{ id: 'ALL', name: '全員搶單' }, ...(eR.data || []).filter(e => !e.is_admin)])
     setLoading(false)
   }
+
   async function saveEdit() {
     if (!editing) return
     const { task_id, ...rest } = editing
     await supabase.from('sop_definitions').update(rest).eq('task_id', task_id)
+    // ✅ 同步更新今日 task_status（標題、負責人、類別、截止時間）
+    const today = format(new Date(), 'yyyy-MM-dd')
+    await supabase.from('task_status').update({
+      title: rest.title,
+      owner: rest.owner,
+      category: rest.category,
+      due_time: rest.due_time || null
+    }).eq('task_id', task_id).eq('date', today)
     setEditing(null); load()
+    alert('SOP定義已更新，今日任務已同步')
   }
+
   async function addTask() {
     if (!newTask.task_id || !newTask.title) return alert('ID和名稱必填')
     if (defs.find(d => d.task_id === newTask.task_id)) return alert('ID已存在')
     await supabase.from('sop_definitions').insert(newTask)
+    // ✅ 清除播種快取，重跑 seeder 讓新任務立即出現在員工端
+    const today = format(new Date(), 'yyyy-MM-dd')
+    sessionStorage.removeItem('seeded_' + today)
+    await seedTodayTasks()
     setNewTask({ task_id: '', owner: 'ALL', category: '', title: '', description: '', need_photo: false, need_input: false, weight: 1, deadline: '18:00', due_time: '', frequency: '每日' })
     setAdding(false); load()
+    alert('SOP任務已新增，今日立即生效')
   }
+
   async function deleteTask(tid) {
-    if (!confirm(`確定刪除「${tid}」？明天起生效`)) return
-    await supabase.from('sop_definitions').delete().eq('task_id', tid); load()
+    if (!confirm(`確定刪除「${tid}」？`)) return
+    await supabase.from('sop_definitions').delete().eq('task_id', tid)
+    // ✅ 同步刪除今日未完成的 task_status（已完成的保留不動）
+    const today = format(new Date(), 'yyyy-MM-dd')
+    await supabase.from('task_status').delete().eq('task_id', tid).eq('date', today).eq('completed', false)
+    load()
+    alert('SOP定義已刪除，今日未完成任務已移除')
   }
+
   if (loading) return <Loading />
 
   const byOwner = {}
@@ -156,7 +203,7 @@ function SOPManager() {
 
   return (
     <div>
-      <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12 }}>修改後明天起生效，共 {defs.length} 項定義</div>
+      <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12 }}>修改後立即生效，共 {defs.length} 項定義</div>
       {Object.entries(byOwner).map(([owner, items]) => (
         <div key={owner} style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--gold)', padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
@@ -252,6 +299,7 @@ function KPIManager() {
   const months = Array.from({ length: 6 }, (_, i) => format(subMonths(new Date(), i), 'yyyy-MM'))
 
   useEffect(() => { load() }, [month])
+
   async function load() {
     setLoading(true)
     const start = month + '-01', end = format(endOfMonth(new Date(month + '-01')), 'yyyy-MM-dd')
@@ -263,6 +311,7 @@ function KPIManager() {
     setEmps((eR.data || []).filter(e => e.id !== 'ADMIN'))
     setTasks(tR.data || []); setKpis(kR.data || []); setLoading(false)
   }
+
   function calcMetrics(empId, empName) {
     const myTasks = tasks.filter(t => t.owner === empId)
     const done = myTasks.filter(t => t.completed).length
@@ -274,6 +323,7 @@ function KPIManager() {
     else if (rate >= 70 && grabs >= 3) grade = 'B'
     return { total: myTasks.length, done, rate, grabs, grade }
   }
+
   async function saveKPI(empId, empName, bossGrade, comment) {
     const m = calcMetrics(empId, empName)
     const existing = kpis.find(k => k.employee_id === empId)
@@ -282,17 +332,25 @@ function KPIManager() {
     else await supabase.from('kpi_evaluations').insert(row)
     alert('評鑑已儲存'); load()
   }
+
   async function toggleLock(empId, lock) {
     if (lock && !confirm('鎖定後無法修改，確定？')) return
     const existing = kpis.find(k => k.employee_id === empId)
     if (!existing) return alert('請先儲存評鑑')
     await supabase.from('kpi_evaluations').update({ lock_status: lock ? '已鎖定' : '草稿' }).eq('id', existing.id); load()
   }
+
   if (loading) return <Loading />
+
   return (
     <div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 16, overflowX: 'auto' }}>
-        {months.map(m => <button key={m} onClick={() => setMonth(m)} style={{ padding: '6px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap', cursor: 'pointer', background: m === month ? 'var(--gold-glow)' : 'transparent', color: m === month ? 'var(--gold)' : 'var(--text-dim)', border: m === month ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>{parseInt(m.slice(5))}月</button>)}
+        {months.map(m => <button key={m} onClick={() => setMonth(m)} style={{
+          padding: '6px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap', cursor: 'pointer',
+          background: m === month ? 'var(--gold-glow)' : 'transparent',
+          color: m === month ? 'var(--gold)' : 'var(--text-dim)',
+          border: m === month ? '1px solid var(--border-gold)' : '1px solid var(--border)'
+        }}>{parseInt(m.slice(5))}月</button>)}
       </div>
       {emps.map(emp => {
         const m = calcMetrics(emp.id, emp.name)
@@ -307,7 +365,9 @@ function KPIManager() {
 function KPICard({ emp, metrics: m, saved, locked, onSave, onToggleLock }) {
   const [grade, setGrade] = useState(saved?.boss_grade || '-')
   const [comment, setComment] = useState(saved?.boss_comment || '')
+
   useEffect(() => { setGrade(saved?.boss_grade || '-'); setComment(saved?.boss_comment || '') }, [saved])
+
   return (
     <div className="card" style={{ marginBottom: 12, padding: 16, borderColor: locked ? 'rgba(77,168,108,.3)' : undefined }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -347,5 +407,8 @@ function KPICard({ emp, metrics: m, saved, locked, onSave, onToggleLock }) {
   )
 }
 
-function Loading() { return <div>{[1,2,3].map(i => <div key={i} className="loading-shimmer" style={{ height: 60, marginBottom: 10 }} />)}</div> }
+function Loading() {
+  return <div>{[1,2,3].map(i => <div key={i} className="loading-shimmer" style={{ height: 60, marginBottom: 10 }} />)}</div>
+}
+
 const iconBtn = { background: 'none', border: 'none', padding: 6, cursor: 'pointer', borderRadius: 6 }
