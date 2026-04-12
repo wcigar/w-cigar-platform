@@ -359,7 +359,7 @@ export default function InventoryMgmt() {
                 </div>
               </div>
               <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
-                {r.source} · {r.time?.slice(0, 16)}
+                {r.source} · {r.time ? new Date(r.time).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}
                 {r.note && <span> · {r.note}</span>}
                 {r.is_low && <span style={{ color: 'var(--red)', fontWeight: 700 }}> ⚠低庫存</span>}
               </div>

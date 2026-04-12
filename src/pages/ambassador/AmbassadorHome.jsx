@@ -37,7 +37,7 @@ export default function AmbassadorHome({ user }) {
           <div style={{ fontSize: 12, color: '#8a8278', marginBottom: 4 }}>上班</div>
           {clockIn ? (
             <div style={{ color: '#4caf50', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
-              <CheckCircle2 size={14} /> {new Date(clockIn.punch_time || clockIn.created_at).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}
+              <CheckCircle2 size={14} /> {new Date(clockIn.punch_time || clockIn.created_at).toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit' })}
             </div>
           ) : (
             <div style={{ color: '#ff9800', fontSize: 13 }}>未打卡</div>
@@ -48,7 +48,7 @@ export default function AmbassadorHome({ user }) {
           <div style={{ fontSize: 12, color: '#8a8278', marginBottom: 4 }}>下班</div>
           {clockOut ? (
             <div style={{ color: '#4caf50', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
-              <CheckCircle2 size={14} /> {new Date(clockOut.punch_time || clockOut.created_at).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}
+              <CheckCircle2 size={14} /> {new Date(clockOut.punch_time || clockOut.created_at).toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit' })}
             </div>
           ) : (
             <div style={{ color: clockIn ? '#ff9800' : '#5a554e', fontSize: 13 }}>{clockIn ? '待打卡' : '—'}</div>

@@ -251,7 +251,7 @@ export default function HRSchedule() {
                   <span style={{ color: 'var(--text-muted)' }}>{l.operator}</span>
                 </div>
                 <div style={{ color: 'var(--text-dim)', marginTop: 2 }}>{l.description?.slice(0, 100)}</div>
-                <div style={{ color: 'var(--text-muted)', fontSize: 10, marginTop: 2 }}>{l.time?.slice(0, 19)}</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: 10, marginTop: 2 }}>{l.time ? new Date(l.time).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}</div>
               </div>
             ))}
         </div>

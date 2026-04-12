@@ -312,8 +312,8 @@ export default function Payroll() {
 
       return {
         date: s.date, shift: s.shift,
-        clockInTime: clockIn?.time?.slice(11, 16) || null,
-        clockOutTime: clockOut?.time?.slice(11, 16) || null,
+        clockInTime: clockIn?.time ? new Date(clockIn.time).toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false }) : null,
+        clockOutTime: clockOut?.time ? new Date(clockOut.time).toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false }) : null,
         clockInId: clockIn?.id, clockOutId: clockOut?.id,
         clockInPunch: clockIn, clockOutPunch: clockOut,
         autoLate, autoEarly, lateMins, earlyMins,

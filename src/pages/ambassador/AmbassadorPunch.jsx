@@ -130,7 +130,7 @@ export default function AmbassadorPunch({ user }) {
           {attendance.map((a, i) => (
             <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #1a1714', fontSize: 13 }}>
               <span style={{ color: a.type === 'clock_in' ? '#4caf50' : '#e74c3c' }}>{a.type === 'clock_in' ? '上班' : '下班'}</span>
-              <span style={{ color: '#8a8278' }}>{new Date(a.punch_time || a.created_at).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}</span>
+              <span style={{ color: '#8a8278' }}>{new Date(a.punch_time || a.created_at).toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit' })}</span>
             </div>
           ))}
         </div>
