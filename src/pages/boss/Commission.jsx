@@ -51,6 +51,7 @@ export default function Commission() {
 
   const fmt = n => `$${Number(n || 0).toLocaleString()}`
   const pct = (n, t) => t > 0 ? `${((n / t) * 100).toFixed(1)}%` : '0%'
+  const formatWan = n => { const v = Number(n || 0); return v >= 10000 ? Math.round(v / 10000) + '萬' : v.toLocaleString() }
   const months = []
   for (let i = -3; i <= 1; i++) {
     const d = new Date(); d.setMonth(d.getMonth() + i)
@@ -101,7 +102,7 @@ export default function Commission() {
         <div style={{ background: '#1a1714', border: '1px solid #2a2520', borderRadius: 12, padding: 16, marginBottom: 16 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: '#c9a84c', marginBottom: 12 }}>分紅計算</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
-            <div style={{ background: '#0d0b09', borderRadius: 8, padding: 12 }}><div style={{ fontSize: 11, color: '#8a7e6e' }}>適用級距</div><div style={{ fontSize: 16, fontWeight: 700, color: '#e8dcc8' }}>{appliedRule ? `${appliedRule.rate_percent || appliedRule.commission_rate || 0}%` : '—'}</div></div>
+            <div style={{ background: '#0d0b09', borderRadius: 8, padding: 12 }}><div style={{ fontSize: 11, color: '#8a7e6e' }}>適用級距</div><div style={{ fontSize: 16, fontWeight: 700, color: '#e8dcc8' }}>{s.commission_rate != null ? `${s.commission_rate}%` : appliedRule ? `${appliedRule.rate_percent || appliedRule.commission_rate || 0}%` : '—'}</div><div style={{ fontSize: 10, color: '#8a7e6e' }}>{appliedRule ? `${formatWan(appliedRule.min_revenue)}~${appliedRule.max_revenue ? formatWan(appliedRule.max_revenue) : '以上'}` : ''}</div></div>
             <div style={{ background: '#0d0b09', borderRadius: 8, padding: 12 }}><div style={{ fontSize: 11, color: '#8a7e6e' }}>分紅總額</div><div style={{ fontSize: 16, fontWeight: 700, color: '#4da86c', fontFamily: 'var(--font-mono)' }}>{fmt(s.total_commission)}</div></div>
             <div style={{ background: '#0d0b09', borderRadius: 8, padding: 12 }}><div style={{ fontSize: 11, color: '#8a7e6e' }}>30hr門檻</div><div style={{ fontSize: 14, fontWeight: 700, color: '#e8dcc8' }}><span style={{ color: '#4da86c' }}>{qualifiedCount}合格</span> / <span style={{ color: '#e74c3c' }}>{disqualifiedCount}不合格</span></div></div>
           </div>
@@ -137,7 +138,7 @@ export default function Commission() {
             return (
               <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 8, marginBottom: 4, background: isActive ? 'rgba(201,168,76,.1)' : 'transparent', border: isActive ? '1px solid rgba(201,168,76,.3)' : '1px solid transparent' }}>
                 <span style={{ fontSize: 13, color: isActive ? '#c9a84c' : '#8a7e6e' }}>
-                  {Math.round(Number(r.min_revenue) / 10000)}萬 ~ {r.max_revenue ? `${Math.round(Number(r.max_revenue) / 10000)}萬` : '以上'}
+                  {formatWan(r.min_revenue)} ~ {r.max_revenue ? formatWan(r.max_revenue) : '以上'}
                 </span>
                 <span style={{ fontSize: 13, fontWeight: 700, color: isActive ? '#c9a84c' : '#e8dcc8' }}>
                   {r.rate_percent || r.commission_rate || 0}%{isActive ? ' ← 本月適用' : ''}

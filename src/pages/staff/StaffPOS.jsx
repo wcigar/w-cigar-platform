@@ -35,7 +35,7 @@ function classifyItem(n, cat) {
   if (cat === '配件' || cat === '營運耗材') return '雪茄配件'
   if (/奶茶|咖啡|拿鐵|espresso|latte|americano/.test(l)) return '奶茶咖啡'
   if (/氣泡|可樂|雪碧|蘋果汁|可爾必思|礦泉水|coke|sprite|zero|蘇打/.test(l)) return '氣泡飲品'
-  if (/茶/.test(l) && cat === '吧台飲品') return '莊園品茗'
+  if (/茶|芭樂|guava/.test(l) && cat === '吧台飲品') return '莊園品茗'
   if (/布朗|蒙布朗|佛卡夏|可頌|甜點|蛋糕/.test(l)) return '甜點'
   if (/滷味|炸物|水餃|雞湯|拼盤|鬆餅|薯條|三明治/.test(l) || cat === '餐飲') return '餐食'
   if (cat === '酒類') return '酒類'
