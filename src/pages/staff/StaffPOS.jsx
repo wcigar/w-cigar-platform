@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
-import { Search, ShoppingCart, X, Plus, Minus, Trash2, CreditCard, DollarSign, ChevronDown, CheckCircle2, LogIn, LogOut as LogOutIcon, Clock, Receipt, LayoutGrid, List, Filter } from 'lucide-react'
+import { Search, ShoppingCart, X, Plus, Minus, Trash2, CreditCard, DollarSign, ChevronLeft, CheckCircle2, LogIn, LogOut as LogOutIcon, Clock, LayoutGrid, List } from 'lucide-react'
 
 // ── Constants ───────────────────────────────────────────────────────────────
 const PAY_METHODS = [
@@ -42,6 +43,7 @@ function deriveStock(current, safe) {
 // ═════════════════════════════════════════════════════════════════════════════
 export default function StaffPOS() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const searchRef = useRef(null)
 
   // ── Data ──
@@ -276,31 +278,34 @@ export default function StaffPOS() {
     else alert('關班失敗: ' + (data?.error || ''))
   }
 
-  if (loading) return <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="loading-shimmer" style={{ width: 80, height: 80, borderRadius: '50%' }} /></div>
+  if (loading) return <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a0a' }}><div className="loading-shimmer" style={{ width: 80, height: 80, borderRadius: '50%' }} /></div>
 
   // ═════════════════════════════════════════════════════════════════════════
   // RENDER
   // ═════════════════════════════════════════════════════════════════════════
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      {/* ── TOP BAR ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: '1px solid var(--border)', flexShrink: 0, background: 'var(--black-card)' }}>
-        <DollarSign size={18} color="var(--gold)" />
-        <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--gold)' }}>POS 收銀</span>
-        {shift && <span style={{ fontSize: 10, background: 'rgba(77,168,108,.15)', color: 'var(--green)', padding: '2px 8px', borderRadius: 10 }}>營業中 · {shift.employee_name}</span>}
-        <div style={{ flex: 1 }} />
-        <div style={{ display: 'flex', gap: 12, fontSize: 11, color: 'var(--text-dim)' }}>
-          <span>今日 <b style={{ color: 'var(--gold)', fontFamily: 'var(--font-mono)' }}>${(summary?.revenue?.total || 0).toLocaleString()}</b></span>
-          <span>單數 <b style={{ color: 'var(--blue)', fontFamily: 'var(--font-mono)' }}>{summary?.orders || 0}</b></span>
-        </div>
-        <button onClick={() => setShowShift(true)} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '4px 10px', fontSize: 11, color: 'var(--text-dim)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
-          <Clock size={12} /> {shift ? '關班' : '開班'}
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#0a0a0a' }}>
+      {/* ── TOP BAR (50px) ── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 10px', height: 50, minHeight: 50, borderBottom: '1px solid var(--border)', flexShrink: 0, background: 'var(--black-card)' }}>
+        <button onClick={() => navigate('/')} style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 2, padding: '4px 6px', borderRadius: 6, fontSize: 12, fontWeight: 600 }}>
+          <ChevronLeft size={16} /> 返回
         </button>
-        {/* Mobile cart fab */}
+        <div style={{ width: 1, height: 20, background: 'var(--border)' }} />
+        <DollarSign size={16} color="var(--gold)" />
+        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--gold)' }}>POS</span>
+        {shift && <span style={{ fontSize: 9, background: 'rgba(77,168,108,.15)', color: 'var(--green)', padding: '2px 6px', borderRadius: 10 }}>營業中</span>}
+        <div style={{ flex: 1 }} />
+        <div className="pos-topbar-stats" style={{ display: 'flex', gap: 10, fontSize: 10, color: 'var(--text-dim)' }}>
+          <span>${(summary?.revenue?.total || 0).toLocaleString()}</span>
+          <span>{summary?.orders || 0}單</span>
+        </div>
+        <button onClick={() => setShowShift(true)} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '3px 8px', fontSize: 10, color: 'var(--text-dim)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}>
+          <Clock size={11} /> {shift ? '關班' : '開班'}
+        </button>
         <button className="pos-cart-fab" onClick={() => setShowMobileCart(true)}
-          style={{ display: 'none', position: 'relative', background: 'var(--gold)', border: 'none', borderRadius: 10, padding: '6px 12px', cursor: 'pointer', color: '#000', fontWeight: 700, fontSize: 13 }}>
-          <ShoppingCart size={16} />
-          {cartCount > 0 && <span style={{ position: 'absolute', top: -6, right: -6, background: 'var(--red)', color: '#fff', borderRadius: '50%', width: 18, height: 18, fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{cartCount}</span>}
+          style={{ display: 'none', position: 'relative', background: 'var(--gold)', border: 'none', borderRadius: 8, padding: '4px 10px', cursor: 'pointer', color: '#000', fontWeight: 700, fontSize: 12 }}>
+          <ShoppingCart size={14} />
+          {cartCount > 0 && <span style={{ position: 'absolute', top: -5, right: -5, background: 'var(--red)', color: '#fff', borderRadius: '50%', width: 16, height: 16, fontSize: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{cartCount}</span>}
         </button>
       </div>
 
@@ -309,50 +314,41 @@ export default function StaffPOS() {
 
         {/* ═══ LEFT: Products ═══ */}
         <div className="pos-products" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', borderRight: '1px solid var(--border)' }}>
-          {/* Search + sort + view toggle */}
-          <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-            <div style={{ position: 'relative', flex: 1, minWidth: 140 }}>
-              <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-              <input ref={searchRef} placeholder="搜尋商品 / 品牌…" value={search} onChange={e => setSearch(e.target.value)}
-                style={{ width: '100%', paddingLeft: 30, fontSize: 13, padding: '8px 8px 8px 32px', background: 'var(--black)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)' }} />
+          {/* Search + categories + sort — single compact toolbar */}
+          <div style={{ padding: '5px 8px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }}>
+            <div style={{ position: 'relative', flex: 1, minWidth: 100 }}>
+              <Search size={13} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <input ref={searchRef} placeholder="搜尋…" value={search} onChange={e => setSearch(e.target.value)}
+                style={{ width: '100%', fontSize: 12, padding: '5px 6px 5px 28px', background: 'var(--black)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)' }} />
             </div>
             <select value={sortBy} onChange={e => setSortBy(e.target.value)}
-              style={{ fontSize: 11, padding: '6px 8px', background: 'var(--black)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)' }}>
+              style={{ fontSize: 10, padding: '5px 4px', background: 'var(--black)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)' }}>
               {SORTS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
             </select>
-            <div style={{ display: 'flex', gap: 2 }}>
-              <button onClick={() => setViewMode('grid')} style={{ background: viewMode === 'grid' ? 'var(--gold-glow)' : 'transparent', border: viewMode === 'grid' ? '1px solid var(--border-gold)' : '1px solid var(--border)', borderRadius: 6, padding: 5, cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-                <LayoutGrid size={14} color={viewMode === 'grid' ? 'var(--gold)' : 'var(--text-dim)'} />
-              </button>
-              <button onClick={() => setViewMode('list')} style={{ background: viewMode === 'list' ? 'var(--gold-glow)' : 'transparent', border: viewMode === 'list' ? '1px solid var(--border-gold)' : '1px solid var(--border)', borderRadius: 6, padding: 5, cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-                <List size={14} color={viewMode === 'list' ? 'var(--gold)' : 'var(--text-dim)'} />
-              </button>
-            </div>
+            <button onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')} style={{ background: 'var(--gold-glow)', border: '1px solid var(--border-gold)', borderRadius: 6, padding: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+              {viewMode === 'grid' ? <List size={13} color="var(--gold)" /> : <LayoutGrid size={13} color="var(--gold)" />}
+            </button>
           </div>
 
-          {/* Category tabs */}
-          <div style={{ display: 'flex', gap: 4, padding: '6px 12px', overflowX: 'auto', flexShrink: 0, borderBottom: '1px solid var(--border)' }}>
+          {/* Category tabs — compact single row */}
+          <div style={{ display: 'flex', gap: 2, padding: '3px 8px', overflowX: 'auto', flexShrink: 0, borderBottom: '1px solid var(--border)' }}>
             {CATEGORIES.map(cat => (
               <button key={cat.key} onClick={() => { setActiveCategory(cat.key); setActiveBrand('all') }}
-                style={{ padding: '4px 12px', borderRadius: 16, fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', background: activeCategory === cat.key ? 'var(--gold-glow)' : 'transparent', color: activeCategory === cat.key ? 'var(--gold)' : 'var(--text-dim)', border: activeCategory === cat.key ? '1px solid var(--border-gold)' : '1px solid transparent' }}>
+                style={{ padding: '2px 10px', borderRadius: 12, fontSize: 10, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', background: activeCategory === cat.key ? 'var(--gold-glow)' : 'transparent', color: activeCategory === cat.key ? 'var(--gold)' : 'var(--text-dim)', border: activeCategory === cat.key ? '1px solid var(--border-gold)' : '1px solid transparent' }}>
                 {cat.label}
               </button>
             ))}
-          </div>
-
-          {/* Brand sub-filter for cigars */}
-          {(activeCategory === '古巴雪茄' || activeCategory === 'Capadura' || activeCategory === 'all') && brands.length > 0 && (
-            <div style={{ display: 'flex', gap: 3, padding: '4px 12px', overflowX: 'auto', flexShrink: 0, borderBottom: '1px solid var(--border)' }}>
-              <button onClick={() => setActiveBrand('all')} style={{ padding: '3px 10px', borderRadius: 12, fontSize: 10, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', background: activeBrand === 'all' ? 'rgba(201,168,76,.12)' : 'transparent', color: activeBrand === 'all' ? 'var(--gold)' : 'var(--text-muted)', border: activeBrand === 'all' ? '1px solid var(--border-gold)' : '1px solid transparent' }}>
-                全部品牌
-              </button>
+            {/* Brand pills inline when cigar categories active */}
+            {(activeCategory === '古巴雪茄' || activeCategory === 'Capadura') && brands.length > 0 && <>
+              <span style={{ width: 1, height: 16, background: 'var(--border)', flexShrink: 0, margin: '0 2px' }} />
               {brands.map(b => (
-                <button key={b} onClick={() => setActiveBrand(b)} style={{ padding: '3px 10px', borderRadius: 12, fontSize: 10, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', background: activeBrand === b ? 'rgba(201,168,76,.12)' : 'transparent', color: activeBrand === b ? 'var(--gold)' : 'var(--text-muted)', border: activeBrand === b ? '1px solid var(--border-gold)' : '1px solid transparent' }}>
+                <button key={b} onClick={() => setActiveBrand(activeBrand === b ? 'all' : b)}
+                  style={{ padding: '2px 8px', borderRadius: 10, fontSize: 9, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', background: activeBrand === b ? 'rgba(201,168,76,.15)' : 'transparent', color: activeBrand === b ? 'var(--gold)' : 'var(--text-muted)', border: 'none' }}>
                   {b}
                 </button>
               ))}
-            </div>
-          )}
+            </>}
+          </div>
 
           {/* Product grid / list */}
           <div style={{ flex: 1, overflow: 'auto', padding: 8 }}>
@@ -414,11 +410,11 @@ export default function StaffPOS() {
             {filtered.length === 0 && <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>無符合商品</div>}
           </div>
 
-          {/* Quantity presets bar */}
-          <div style={{ padding: '6px 12px', borderTop: '1px solid var(--border)', display: 'flex', gap: 4, justifyContent: 'center', flexShrink: 0 }}>
+          {/* Quantity presets bar — compact */}
+          <div style={{ padding: '4px 8px', borderTop: '1px solid var(--border)', display: 'flex', gap: 3, justifyContent: 'center', flexShrink: 0 }}>
             {QTY_PRESETS.map(n => (
               <button key={n} onClick={() => setQtyMultiplier(n)}
-                style={{ padding: '5px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', background: qtyMultiplier === n ? 'var(--gold-glow)' : 'var(--black)', color: qtyMultiplier === n ? 'var(--gold)' : 'var(--text-dim)', border: qtyMultiplier === n ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>
+                style={{ padding: '3px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', background: qtyMultiplier === n ? 'var(--gold-glow)' : 'var(--black)', color: qtyMultiplier === n ? 'var(--gold)' : 'var(--text-dim)', border: qtyMultiplier === n ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>
                 ×{n}
               </button>
             ))}

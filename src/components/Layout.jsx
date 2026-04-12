@@ -29,6 +29,17 @@ export default function Layout({ children }) {
   const isBoss = user?.role === 'boss'
   const nav = isBoss ? BOSS_NAV : STAFF_NAV
 
+  // POS uses its own fullscreen layout — skip header, nav, and bottom padding
+  const isFullscreen = location.pathname === '/pos'
+
+  if (isFullscreen) {
+    return (
+      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#0a0a0a', overflow: 'hidden' }}>
+        {children}
+      </div>
+    )
+  }
+
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#0a0a0a' }}>
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', borderBottom: '1px solid #2a2520', background: 'rgba(17,17,17,.95)', flexShrink: 0, zIndex: 10 }}>
