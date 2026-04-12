@@ -14,7 +14,15 @@ const PAY_METHODS = [
   { key: 'alipay', label: '支付寶', icon: '🔵', color: '#1677ff' },
 ]
 
-const TABLES = ['1F四人位','1F六人位','B1包廂四人','B1大圓桌','B1沙發區','戶外區','外帶']
+// P1-6: actual table names
+const TABLES = [
+  '1F-A1 四人座','1F-A2 四人座','1F-A3 四人座',
+  '1F-B1 六人座','1F-B2 六人座',
+  'B1-VIP1 包廂四人','B1-VIP2 包廂四人','B1-VIP3 大圓桌',
+  'B1-沙發A','B1-沙發B','B1-沙發C',
+  '戶外-1','戶外-2','戶外-3',
+  '外帶',
+]
 const QUICK_CASH = [100, 500, 1000, 2000, 3000, 5000]
 const QTY_PRESETS = [1, 2, 3, 4, 5]
 
@@ -28,16 +36,25 @@ const CATEGORIES = [
   { key: '酒類', label: '酒類' },
 ]
 
+// P2-9: default sort by price high→low (popular cigars first)
 const SORTS = [
-  { key: 'name', label: '名稱' },
   { key: 'price_desc', label: '價格高→低' },
   { key: 'price_asc', label: '價格低→高' },
+  { key: 'name', label: '名稱' },
 ]
+
+// P2-10: inventory items to exclude (raw materials, not sellable)
+const EXCLUDE_NAMES = ['糖漿', '原汁', '果露', '濃縮']
 
 function deriveStock(current, safe) {
   if (current <= 0) return '缺貨'
   if (current <= (safe || 0)) return '少量'
   return '現貨'
+}
+
+// Is this item sellable? (not OOS and has a price)
+function isSellable(p) {
+  return p._stock !== '缺貨' && p._price > 0
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -56,7 +73,6 @@ export default function StaffPOS() {
 
   // ── Cart ──
   const [cart, setCart] = useState([])
-  const [qtyMultiplier, setQtyMultiplier] = useState(1)
 
   // ── Left panel ──
   const [tableNo, setTableNo] = useState('')
@@ -75,7 +91,7 @@ export default function StaffPOS() {
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState('all')
   const [activeBrand, setActiveBrand] = useState('all')
-  const [sortBy, setSortBy] = useState('name')
+  const [sortBy, setSortBy] = useState('price_desc') // P2-9
   const [viewMode, setViewMode] = useState('grid')
 
   // ── Modals ──
@@ -83,12 +99,12 @@ export default function StaffPOS() {
   const [showShift, setShowShift] = useState(false)
   const [showMobileCart, setShowMobileCart] = useState(false)
   const [lastOrder, setLastOrder] = useState(null)
+  const [detailProduct, setDetailProduct] = useState(null) // P0-2: product detail modal
+  const [detailQty, setDetailQty] = useState(1) // P0-2
 
   // ── Payment ──
   const [payMethod, setPayMethod] = useState('cash')
   const [payAmount, setPayAmount] = useState('')
-  const [payComposite, setPayComposite] = useState({}) // for multi-method
-  const [compositeMode, setCompositeMode] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
   // ── Shift ──
@@ -106,18 +122,13 @@ export default function StaffPOS() {
         supabase.from('unified_orders').select('*').eq('channel', 'store').gte('created_at', new Date().toISOString().slice(0, 10)).order('created_at', { ascending: false }).limit(20),
       ])
 
-      // Debug: inspect RPC response shape
       console.log('[POS] pos_get_products raw:', JSON.stringify(prodR.data).slice(0, 500))
-      console.log('[POS] prodR.error:', prodR.error)
 
-      // Try RPC first; if it returns products in an unexpected shape, fallback to direct query
       let cigarProducts = []
       let rpcBrands = []
 
       const rpcProducts = prodR.data?.products
       if (Array.isArray(rpcProducts) && rpcProducts.length > 0 && rpcProducts[0].name) {
-        // RPC returned expected shape: { products: [...], brands: [...] }
-        console.log('[POS] Using RPC data, sample:', rpcProducts[0])
         cigarProducts = rpcProducts.map(p => ({
           ...p,
           _source: 'products',
@@ -127,15 +138,12 @@ export default function StaffPOS() {
         }))
         rpcBrands = prodR.data?.brands || []
       } else {
-        // RPC shape unexpected — fallback to direct query
-        console.warn('[POS] RPC shape unexpected, falling back to direct products query. prodR.data sample:', JSON.stringify(prodR.data).slice(0, 300))
-        const { data: directProducts, error: directErr } = await supabase
+        console.warn('[POS] RPC shape unexpected, falling back to direct query')
+        const { data: directProducts } = await supabase
           .from('products')
           .select('id, brand, name, spec, pack, price_a, price_b, price_vip, suggest_price, image_url, stock_status, is_active, inv_master_id, sections')
           .eq('is_active', true)
           .order('sort_order', { ascending: true })
-        if (directErr) console.error('[POS] direct query error:', directErr)
-        console.log('[POS] direct query got', directProducts?.length, 'products, sample:', directProducts?.[0])
         cigarProducts = (directProducts || []).map(p => ({
           ...p,
           _source: 'products',
@@ -143,7 +151,6 @@ export default function StaffPOS() {
           _price: p.suggest_price || p.price_a || 0,
           _stock: p.stock_status || '現貨',
         }))
-        // Derive brands from products
         const brandSet = new Set()
         cigarProducts.forEach(p => { if (p.brand) brandSet.add(p.brand) })
         rpcBrands = Array.from(brandSet).sort()
@@ -156,17 +163,21 @@ export default function StaffPOS() {
         .select('id, name, category, current_stock, safe_stock, retail_price, unit, image_url')
         .eq('enabled', true)
         .in('category', ['吧台飲品', '餐飲', '酒類', '配件'])
-      const otherProducts = (invItems || []).map(p => ({
-        id: p.id,
-        name: p.name,
-        brand: p.category,
-        image_url: p.image_url || null,
-        inv_master_id: p.id,
-        _source: 'inventory',
-        _category: p.category,
-        _price: p.retail_price || 0,
-        _stock: deriveStock(p.current_stock, p.safe_stock),
-      }))
+
+      // P2-10: filter out raw materials (糖漿, 原汁, etc.)
+      const otherProducts = (invItems || [])
+        .filter(p => !EXCLUDE_NAMES.some(ex => (p.name || '').includes(ex)))
+        .map(p => ({
+          id: p.id,
+          name: p.name,
+          brand: p.category,
+          image_url: p.image_url || null,
+          inv_master_id: p.id,
+          _source: 'inventory',
+          _category: p.category,
+          _price: p.retail_price || 0,
+          _stock: deriveStock(p.current_stock, p.safe_stock),
+        }))
 
       setProducts([...cigarProducts, ...otherProducts])
       if (sumR.data) setSummary(sumR.data)
@@ -197,15 +208,21 @@ export default function StaffPOS() {
   }, [products, activeCategory, activeBrand, search, sortBy])
 
   // ── Cart logic ──
-  function addToCart(product) {
-    if (product._stock === '缺貨') return
-    const qty = qtyMultiplier
+  // P0-2: addToCart is now called from the detail modal, not directly from grid
+  function addToCart(product, qty) {
+    if (!isSellable(product)) return // P1-7
     setCart(prev => {
       const idx = prev.findIndex(c => c.id === product.id)
       if (idx >= 0) { const a = [...prev]; a[idx] = { ...a[idx], qty: a[idx].qty + qty }; return a }
       return [...prev, { id: product.id, name: product.name, brand: product.brand, price: product._price, qty, inv_master_id: product.inv_master_id || null }]
     })
-    setQtyMultiplier(1)
+  }
+
+  // P0-2: open product detail modal
+  function openDetail(product) {
+    if (!isSellable(product)) return // P1-7
+    setDetailProduct(product)
+    setDetailQty(1)
   }
 
   function updateQty(id, delta) {
@@ -314,7 +331,7 @@ export default function StaffPOS() {
 
         {/* ═══ LEFT: Products ═══ */}
         <div className="pos-products" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', borderRight: '1px solid var(--border)' }}>
-          {/* Search + categories + sort — single compact toolbar */}
+          {/* Search + sort + view toggle */}
           <div style={{ padding: '5px 8px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }}>
             <div style={{ position: 'relative', flex: 1, minWidth: 100 }}>
               <Search size={13} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
@@ -330,7 +347,7 @@ export default function StaffPOS() {
             </button>
           </div>
 
-          {/* Category tabs — compact single row */}
+          {/* Category tabs */}
           <div style={{ display: 'flex', gap: 2, padding: '3px 8px', overflowX: 'auto', flexShrink: 0, borderBottom: '1px solid var(--border)' }}>
             {CATEGORIES.map(cat => (
               <button key={cat.key} onClick={() => { setActiveCategory(cat.key); setActiveBrand('all') }}
@@ -338,7 +355,6 @@ export default function StaffPOS() {
                 {cat.label}
               </button>
             ))}
-            {/* Brand pills inline when cigar categories active */}
             {(activeCategory === '古巴雪茄' || activeCategory === 'Capadura') && brands.length > 0 && <>
               <span style={{ width: 1, height: 16, background: 'var(--border)', flexShrink: 0, margin: '0 2px' }} />
               {brands.map(b => (
@@ -350,7 +366,7 @@ export default function StaffPOS() {
             </>}
           </div>
 
-          {/* Product grid / list */}
+          {/* Product grid / list — P0-2: onClick opens detail modal, not direct add */}
           <div style={{ flex: 1, overflow: 'auto', padding: 8 }}>
             {viewMode === 'grid' ? (
               <div className="pos-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 6 }}>
@@ -358,11 +374,12 @@ export default function StaffPOS() {
                   const inCart = cart.find(c => c.id === p.id)
                   const isLow = p._stock === '少量'
                   const isOut = p._stock === '缺貨'
+                  const noPrice = p._price <= 0 // P0-3
+                  const disabled = isOut || noPrice // P1-7
                   return (
-                    <button key={p.id} onClick={() => !isOut && addToCart(p)} disabled={isOut}
-                      style={{ background: inCart ? 'rgba(201,168,76,.08)' : 'var(--black-card)', border: inCart ? '1.5px solid var(--border-gold)' : '1px solid var(--border)', borderRadius: 10, padding: 0, cursor: isOut ? 'not-allowed' : 'pointer', textAlign: 'left', opacity: isOut ? .4 : 1, position: 'relative', transition: 'all .15s', overflow: 'hidden' }}>
+                    <button key={p.id} onClick={() => !disabled && openDetail(p)} disabled={disabled}
+                      style={{ background: inCart ? 'rgba(201,168,76,.08)' : 'var(--black-card)', border: inCart ? '1.5px solid var(--border-gold)' : '1px solid var(--border)', borderRadius: 10, padding: 0, cursor: disabled ? 'not-allowed' : 'pointer', textAlign: 'left', opacity: disabled ? .4 : 1, position: 'relative', transition: 'all .15s', overflow: 'hidden' }}>
                       {inCart && <span style={{ position: 'absolute', top: 4, right: 4, zIndex: 2, background: 'var(--gold)', color: '#000', borderRadius: '50%', width: 22, height: 22, fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{inCart.qty}</span>}
-                      {/* Image */}
                       {p.image_url ? (
                         <div style={{ aspectRatio: '1', background: '#0f0d0a', overflow: 'hidden' }}>
                           <img src={p.image_url} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.target.style.display = 'none' }} />
@@ -376,7 +393,10 @@ export default function StaffPOS() {
                         <div style={{ fontSize: 10, color: isLow ? '#f59e0b' : 'var(--text-muted)', marginBottom: 2 }}>{p.brand}</div>
                         <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', lineHeight: 1.3, marginBottom: 4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{p.name}</div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: 15, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--gold)' }}>${p._price.toLocaleString()}</span>
+                          {noPrice
+                            ? <span style={{ fontSize: 11, color: 'var(--red)', fontWeight: 600 }}>未定價</span>
+                            : <span style={{ fontSize: 15, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--gold)' }}>${p._price.toLocaleString()}</span>
+                          }
                           {isLow && <span style={{ fontSize: 9, color: '#f59e0b', fontWeight: 600 }}>庫存少</span>}
                           {isOut && <span style={{ fontSize: 9, color: 'var(--red)', fontWeight: 600 }}>缺貨</span>}
                         </div>
@@ -390,9 +410,11 @@ export default function StaffPOS() {
                 {filtered.map(p => {
                   const inCart = cart.find(c => c.id === p.id)
                   const isOut = p._stock === '缺貨'
+                  const noPrice = p._price <= 0
+                  const disabled = isOut || noPrice
                   return (
-                    <button key={p.id} onClick={() => !isOut && addToCart(p)} disabled={isOut}
-                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: inCart ? 'rgba(201,168,76,.08)' : 'var(--black-card)', border: inCart ? '1.5px solid var(--border-gold)' : '1px solid var(--border)', borderRadius: 10, cursor: isOut ? 'not-allowed' : 'pointer', opacity: isOut ? .4 : 1, textAlign: 'left', width: '100%', position: 'relative' }}>
+                    <button key={p.id} onClick={() => !disabled && openDetail(p)} disabled={disabled}
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: inCart ? 'rgba(201,168,76,.08)' : 'var(--black-card)', border: inCart ? '1.5px solid var(--border-gold)' : '1px solid var(--border)', borderRadius: 10, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? .4 : 1, textAlign: 'left', width: '100%', position: 'relative' }}>
                       {inCart && <span style={{ position: 'absolute', top: 4, right: 8, background: 'var(--gold)', color: '#000', borderRadius: '50%', width: 20, height: 20, fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{inCart.qty}</span>}
                       <div style={{ width: 42, height: 42, borderRadius: 8, background: '#0f0d0a', overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         {p.image_url ? <img src={p.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.target.style.display = 'none' }} /> : <span style={{ fontSize: 16, fontWeight: 900, color: 'var(--border)' }}>{(p.brand || '?')[0]}</span>}
@@ -401,7 +423,10 @@ export default function StaffPOS() {
                         <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
                         <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{p.brand}</div>
                       </div>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--gold)', fontSize: 14, flexShrink: 0 }}>${p._price.toLocaleString()}</span>
+                      {noPrice
+                        ? <span style={{ fontSize: 11, color: 'var(--red)', fontWeight: 600, flexShrink: 0 }}>未定價</span>
+                        : <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--gold)', fontSize: 14, flexShrink: 0 }}>${p._price.toLocaleString()}</span>
+                      }
                     </button>
                   )
                 })}
@@ -410,38 +435,36 @@ export default function StaffPOS() {
             {filtered.length === 0 && <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>無符合商品</div>}
           </div>
 
-          {/* Quantity presets bar — compact */}
+          {/* Quantity presets bar */}
           <div style={{ padding: '4px 8px', borderTop: '1px solid var(--border)', display: 'flex', gap: 3, justifyContent: 'center', flexShrink: 0 }}>
             {QTY_PRESETS.map(n => (
-              <button key={n} onClick={() => setQtyMultiplier(n)}
-                style={{ padding: '3px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', background: qtyMultiplier === n ? 'var(--gold-glow)' : 'var(--black)', color: qtyMultiplier === n ? 'var(--gold)' : 'var(--text-dim)', border: qtyMultiplier === n ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>
+              <button key={n} onClick={() => setDetailQty(n)}
+                style={{ padding: '3px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', background: detailQty === n ? 'var(--gold-glow)' : 'var(--black)', color: detailQty === n ? 'var(--gold)' : 'var(--text-dim)', border: detailQty === n ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>
                 ×{n}
               </button>
             ))}
           </div>
         </div>
 
-        {/* ═══ RIGHT: Cart Panel ═══ */}
+        {/* ═══ RIGHT: Cart Panel — P0-1: split into scrollable items + sticky bottom ═══ */}
         <div className="pos-cart-panel" style={{ width: 340, display: 'flex', flexDirection: 'column', background: 'var(--black-card)', overflow: 'hidden' }}>
           {/* Cart header */}
-          <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ padding: '8px 14px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
             <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--gold)', display: 'flex', alignItems: 'center', gap: 6 }}><ShoppingCart size={16} /> 購物車 ({cartCount})</span>
             {cart.length > 0 && <button onClick={clearAll} style={{ background: 'none', border: 'none', color: 'var(--red)', fontSize: 11, cursor: 'pointer' }}>清空</button>}
           </div>
 
           {/* Table + guest + customer */}
-          <div style={{ padding: '6px 14px', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ padding: '6px 14px', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
             <div style={{ display: 'flex', gap: 6 }}>
               <select value={tableNo} onChange={e => setTableNo(e.target.value)} style={{ flex: 1, fontSize: 11, padding: '5px 6px', background: 'var(--black)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)' }}>
                 <option value="">桌位</option>
                 {TABLES.map(t => <option key={t}>{t}</option>)}
               </select>
-              <input type="number" min={1} value={guestCount} onChange={e => setGuestCount(Math.max(1, +e.target.value || 1))} placeholder="人數" style={{ width: 56, fontSize: 11, padding: '5px 6px', background: 'var(--black)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', textAlign: 'center' }} />
-            </div>
-            <div style={{ display: 'flex', gap: 4 }}>
+              <input type="number" min={1} value={guestCount} onChange={e => setGuestCount(Math.max(1, +e.target.value || 1))} placeholder="人數" style={{ width: 50, fontSize: 11, padding: '5px 4px', background: 'var(--black)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', textAlign: 'center' }} />
               {[['walk_in', '散客'], ['vip', 'VIP']].map(([k, l]) => (
                 <button key={k} onClick={() => setCustomerMode(k)}
-                  style={{ flex: 1, padding: '4px 0', borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: 'pointer', background: customerMode === k ? 'var(--gold-glow)' : 'var(--black)', color: customerMode === k ? 'var(--gold)' : 'var(--text-dim)', border: customerMode === k ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>
+                  style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: 'pointer', background: customerMode === k ? 'var(--gold-glow)' : 'var(--black)', color: customerMode === k ? 'var(--gold)' : 'var(--text-dim)', border: customerMode === k ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>
                   {l}
                 </button>
               ))}
@@ -451,87 +474,140 @@ export default function StaffPOS() {
             )}
           </div>
 
-          {/* Cart items */}
-          <div style={{ flex: 1, overflow: 'auto', padding: '6px 14px' }}>
+          {/* P0-1: Scrollable cart items area */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '6px 14px' }}>
             {cart.length === 0 ? (
               <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)', fontSize: 13 }}>點選左側商品加入購物車</div>
             ) : cart.map(c => (
-              <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+              <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 0', borderBottom: '1px solid var(--border)' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</div>
                   <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>${c.price.toLocaleString()} × {c.qty}</div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <button onClick={() => updateQty(c.id, -1)} style={{ width: 26, height: 26, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Minus size={12} /></button>
-                  <span style={{ width: 24, textAlign: 'center', fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--text)' }}>{c.qty}</span>
-                  <button onClick={() => updateQty(c.id, 1)} style={{ width: 26, height: 26, borderRadius: 6, border: '1px solid var(--border-gold)', background: 'var(--gold-glow)', color: 'var(--gold)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Plus size={12} /></button>
+                  <button onClick={() => updateQty(c.id, -1)} style={{ width: 24, height: 24, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Minus size={11} /></button>
+                  <span style={{ width: 22, textAlign: 'center', fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--text)' }}>{c.qty}</span>
+                  <button onClick={() => updateQty(c.id, 1)} style={{ width: 24, height: 24, borderRadius: 6, border: '1px solid var(--border-gold)', background: 'var(--gold-glow)', color: 'var(--gold)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Plus size={11} /></button>
                 </div>
-                <span style={{ width: 60, textAlign: 'right', fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--gold)' }}>${(c.price * c.qty).toLocaleString()}</span>
-                <button onClick={() => removeItem(c.id)} style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', padding: 2 }}><Trash2 size={14} /></button>
+                <span style={{ width: 56, textAlign: 'right', fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--gold)' }}>${(c.price * c.qty).toLocaleString()}</span>
+                <button onClick={() => removeItem(c.id)} style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', padding: 2 }}><Trash2 size={13} /></button>
               </div>
             ))}
           </div>
 
-          {/* Bottom: discount, service fee, invoice, totals, checkout */}
-          <div style={{ padding: '10px 14px', borderTop: '1px solid var(--border-gold)', background: 'rgba(201,168,76,.04)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {/* P0-1: Sticky bottom — totals + actions (always visible) */}
+          <div style={{ flexShrink: 0, borderTop: '1px solid var(--border-gold)', background: 'rgba(201,168,76,.04)', padding: '8px 14px', display: 'flex', flexDirection: 'column', gap: 4 }}>
             {/* Discount + service fee + note */}
-            <div style={{ display: 'flex', gap: 6 }}>
+            <div style={{ display: 'flex', gap: 4 }}>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 9, color: 'var(--text-muted)', marginBottom: 2 }}>折扣 %</div>
+                <div style={{ fontSize: 9, color: 'var(--text-muted)', marginBottom: 1 }}>折扣%</div>
                 <input type="number" min={0} max={100} value={discountPct || ''} onChange={e => setDiscountPct(Math.min(100, Math.max(0, +e.target.value || 0)))} placeholder="0"
-                  style={{ width: '100%', fontSize: 12, padding: '5px 6px', fontFamily: 'var(--font-mono)', background: 'var(--black)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)' }} />
+                  style={{ width: '100%', fontSize: 11, padding: '4px 5px', fontFamily: 'var(--font-mono)', background: 'var(--black)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)' }} />
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 9, color: 'var(--text-muted)', marginBottom: 2 }}>服務費 %</div>
+                <div style={{ fontSize: 9, color: 'var(--text-muted)', marginBottom: 1 }}>服務費%</div>
                 <input type="number" min={0} max={100} value={serviceFeePct || ''} onChange={e => setServiceFeePct(Math.min(100, Math.max(0, +e.target.value || 0)))} placeholder="0"
-                  style={{ width: '100%', fontSize: 12, padding: '5px 6px', fontFamily: 'var(--font-mono)', background: 'var(--black)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)' }} />
+                  style={{ width: '100%', fontSize: 11, padding: '4px 5px', fontFamily: 'var(--font-mono)', background: 'var(--black)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)' }} />
               </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 9, color: 'var(--text-muted)', marginBottom: 2 }}>備註</div>
-                <input value={orderNote} onChange={e => setOrderNote(e.target.value)} placeholder="備註"
-                  style={{ width: '100%', fontSize: 11, padding: '5px 6px', background: 'var(--black)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)' }} />
-              </div>
-            </div>
-
-            {/* Invoice */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--text-dim)', cursor: 'pointer' }}>
-                <input type="checkbox" checked={invoiceEnabled} onChange={e => setInvoiceEnabled(e.target.checked)} /> 發票
+              {/* P2-12: whiteSpace nowrap to prevent "發\n票" */}
+              <label style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10, color: 'var(--text-dim)', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                <input type="checkbox" checked={invoiceEnabled} onChange={e => setInvoiceEnabled(e.target.checked)} /> 開發票
               </label>
-              {invoiceEnabled && (
-                <>
-                  <input value={taxId} onChange={e => setTaxId(e.target.value)} placeholder="統編" style={{ flex: 1, fontSize: 11, padding: '4px 6px', background: 'var(--black)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)' }} />
-                  <input value={carrier} onChange={e => setCarrier(e.target.value)} placeholder="載具" style={{ flex: 1, fontSize: 11, padding: '4px 6px', background: 'var(--black)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)' }} />
-                </>
-              )}
             </div>
+            {invoiceEnabled && (
+              <div style={{ display: 'flex', gap: 4 }}>
+                <input value={taxId} onChange={e => setTaxId(e.target.value)} placeholder="統一編號" style={{ flex: 1, fontSize: 10, padding: '4px 5px', background: 'var(--black)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)' }} />
+                <input value={carrier} onChange={e => setCarrier(e.target.value)} placeholder="載具" style={{ flex: 1, fontSize: 10, padding: '4px 5px', background: 'var(--black)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)' }} />
+              </div>
+            )}
+            <input value={orderNote} onChange={e => setOrderNote(e.target.value)} placeholder="備註…"
+              style={{ width: '100%', fontSize: 10, padding: '4px 5px', background: 'var(--black)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)' }} />
 
             {/* Totals */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-dim)' }}>
-              <span>小計 ({cartCount} 件)</span><span style={{ fontFamily: 'var(--font-mono)' }}>${subtotal.toLocaleString()}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-dim)' }}>
+              <span>小計 ({cartCount})</span><span style={{ fontFamily: 'var(--font-mono)' }}>${subtotal.toLocaleString()}</span>
             </div>
-            {discountAmt > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#f59e0b' }}>
+            {discountAmt > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#f59e0b' }}>
               <span>折扣 {discountPct}%</span><span style={{ fontFamily: 'var(--font-mono)' }}>-${discountAmt.toLocaleString()}</span>
             </div>}
-            {serviceFeeAmt > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-dim)' }}>
-              <span>服務費 {serviceFeePct}%</span><span style={{ fontFamily: 'var(--font-mono)' }}>+${serviceFeeAmt.toLocaleString()}</span>
+            {serviceFeeAmt > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-dim)' }}>
+              <span>服務費</span><span style={{ fontFamily: 'var(--font-mono)' }}>+${serviceFeeAmt.toLocaleString()}</span>
             </div>}
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 20, fontWeight: 800, color: 'var(--gold)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 800, color: 'var(--gold)' }}>
               <span>應收</span><span style={{ fontFamily: 'var(--font-mono)' }}>${total.toLocaleString()}</span>
             </div>
 
-            {/* Action buttons */}
+            {/* P1-8: All action buttons visible */}
             <button onClick={() => cart.length > 0 && setShowCheckout(true)} disabled={cart.length === 0}
-              style={{ width: '100%', padding: 14, fontSize: 16, fontWeight: 700, cursor: cart.length > 0 ? 'pointer' : 'not-allowed', background: cart.length > 0 ? 'linear-gradient(135deg, #c9a84c, #b8943f)' : 'var(--border)', border: 'none', borderRadius: 12, color: cart.length > 0 ? '#000' : 'var(--text-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-              <CreditCard size={18} /> 結帳 ${total.toLocaleString()}
+              style={{ width: '100%', padding: 12, fontSize: 15, fontWeight: 700, cursor: cart.length > 0 ? 'pointer' : 'not-allowed', background: cart.length > 0 ? 'linear-gradient(135deg, #c9a84c, #b8943f)' : 'var(--border)', border: 'none', borderRadius: 10, color: cart.length > 0 ? '#000' : 'var(--text-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <CreditCard size={16} /> 結帳 ${total.toLocaleString()}
             </button>
             <div style={{ display: 'flex', gap: 4 }}>
-              <button onClick={clearAll} style={{ flex: 1, padding: '8px 0', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', background: 'var(--black)', color: 'var(--text-dim)', border: '1px solid var(--border)' }}>清除</button>
-              <button onClick={clearAll} style={{ flex: 1, padding: '8px 0', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', background: 'var(--black)', color: 'var(--red)', border: '1px solid rgba(231,76,60,.3)' }}>取消</button>
+              <button onClick={() => alert('稍後結帳：暫存訂單功能開發中')} style={{ flex: 1, padding: '6px 0', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer', background: 'rgba(37,99,235,.1)', color: '#60a5fa', border: '1px solid rgba(37,99,235,.3)' }}>暫存</button>
+              <button onClick={() => alert('空訂單：開桌不點餐功能開發中')} style={{ flex: 1, padding: '6px 0', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer', background: 'rgba(161,98,7,.1)', color: '#fbbf24', border: '1px solid rgba(161,98,7,.3)' }}>空訂單</button>
+              <button onClick={clearAll} style={{ flex: 1, padding: '6px 0', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer', background: 'var(--black)', color: 'var(--red)', border: '1px solid rgba(231,76,60,.3)' }}>清除</button>
             </div>
           </div>
         </div>
       </div>
+
+      {/* ═══ P0-2: PRODUCT DETAIL MODAL ═══ */}
+      {detailProduct && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setDetailProduct(null)}>
+          <div style={{ background: 'var(--black-card)', border: '1px solid var(--border-gold)', borderRadius: 20, width: '100%', maxWidth: 400, overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+            {/* Image */}
+            {detailProduct.image_url ? (
+              <div style={{ height: 200, background: '#0f0d0a', overflow: 'hidden' }}>
+                <img src={detailProduct.image_url} alt={detailProduct.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              </div>
+            ) : (
+              <div style={{ height: 120, background: '#0f0d0a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 48, fontWeight: 900, color: 'var(--border)' }}>
+                {(detailProduct.brand || detailProduct.name || '?')[0]}
+              </div>
+            )}
+            <div style={{ padding: '16px 20px' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{detailProduct.brand}</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', marginBottom: 8, lineHeight: 1.3 }}>{detailProduct.name}</div>
+              {detailProduct.spec && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>{detailProduct.spec}</div>}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <span style={{ fontSize: 24, fontFamily: 'var(--font-mono)', fontWeight: 800, color: 'var(--gold)' }}>${detailProduct._price.toLocaleString()}</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: detailProduct._stock === '現貨' ? 'var(--green)' : detailProduct._stock === '少量' ? '#f59e0b' : 'var(--red)' }}>
+                  {detailProduct._stock}
+                </span>
+              </div>
+              {/* Qty selector */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, marginBottom: 16 }}>
+                <button onClick={() => setDetailQty(q => Math.max(1, q - 1))}
+                  style={{ width: 40, height: 40, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+                  <Minus size={18} />
+                </button>
+                <span style={{ fontSize: 28, fontFamily: 'var(--font-mono)', fontWeight: 800, color: 'var(--text)', width: 50, textAlign: 'center' }}>{detailQty}</span>
+                <button onClick={() => setDetailQty(q => q + 1)}
+                  style={{ width: 40, height: 40, borderRadius: 10, border: '1px solid var(--border-gold)', background: 'var(--gold-glow)', color: 'var(--gold)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+                  <Plus size={18} />
+                </button>
+              </div>
+              {/* Quick qty buttons */}
+              <div style={{ display: 'flex', gap: 4, justifyContent: 'center', marginBottom: 16 }}>
+                {QTY_PRESETS.map(n => (
+                  <button key={n} onClick={() => setDetailQty(n)}
+                    style={{ padding: '4px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer', background: detailQty === n ? 'var(--gold-glow)' : 'var(--black)', color: detailQty === n ? 'var(--gold)' : 'var(--text-dim)', border: detailQty === n ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>
+                    {n}
+                  </button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => setDetailProduct(null)}
+                  style={{ flex: 1, padding: 12, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text-dim)', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>取消</button>
+                <button onClick={() => { addToCart(detailProduct, detailQty); setDetailProduct(null) }}
+                  style={{ flex: 2, padding: 12, borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #c9a84c, #b8943f)', color: '#000', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                  <ShoppingCart size={16} /> 加入購物車 · ${(detailProduct._price * detailQty).toLocaleString()}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ═══ CHECKOUT MODAL ═══ */}
       {showCheckout && (
@@ -541,7 +617,6 @@ export default function StaffPOS() {
               <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--gold)' }}>💰 結帳</span>
               <button onClick={() => setShowCheckout(false)} style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer' }}><X size={20} /></button>
             </div>
-            {/* Order summary */}
             <div style={{ background: 'var(--black)', borderRadius: 12, padding: 12, marginBottom: 14 }}>
               {cart.map(c => (
                 <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '3px 0', color: 'var(--text)' }}>
@@ -555,7 +630,6 @@ export default function StaffPOS() {
                 <span>應收</span><span style={{ fontFamily: 'var(--font-mono)' }}>${total.toLocaleString()}</span>
               </div>
             </div>
-            {/* Payment methods */}
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 6 }}>支付方式</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: 14 }}>
               {PAY_METHODS.map(m => (
@@ -565,7 +639,6 @@ export default function StaffPOS() {
                 </button>
               ))}
             </div>
-            {/* Cash input + quick buttons */}
             {payMethod === 'cash' && (
               <div style={{ marginBottom: 14 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 6 }}>收取金額</div>
@@ -597,16 +670,17 @@ export default function StaffPOS() {
         </div>
       )}
 
-      {/* ═══ LAST ORDER SUCCESS ═══ */}
+      {/* ═══ LAST ORDER SUCCESS — P2-11: shows order_no + change ═══ */}
       {lastOrder && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setLastOrder(null)}>
           <div style={{ background: 'var(--black-card)', border: '2px solid rgba(77,168,108,.5)', borderRadius: 20, padding: 30, width: '100%', maxWidth: 380, textAlign: 'center' }} onClick={e => e.stopPropagation()}>
             <CheckCircle2 size={48} color="var(--green)" style={{ marginBottom: 12 }} />
             <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--green)', marginBottom: 4 }}>結帳成功！</div>
-            <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 16 }}>{lastOrder.order_no}</div>
+            <div style={{ fontSize: 15, fontFamily: 'var(--font-mono)', color: 'var(--gold)', marginBottom: 4, fontWeight: 700 }}>{lastOrder.order_no}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 16 }}>{lastOrder.payMethod === 'cash' ? '現金' : PAY_METHODS.find(m => m.key === lastOrder.payMethod)?.label || lastOrder.payMethod}</div>
             <div style={{ display: 'flex', justifyContent: 'space-around', marginBottom: 20 }}>
-              <div><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>合計</div><div style={{ fontSize: 22, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--gold)' }}>${lastOrder.total?.toLocaleString()}</div></div>
-              {(lastOrder.change > 0) && <div><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>找零</div><div style={{ fontSize: 22, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--green)' }}>${lastOrder.change?.toLocaleString()}</div></div>}
+              <div><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>合計</div><div style={{ fontSize: 24, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--gold)' }}>${lastOrder.total?.toLocaleString()}</div></div>
+              {(lastOrder.change > 0) && <div><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>找零</div><div style={{ fontSize: 24, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--green)' }}>${lastOrder.change?.toLocaleString()}</div></div>}
             </div>
             <button onClick={() => setLastOrder(null)} style={{ padding: '12px 40px', fontSize: 16, fontWeight: 700, cursor: 'pointer', background: 'var(--gold)', border: 'none', borderRadius: 12, color: '#000' }}>繼續收銀</button>
           </div>
@@ -652,7 +726,6 @@ export default function StaffPOS() {
               <button onClick={() => setShowMobileCart(false)} style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer' }}><X size={20} /></button>
             </div>
             <div style={{ padding: '8px 16px' }}>
-              {/* Table + guest */}
               <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
                 <select value={tableNo} onChange={e => setTableNo(e.target.value)} style={{ flex: 1, fontSize: 12, padding: '6px 8px', background: 'var(--black)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)' }}>
                   <option value="">桌位</option>
@@ -660,7 +733,6 @@ export default function StaffPOS() {
                 </select>
                 <input type="number" min={1} value={guestCount} onChange={e => setGuestCount(Math.max(1, +e.target.value || 1))} placeholder="人數" style={{ width: 56, fontSize: 12, padding: '6px', background: 'var(--black)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', textAlign: 'center' }} />
               </div>
-              {/* Cart items */}
               {cart.map(c => (
                 <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -677,11 +749,9 @@ export default function StaffPOS() {
                 </div>
               ))}
               {cart.length === 0 && <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-dim)', fontSize: 13 }}>購物車是空的</div>}
-              {/* Total */}
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 20, fontWeight: 800, color: 'var(--gold)', padding: '12px 0' }}>
                 <span>應收</span><span style={{ fontFamily: 'var(--font-mono)' }}>${total.toLocaleString()}</span>
               </div>
-              {/* Checkout button */}
               <button onClick={() => { setShowMobileCart(false); cart.length > 0 && setShowCheckout(true) }} disabled={cart.length === 0}
                 style={{ width: '100%', padding: 14, fontSize: 16, fontWeight: 700, cursor: cart.length > 0 ? 'pointer' : 'not-allowed', background: cart.length > 0 ? 'linear-gradient(135deg, #c9a84c, #b8943f)' : 'var(--border)', border: 'none', borderRadius: 12, color: cart.length > 0 ? '#000' : 'var(--text-dim)', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
                 <CreditCard size={18} /> 結帳 ${total.toLocaleString()}
