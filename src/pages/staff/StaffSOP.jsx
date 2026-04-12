@@ -2,7 +2,7 @@ import ShiftHandover from '../../components/ShiftHandover'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
-import { compressImage } from '../../lib/imageUtils'
+import { compressImage, stampWatermark } from '../../lib/imageUtils'
 import { CheckCircle2, Circle, Camera, Send, RotateCcw, ChevronDown, ChevronUp, Sparkles } from 'lucide-react'
 import { format } from 'date-fns'
 
@@ -51,7 +51,7 @@ function SOPView() {
 
   async function handlePhoto(taskId, file) {
     if (!file) { setPhotos(p => ({ ...p, [taskId]: null })); setPreviews(p => ({ ...p, [taskId]: null })); return }
-    const compressed = await compressImage(file)
+    const compressed = await stampWatermark(file, user.name)
     setPhotos(p => ({ ...p, [taskId]: compressed }))
     const reader = new FileReader()
     reader.onload = e => setPreviews(p => ({ ...p, [taskId]: e.target.result }))

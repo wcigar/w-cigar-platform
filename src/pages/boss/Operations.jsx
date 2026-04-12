@@ -22,16 +22,17 @@ export default function Operations() {
   const [photoModal, setPhotoModal] = useState(null)
   const [loading, setLoading] = useState(true)
   const [tick, setTick] = useState(0)
+  const [sopDate, setSopDate] = useState(format(new Date(), 'yyyy-MM-dd'))
   const today = format(new Date(), 'yyyy-MM-dd')
   const month = format(new Date(), 'yyyy-MM')
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [sopDate])
   useEffect(() => { const iv = setInterval(() => setTick(t => t + 1), 60000); return () => clearInterval(iv) }, [])
 
   async function load() {
     setLoading(true)
     const [tR, nR, aR, lbR] = await Promise.all([
-      supabase.from('task_status').select('*').eq('date', today).order('owner').order('task_id'),
+      supabase.from('task_status').select('*').eq('date', sopDate).order('owner').order('task_id'),
       supabase.from('notices').select('*').order('created_at', { ascending: false }).limit(20),
       supabase.from('abnormal_reports').select('*').order('time', { ascending: false }).limit(20),
       supabase.from('task_status').select('completed_by').eq('owner', 'ALL').eq('completed', true).gte('date', month + '-01').lte('date', format(endOfMonth(new Date(month + '-01')), 'yyyy-MM-dd')),
@@ -94,6 +95,14 @@ export default function Operations() {
 
       {tab === 'sop' && (
         <div>
+          {/* Date picker for SOP — allows boss to view yesterday's tasks after midnight */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <button onClick={() => { const d = new Date(sopDate); d.setDate(d.getDate() - 1); setSopDate(format(d, 'yyyy-MM-dd')) }} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--black-card)', color: 'var(--text)', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
+            <input type="date" value={sopDate} onChange={e => setSopDate(e.target.value)} max={today} style={{ fontSize: 13, padding: '6px 10px', background: 'var(--black-card)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--gold)', fontFamily: 'var(--font-mono)' }} />
+            <button onClick={() => { const d = new Date(sopDate); d.setDate(d.getDate() + 1); const next = format(d, 'yyyy-MM-dd'); if (next <= today) setSopDate(next) }} disabled={sopDate >= today} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--black-card)', color: sopDate >= today ? 'var(--text-muted)' : 'var(--text)', cursor: sopDate >= today ? 'default' : 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
+            {sopDate !== today && <button onClick={() => setSopDate(today)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border-gold)', background: 'var(--gold-glow)', color: 'var(--gold)', cursor: 'pointer', fontWeight: 600 }}>回到今天</button>}
+            {sopDate !== today && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>查看 {sopDate} 的 SOP</span>}
+          </div>
           {(overdueCount > 0 || warningCount > 0) && (
             <div className="card" style={{ padding: 12, marginBottom: 12, borderColor: overdueCount > 0 ? 'rgba(196,77,77,.4)' : 'rgba(245,158,11,.4)', background: overdueCount > 0 ? 'rgba(196,77,77,.06)' : 'rgba(245,158,11,.06)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700 }}>
@@ -102,7 +111,7 @@ export default function Operations() {
               </div>
             </div>
           )}
-          {Object.keys(byOwner).length === 0 ? <div className="card" style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>今日無SOP</div> :
+          {Object.keys(byOwner).length === 0 ? <div className="card" style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>{sopDate === today ? '今日' : sopDate}無SOP紀錄</div> :
             Object.entries(byOwner).map(([owner, ownerTasks]) => {
               const done = ownerTasks.filter(t => t.completed).length, total = ownerTasks.length, pct = Math.round(done / total * 100)
               return (

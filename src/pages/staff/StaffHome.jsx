@@ -74,18 +74,28 @@ export default function StaffHome() {
     canvas.height = video.videoHeight || 480
     const ctx = canvas.getContext('2d')
     ctx.drawImage(video, 0, 0)
-    // Overlay text
+    // Watermark: employee name + date/time → bottom-right
     const now = new Date()
-    const timeStr = format(now, 'yyyy/MM/dd HH:mm:ss')
-    const label = user.name + ' ' + punchType + '打卡'
-    ctx.fillStyle = 'rgba(0,0,0,0.5)'
-    ctx.fillRect(0, canvas.height - 60, canvas.width, 60)
+    const timeStr = now.toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
+    const label = user.name + ' · ' + punchType + '打卡'
+    ctx.font = 'bold 18px sans-serif'
+    const labelW = ctx.measureText(label).width
+    ctx.font = '14px sans-serif'
+    const timeW = ctx.measureText(timeStr).width
+    const boxW = Math.max(labelW, timeW) + 24
+    const boxH = 52
+    const boxX = canvas.width - boxW - 8
+    const boxY = canvas.height - boxH - 8
+    ctx.fillStyle = 'rgba(0,0,0,0.6)'
+    ctx.fillRect(boxX, boxY, boxW, boxH)
     ctx.fillStyle = '#FFD700'
-    ctx.font = 'bold 20px sans-serif'
-    ctx.fillText(label, 12, canvas.height - 35)
+    ctx.font = 'bold 18px sans-serif'
+    ctx.textAlign = 'right'
+    ctx.fillText(label, canvas.width - 20, boxY + 22)
     ctx.fillStyle = '#fff'
-    ctx.font = '16px sans-serif'
-    ctx.fillText(timeStr, 12, canvas.height - 12)
+    ctx.font = '14px sans-serif'
+    ctx.fillText(timeStr, canvas.width - 20, boxY + 42)
+    ctx.textAlign = 'left'
     // Upload
     let photoUrl = null
     try {
