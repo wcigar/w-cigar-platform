@@ -399,7 +399,7 @@ export default function StaffPOS() {
         </div>
 
         {/* ═══ RIGHT: CHECKOUT PANEL (40%) ═══ */}
-        <div className="pos-cart-panel" style={{ width: 340, display: 'flex', flexDirection: 'column', background: '#1a1714', height: 'calc(100vh - 50px)' }}>
+        <div className="pos-cart-panel" style={{ width: 340, display: 'flex', flexDirection: 'column', background: '#1a1714', height: 'calc(100vh - 50px)', overflow: 'hidden' }}>
           {/* Header */}
           <div style={{ padding: '8px 12px', borderBottom: '1px solid #2a2520', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
             <span style={{ fontSize: 14, fontWeight: 700, color: '#c9a84c', display: 'flex', alignItems: 'center', gap: 6 }}><ShoppingCart size={16} /> 購物車 ({cartCount})</span>
@@ -443,7 +443,7 @@ export default function StaffPOS() {
             )}
           </div>
           {/* Cart items + settings — scrollable middle area */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '4px 12px', minHeight: 0 }}>
+          <div style={{ flex: '1 1 0', overflowY: 'scroll', padding: '4px 12px', minHeight: 0, WebkitOverflowScrolling: 'touch' }}>
             {!cart.length ? <div style={{ textAlign: 'center', padding: 40, color: '#8a7e6e', fontSize: 13 }}>點選商品加入購物車</div> : cart.map(c => (
               <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 0', borderBottom: '1px solid #2a2520' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -474,8 +474,8 @@ export default function StaffPOS() {
               <input value={orderNote} onChange={e => setOrderNote(e.target.value)} placeholder="備註…" style={{ width: '100%', fontSize: 10, padding: '3px 4px', background: '#0d0b09', border: '1px solid #2a2520', borderRadius: 6, color: '#e8dcc8' }} />
             </div>}
           </div>
-          {/* STICKY BOTTOM — only totals + buttons, always visible */}
-          <div style={{ flexShrink: 0, position: 'sticky', bottom: 0, zIndex: 2, borderTop: '2px solid rgba(201,168,76,.4)', background: '#0d0b09', padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 3 }}>
+          {/* FIXED BOTTOM — totals + buttons, never scrolls */}
+          <div style={{ flexShrink: 0, flexGrow: 0, borderTop: '2px solid rgba(201,168,76,.4)', background: '#0d0b09', padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 3 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#8a7e6e' }}><span>共 {cartCount} 件</span><span style={{ fontFamily: 'var(--font-mono)' }}>${subtotal.toLocaleString()}</span></div>
             {memberDiscount.discount > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#9b59b6' }}><span>會員折扣</span><span>-${memberDiscount.discount.toLocaleString()}</span></div>}
             {manualDiscountAmt > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#f59e0b' }}><span>折扣 {discountPct}%</span><span>-${manualDiscountAmt.toLocaleString()}</span></div>}
