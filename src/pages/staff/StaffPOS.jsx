@@ -299,7 +299,7 @@ export default function StaffPOS() {
         {editPriceId === c.id && <div style={{ display: 'flex', gap: 4, marginTop: 4, alignItems: 'center' }}>
           <span style={{ fontSize: 10, color: '#f59e0b', flexShrink: 0 }}>$</span>
           <input type="number" inputMode="numeric" value={editPriceVal} onChange={e => setEditPriceVal(e.target.value)} autoFocus
-            style={{ width: 60, fontSize: 12, padding: '3px 4px', background: '#0d0b09', border: '1px solid #f59e0b', borderRadius: 4, color: '#f59e0b', fontFamily: 'var(--font-mono)', textAlign: 'center' }}
+            style={{ width: 90, fontSize: 12, padding: '3px 4px', background: '#0d0b09', border: '1px solid #f59e0b', borderRadius: 4, color: '#f59e0b', fontFamily: 'var(--font-mono)', textAlign: 'center' }}
             onKeyDown={e => { if (e.key === 'Enter') applyPriceOverride(c.id); if (e.key === 'Escape') setEditPriceId(null) }} />
           <input placeholder="原因" value={editPriceReason} onChange={e => setEditPriceReason(e.target.value)}
             style={{ flex: 1, fontSize: 10, padding: '3px 4px', background: '#0d0b09', border: '1px solid #2a2520', borderRadius: 4, color: '#e8dcc8', minWidth: 0 }}
