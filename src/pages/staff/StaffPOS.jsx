@@ -113,9 +113,10 @@ export default function StaffPOS() {
   const [taxId, setTaxId] = useState('')
   const [carrier, setCarrier] = useState('')
 
-  // Customer / membership
-  const [customer, setCustomer] = useState(null) // selected customer object
-  const [customerTier, setCustomerTier] = useState(null) // tier details from membership_tiers
+  // Customer / membership / attribution
+  const [customer, setCustomer] = useState(null)
+  const [customerTier, setCustomerTier] = useState(null)
+  const [attributedTo, setAttributedTo] = useState('店內') // 老闆 / 老闆娘 / 店內
   const [showCustomerSearch, setShowCustomerSearch] = useState(false)
   const [customerQuery, setCustomerQuery] = useState('')
   const [customerResults, setCustomerResults] = useState([])
@@ -198,10 +199,11 @@ export default function StaffPOS() {
     setCustomer(c)
     const t = tiers.find(t => t.id === c.membership_tier) || null
     setCustomerTier(t)
+    setAttributedTo(c.belongs_to || '店內')
     setShowCustomerSearch(false)
   }
 
-  function clearCustomer() { setCustomer(null); setCustomerTier(null) }
+  function clearCustomer() { setCustomer(null); setCustomerTier(null); setAttributedTo('店內') }
 
   /* ── Filtered products ────────────────────────────────────────────────── */
   const filtered = useMemo(() => {
@@ -227,7 +229,7 @@ export default function StaffPOS() {
   function openDetail(p) { if (p._stock === '缺貨' || p._price <= 0) return; setDetailProduct(p); setDetailQty(1); setDetailNote('') }
   function updateQty(id, d) { setCart(prev => prev.map(c => c.id === id ? { ...c, qty: Math.max(1, c.qty + d) } : c)) }
   function removeItem(id) { setCart(prev => prev.filter(c => c.id !== id)) }
-  function clearAll() { setCart([]); setDiscountPct(0); setServiceFeePct(0); setInvoiceEnabled(false); setTaxId(''); setCarrier(''); setOrderNote(''); clearCustomer() }
+  function clearAll() { setCart([]); setDiscountPct(0); setServiceFeePct(0); setInvoiceEnabled(false); setTaxId(''); setCarrier(''); setOrderNote(''); clearCustomer(); setAttributedTo('店內') }
 
   /* ── Totals with member discount ──────────────────────────────────────── */
   const cartCount = cart.reduce((s, c) => s + c.qty, 0)
@@ -267,6 +269,11 @@ export default function StaffPOS() {
           if (upgData?.upgraded) upg = upgData
         } catch (e) { console.warn('upgrade check failed:', e) }
       }
+
+      // Update attribution
+      try {
+        await supabase.from('unified_orders').update({ attributed_to: customer ? (customer.belongs_to || '店內') : attributedTo }).eq('order_no', data.order_no)
+      } catch (e) { console.warn('attribution update failed:', e) }
 
       setUpgradeInfo(upg)
       setLastOrder({ ...data, items: cart, payMethod, total, memberDiscount: memberDiscount.discount, paid: payMethod === 'cash' ? +payAmount : total, change: data.change ?? change, customerName: customer?.name })
@@ -422,6 +429,18 @@ export default function StaffPOS() {
                 </div>
               )}
             </div>
+            {/* Attribution — only show for walk-in (customer auto-fills from belongs_to) */}
+            {!customer && (
+              <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+                <span style={{ fontSize: 9, color: '#8a7e6e', whiteSpace: 'nowrap' }}>業績歸屬</span>
+                {['老闆', '老闆娘', '店內'].map(a => (
+                  <button key={a} onClick={() => setAttributedTo(a)} style={{ flex: 1, padding: '3px 0', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer', background: attributedTo === a ? 'rgba(201,168,76,.15)' : '#0d0b09', color: attributedTo === a ? '#c9a84c' : '#8a7e6e', border: attributedTo === a ? '1px solid rgba(201,168,76,.3)' : '1px solid #2a2520' }}>{a}</button>
+                ))}
+              </div>
+            )}
+            {customer && customer.belongs_to && (
+              <div style={{ fontSize: 9, color: '#8a7e6e' }}>業績歸屬：<span style={{ color: '#c9a84c' }}>{customer.belongs_to}</span></div>
+            )}
           </div>
           {/* Cart items — scrollable */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '4px 12px' }}>

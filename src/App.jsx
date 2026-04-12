@@ -18,6 +18,8 @@ import BossHR from './pages/boss/HRSchedule'
 import BossPayroll from './pages/boss/Payroll'
 import BossSettings from './pages/boss/Settings'
 import BossInventory from './pages/boss/BossInventory'
+import Commission from './pages/boss/Commission'
+import Customers from './pages/boss/Customers'
 import AmbassadorApp from './pages/ambassador/AmbassadorApp'
 
 export default function App() {
@@ -53,6 +55,8 @@ export default function App() {
           <Route path="/hr" element={<BossHR />} />
           <Route path="/payroll" element={<BossPayroll />} />
           <Route path="/boss-inventory" element={<BossInventory />} />
+          <Route path="/commission" element={<Commission />} />
+          <Route path="/customers" element={<Customers />} />
           <Route path="/settings" element={<BossSettings />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

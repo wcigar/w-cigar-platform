@@ -1,6 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
-import { Home, ClipboardList, BarChart3, Calendar, Settings, DollarSign, Users, LogOut, Briefcase, Package, ShoppingCart } from 'lucide-react'
+import { Home, ClipboardList, BarChart3, Calendar, Settings, DollarSign, Users, LogOut, Briefcase, Package, ShoppingCart, TrendingUp } from 'lucide-react'
 
 const STAFF_NAV = [
   { path: '/', icon: Home, label: '首頁' },
@@ -19,6 +19,8 @@ const BOSS_NAV = [
   { path: '/hr', icon: Users, label: '人事' },
   { path: '/payroll', icon: DollarSign, label: '薪資' },
   { path: '/boss-inventory', icon: Package, label: '庫存' },
+  { path: '/commission', icon: TrendingUp, label: '業績' },
+  { path: '/customers', icon: Users, label: '會員' },
   { path: '/settings', icon: Settings, label: '設定' },
 ]
 
