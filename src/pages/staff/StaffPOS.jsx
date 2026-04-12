@@ -109,6 +109,8 @@ export default function StaffPOS() {
   const [submitting, setSubmitting] = useState(false)
   const [shiftCash, setShiftCash] = useState('10000')
   const [closingCash, setClosingCash] = useState('')
+  const [showQuickAdd, setShowQuickAdd] = useState(false)
+  const [newCust, setNewCust] = useState({ name: '', phone: '', belongs_to: '店內', notes: '' })
 
   const loadAll = useCallback(async () => {
     setLoading(true)
@@ -208,24 +210,25 @@ export default function StaffPOS() {
 
   // ── Shared: checkout bottom content (used in both desktop panel and mobile drawer) ──
   function CheckoutBottom() {
+    const is = { w: '100%', fontSize: 10, padding: '2px 4px', background: '#0d0b09', border: '1px solid #2a2520', borderRadius: 6, color: '#e8dcc8', boxSizing: 'border-box' }
     return <>
-      <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
-        <div style={{ flex: 1 }}><div style={{ fontSize: 8, color: '#8a7e6e' }}>折扣%</div><input type="number" min={0} max={100} value={discountPct || ''} onChange={e => setDiscountPct(Math.min(100, Math.max(0, +e.target.value || 0)))} placeholder="0" style={{ width: '100%', fontSize: 11, padding: '3px 4px', fontFamily: 'var(--font-mono)', background: '#0d0b09', border: '1px solid #2a2520', borderRadius: 6, color: '#e8dcc8' }} /></div>
-        <div style={{ flex: 1 }}><div style={{ fontSize: 8, color: '#8a7e6e' }}>服務費%</div><input type="number" min={0} max={100} value={serviceFeePct || ''} onChange={e => setServiceFeePct(Math.min(100, Math.max(0, +e.target.value || 0)))} placeholder="0" style={{ width: '100%', fontSize: 11, padding: '3px 4px', fontFamily: 'var(--font-mono)', background: '#0d0b09', border: '1px solid #2a2520', borderRadius: 6, color: '#e8dcc8' }} /></div>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 4, alignItems: 'center' }}>
+        <div style={{ flex: 1 }}><span style={{ fontSize: 8, color: '#8a7e6e' }}>折扣%</span><input type="number" min={0} max={100} value={discountPct || ''} onChange={e => setDiscountPct(Math.min(100, Math.max(0, +e.target.value || 0)))} placeholder="0" style={{ ...is, height: 28, fontFamily: 'var(--font-mono)' }} /></div>
+        <div style={{ flex: 1 }}><span style={{ fontSize: 8, color: '#8a7e6e' }}>服務費%</span><input type="number" min={0} max={100} value={serviceFeePct || ''} onChange={e => setServiceFeePct(Math.min(100, Math.max(0, +e.target.value || 0)))} placeholder="0" style={{ ...is, height: 28, fontFamily: 'var(--font-mono)' }} /></div>
         <label style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10, color: '#8a7e6e', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}><input type="checkbox" checked={invoiceEnabled} onChange={e => setInvoiceEnabled(e.target.checked)} /> 開發票</label>
       </div>
-      {invoiceEnabled && <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}><input value={taxId} onChange={e => setTaxId(e.target.value)} placeholder="統一編號" style={{ flex: 1, fontSize: 10, padding: '3px 4px', background: '#0d0b09', border: '1px solid #2a2520', borderRadius: 6, color: '#e8dcc8' }} /><input value={carrier} onChange={e => setCarrier(e.target.value)} placeholder="載具" style={{ flex: 1, fontSize: 10, padding: '3px 4px', background: '#0d0b09', border: '1px solid #2a2520', borderRadius: 6, color: '#e8dcc8' }} /></div>}
-      <input value={orderNote} onChange={e => setOrderNote(e.target.value)} placeholder="備註…" style={{ width: '100%', fontSize: 10, padding: '3px 4px', background: '#0d0b09', border: '1px solid #2a2520', borderRadius: 6, color: '#e8dcc8', marginBottom: 4, boxSizing: 'border-box' }} />
+      {invoiceEnabled && <div style={{ display: 'flex', gap: 4, marginBottom: 3 }}><input value={taxId} onChange={e => setTaxId(e.target.value)} placeholder="統一編號" style={{ ...is, flex: 1, height: 28 }} /><input value={carrier} onChange={e => setCarrier(e.target.value)} placeholder="載具" style={{ ...is, flex: 1, height: 28 }} /></div>}
+      <input value={orderNote} onChange={e => setOrderNote(e.target.value)} placeholder="備註…" style={{ ...is, width: '100%', height: 28, marginBottom: 3 }} />
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#8a7e6e' }}><span>共 {cartCount} 件</span><span>${subtotal.toLocaleString()}</span></div>
-      {memberDiscount.discount > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#9b59b6' }}><span>會員折扣</span><span>-${memberDiscount.discount.toLocaleString()}</span></div>}
-      {manualDiscountAmt > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#f59e0b' }}><span>折扣 {discountPct}%</span><span>-${manualDiscountAmt.toLocaleString()}</span></div>}
-      {serviceFeeAmt > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#8a7e6e' }}><span>服務費</span><span>+${serviceFeeAmt.toLocaleString()}</span></div>}
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 20, fontWeight: 800, color: '#c9a84c', padding: '4px 0' }}><span>應收</span><span style={{ fontFamily: 'var(--font-mono)' }}>${total.toLocaleString()}</span></div>
-      <button onClick={() => { if (cart.length) setShowCheckout(true) }} disabled={!cart.length} style={{ width: '100%', padding: 12, fontSize: 15, fontWeight: 700, cursor: cart.length ? 'pointer' : 'not-allowed', background: cart.length ? 'linear-gradient(135deg, #c9a84c, #b8943f)' : '#2a2520', border: 'none', borderRadius: 10, color: cart.length ? '#000' : '#8a7e6e', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 4 }}><CreditCard size={16} /> 結帳 ${total.toLocaleString()}</button>
-      <div style={{ display: 'flex', gap: 4 }}>
-        <button onClick={() => alert('暫存功能開發中')} style={{ flex: 1, padding: '5px 0', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer', background: 'rgba(37,99,235,.1)', color: '#60a5fa', border: '1px solid rgba(37,99,235,.3)' }}>暫存</button>
-        <button onClick={() => alert('空訂單功能開發中')} style={{ flex: 1, padding: '5px 0', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer', background: 'rgba(161,98,7,.1)', color: '#fbbf24', border: '1px solid rgba(161,98,7,.3)' }}>空訂單</button>
-        <button onClick={clearAll} style={{ flex: 1, padding: '5px 0', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer', background: '#0d0b09', color: '#e74c3c', border: '1px solid rgba(231,76,60,.3)' }}>清除</button>
+      {memberDiscount.discount > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#9b59b6' }}><span>會員折扣</span><span>-${memberDiscount.discount.toLocaleString()}</span></div>}
+      {manualDiscountAmt > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#f59e0b' }}><span>折扣 {discountPct}%</span><span>-${manualDiscountAmt.toLocaleString()}</span></div>}
+      {serviceFeeAmt > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#8a7e6e' }}><span>服務費</span><span>+${serviceFeeAmt.toLocaleString()}</span></div>}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', margin: '2px 0' }}><span style={{ fontSize: 16, fontWeight: 800, color: '#c9a84c' }}>應收</span><span style={{ fontSize: 24, fontWeight: 800, color: '#c9a84c', fontFamily: 'var(--font-mono)' }}>${total.toLocaleString()}</span></div>
+      <button onClick={() => { if (cart.length) setShowCheckout(true) }} disabled={!cart.length} style={{ width: '100%', padding: '10px 0', fontSize: 16, fontWeight: 700, cursor: cart.length ? 'pointer' : 'not-allowed', background: cart.length ? '#c9a84c' : '#2a2520', border: 'none', borderRadius: 8, color: cart.length ? '#0d0b09' : '#8a7e6e', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 4 }}><CreditCard size={16} /> 結帳 ${total.toLocaleString()}</button>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <button onClick={() => alert('暫存功能開發中')} style={{ flex: 1, padding: '6px 0', fontSize: 11, background: '#1a1714', color: '#c9a84c', border: '1px solid #2a2520', borderRadius: 6, cursor: 'pointer' }}>暫存</button>
+        <button onClick={() => alert('空訂單功能開發中')} style={{ flex: 1, padding: '6px 0', fontSize: 11, background: '#1a1714', color: '#c9a84c', border: '1px solid #2a2520', borderRadius: 6, cursor: 'pointer' }}>空訂單</button>
+        <button onClick={clearAll} style={{ flex: 1, padding: '6px 0', fontSize: 11, background: '#1a1714', color: '#e74c3c', border: '1px solid #2a2520', borderRadius: 6, cursor: 'pointer' }}>清除</button>
       </div>
     </>
   }
@@ -443,6 +446,28 @@ export default function StaffPOS() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}><span style={{ fontSize: 16, fontWeight: 700, color: '#c9a84c', display: 'flex', alignItems: 'center', gap: 6 }}><User size={18} /> 選取客戶</span><button onClick={() => setShowCustomerSearch(false)} style={{ background: 'none', border: 'none', color: '#8a7e6e', cursor: 'pointer' }}><X size={20} /></button></div>
           <div style={{ position: 'relative', marginBottom: 10 }}><Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#8a7e6e' }} /><input placeholder="搜尋姓名 / 電話…" value={customerQuery} onChange={e => { setCustomerQuery(e.target.value); searchCustomers(e.target.value) }} autoFocus style={{ width: '100%', fontSize: 13, padding: '8px 10px 8px 32px', background: '#0d0b09', border: '1px solid #2a2520', borderRadius: 10, color: '#e8dcc8', boxSizing: 'border-box' }} /></div>
           <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>{['all', '尊榮會員', '進階會員', '紳士俱樂部'].map(f => <button key={f} onClick={() => setCustomerFilter(f)} style={{ padding: '3px 10px', borderRadius: 10, fontSize: 10, fontWeight: 600, cursor: 'pointer', background: customerFilter === f ? 'rgba(201,168,76,.15)' : 'transparent', color: customerFilter === f ? '#c9a84c' : '#8a7e6e', border: customerFilter === f ? '1px solid rgba(201,168,76,.3)' : '1px solid transparent' }}>{f === 'all' ? '全部' : (TIER_STYLES[f]?.label || f).slice(0, 4)}</button>)}</div>
+          {/* Quick add customer */}
+          <button onClick={() => setShowQuickAdd(!showQuickAdd)} style={{ width: '100%', padding: 8, marginBottom: 8, background: showQuickAdd ? '#2a2520' : 'transparent', color: '#c9a84c', border: '1px dashed #c9a84c', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>{showQuickAdd ? '▼ 收起' : '+ 快速新增客戶'}</button>
+          {showQuickAdd && <div style={{ background: '#1a1714', borderRadius: 8, padding: 12, marginBottom: 12, border: '1px solid #2a2520' }}>
+            <input placeholder="姓名 *" value={newCust.name} onChange={e => setNewCust({ ...newCust, name: e.target.value })} style={{ width: '100%', marginBottom: 8, padding: 8, background: '#0d0b09', color: '#e8dcc8', border: '1px solid #2a2520', borderRadius: 6, boxSizing: 'border-box' }} />
+            <input placeholder="電話" value={newCust.phone} onChange={e => setNewCust({ ...newCust, phone: e.target.value })} style={{ width: '100%', marginBottom: 8, padding: 8, background: '#0d0b09', color: '#e8dcc8', border: '1px solid #2a2520', borderRadius: 6, boxSizing: 'border-box' }} />
+            <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+              <span style={{ color: '#8a7e6e', fontSize: 12, lineHeight: '32px' }}>歸屬：</span>
+              {['老闆', '老闆娘', '店內'].map(v => <button key={v} onClick={() => setNewCust({ ...newCust, belongs_to: v })} style={{ flex: 1, padding: '6px 0', fontSize: 12, borderRadius: 6, background: newCust.belongs_to === v ? '#c9a84c' : '#0d0b09', color: newCust.belongs_to === v ? '#0d0b09' : '#e8dcc8', border: '1px solid #2a2520', cursor: 'pointer' }}>{v}</button>)}
+            </div>
+            <input placeholder="備註" value={newCust.notes} onChange={e => setNewCust({ ...newCust, notes: e.target.value })} style={{ width: '100%', marginBottom: 8, padding: 8, background: '#0d0b09', color: '#e8dcc8', border: '1px solid #2a2520', borderRadius: 6, boxSizing: 'border-box' }} />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setShowQuickAdd(false)} style={{ flex: 1, padding: 8, background: '#0d0b09', color: '#8a7e6e', border: '1px solid #2a2520', borderRadius: 6, cursor: 'pointer' }}>取消</button>
+              <button onClick={async () => {
+                if (!newCust.name.trim()) return alert('請輸入姓名')
+                const { data, error } = await supabase.from('customers').insert({ name: newCust.name.trim(), phone: newCust.phone.trim() || null, belongs_to: newCust.belongs_to, notes: newCust.notes.trim() || null, customer_type: '會員', membership_tier: '非會員', total_spent: 0, enabled: true }).select().single()
+                if (error) return alert('新增失敗：' + error.message)
+                selectCustomer(data)
+                setShowQuickAdd(false)
+                setNewCust({ name: '', phone: '', belongs_to: '店內', notes: '' })
+              }} style={{ flex: 1, padding: 8, background: '#c9a84c', color: '#0d0b09', border: 'none', borderRadius: 6, fontWeight: 700, cursor: 'pointer' }}>儲存並選取</button>
+            </div>
+          </div>}
           <div style={{ flex: 1, overflowY: 'auto' }}>{customerSearching ? <div style={{ textAlign: 'center', padding: 20, color: '#8a7e6e' }}>搜尋中…</div> : customerResults.filter(c => customerFilter === 'all' || c.membership_tier === customerFilter).map(c => { const s = TIER_STYLES[c.membership_tier] || TIER_STYLES['非會員']; return <button key={c.id} onClick={() => selectCustomer(c)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: '#0d0b09', border: `1px solid ${s.border}40`, borderRadius: 10, cursor: 'pointer', textAlign: 'left', marginBottom: 6 }}><div style={{ width: 36, height: 36, borderRadius: '50%', background: s.bg, border: `1px solid ${s.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><User size={16} color={s.color} /></div><div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 13, fontWeight: 700, color: '#e8dcc8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</div><div style={{ fontSize: 10, color: '#8a7e6e' }}>{c.phone || '—'}</div></div><div style={{ textAlign: 'right', flexShrink: 0 }}><span style={{ fontSize: 10, fontWeight: 600, color: s.color, background: s.bg, border: `1px solid ${s.border}`, borderRadius: 8, padding: '2px 6px' }}>{s.label}</span><div style={{ fontSize: 10, color: '#8a7e6e', marginTop: 2 }}>${(c.total_spent || 0).toLocaleString()}</div></div></button> })}</div>
         </div>
       </div>}
