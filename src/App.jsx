@@ -60,6 +60,7 @@ export default function App() {
           <Route path="/customers" element={<Customers />} />
           <Route path="/dealer-orders" element={<DealerOrders />} />
           <Route path="/pos" element={<StaffPOS />} />
+          <Route path="/revenue" element={<StaffRevenue />} />
           <Route path="/settings" element={<BossSettings />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
