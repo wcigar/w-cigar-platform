@@ -20,6 +20,7 @@ const BOSS_NAV = [
   { path: '/boss-inventory', icon: Package, label: '庫存' },
   { path: '/commission', icon: TrendingUp, label: '業績' },
   { path: '/customers', icon: Users, label: '會員' },
+  { path: '/pos', icon: ShoppingCart, label: '收銀' },
   { path: '/settings', icon: Settings, label: '設定' },
 ]
 
