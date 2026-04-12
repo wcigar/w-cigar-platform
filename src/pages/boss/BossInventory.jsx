@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
-import { Package, Search, AlertTriangle, X } from 'lucide-react'
+import { Package, Search, AlertTriangle, X, Camera } from 'lucide-react'
 
 export default function BossInventory() {
   const [items, setItems] = useState([])
@@ -11,13 +11,16 @@ export default function BossInventory() {
   const [adjReason, setAdjReason] = useState('')
   const [adjType, setAdjType] = useState('in')
   const [saving, setSaving] = useState(false)
+  const [photoItem, setPhotoItem] = useState(null)
+  const [uploading, setUploading] = useState(false)
+  const fileRef = useRef(null)
 
   const lowCount = items.filter(i => Number(i.current_stock) < Number(i.safe_stock)).length
   useEffect(() => { loadInventory() }, [])
 
   async function loadInventory() {
     setLoading(true)
-    const { data } = await supabase.from('inventory_master').select('*').eq('enabled', true).order('category').order('name')
+    const { data } = await supabase.from('inventory_master').select('*, image_url').eq('enabled', true).order('category').order('name')
     if (data) setItems(data)
     setLoading(false)
   }
@@ -51,6 +54,32 @@ export default function BossInventory() {
     setAdjQty('')
     setAdjReason('')
     loadInventory()
+  }
+
+  async function handlePhotoUpload(e) {
+    const file = e.target.files?.[0]
+    if (!file || !photoItem) return
+    setUploading(true)
+    try {
+      const ext = file.name.split('.').pop()
+      const path = `inventory/${photoItem.id}_${Date.now()}.${ext}`
+      const { error: upErr } = await supabase.storage
+        .from('product-images')
+        .upload(path, file, { upsert: true, contentType: file.type })
+      if (upErr) throw upErr
+      const url = supabase.storage.from('product-images').getPublicUrl(path).data.publicUrl
+      const { error: dbErr } = await supabase.from('inventory_master')
+        .update({ image_url: url })
+        .eq('id', photoItem.id)
+      if (dbErr) throw dbErr
+      setPhotoItem(null)
+      loadInventory()
+    } catch (err) {
+      alert('上傳失敗: ' + (err.message || err))
+    } finally {
+      setUploading(false)
+      if (fileRef.current) fileRef.current.value = ''
+    }
   }
 
   const filtered = items.filter(i => {
@@ -105,16 +134,51 @@ export default function BossInventory() {
             const stock = Number(item.current_stock), safe = Number(item.safe_stock), isLow = stock < safe
             return (
               <div key={item.id} style={{ ...s.row, background: isLow ? 'rgba(231,76,60,.06)' : 'transparent' }}>
+                {/* Thumbnail */}
+                <div style={{ width: 36, height: 36, borderRadius: 6, background: '#0f0d0a', overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {item.image_url
+                    ? <img src={item.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.target.style.display = 'none' }} />
+                    : <span style={{ fontSize: 14, color: '#2a2520', fontWeight: 700 }}>{(item.name || '?')[0]}</span>
+                  }
+                </div>
                 <div style={s.name}>{item.name}</div>
                 <div style={{ ...s.qty, color: isLow ? '#e74c3c' : '#c9a84c' }}>{stock}</div>
                 <div style={s.unit}>{item.unit}</div>
                 {isLow ? <div style={s.statusBad}><AlertTriangle size={12} /> 低庫存</div> : <div style={s.statusOk}>正常</div>}
+                <button style={{ ...s.btn, background: 'transparent', border: '1px solid #2a2520', color: '#8a8278', padding: '5px 8px' }} onClick={() => setPhotoItem(item)} title="上傳圖片"><Camera size={14} /></button>
                 <button style={s.btn} onClick={() => { setSelected(item); setAdjType('in'); setAdjQty(''); setAdjReason('') }}>調整</button>
               </div>
             )
           })}
         </div>
       ))}
+      {/* Hidden file input */}
+      <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handlePhotoUpload} />
+
+      {/* Photo upload modal */}
+      {photoItem && (
+        <div style={s.overlay} onClick={() => !uploading && setPhotoItem(null)}>
+          <div style={s.modal} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <h3 style={{ color: '#c9a84c', margin: 0, fontSize: 18 }}>上傳圖片</h3>
+              <X size={20} style={{ cursor: 'pointer', color: '#8a8278' }} onClick={() => !uploading && setPhotoItem(null)} />
+            </div>
+            <div style={{ marginBottom: 12, color: '#e8dcc8', fontWeight: 600 }}>{photoItem.name}</div>
+            {photoItem.image_url && (
+              <div style={{ marginBottom: 12, borderRadius: 8, overflow: 'hidden', border: '1px solid #2a2520' }}>
+                <img src={photoItem.image_url} alt="" style={{ width: '100%', maxHeight: 200, objectFit: 'cover', display: 'block' }} />
+                <div style={{ fontSize: 10, color: '#8a8278', padding: '4px 8px', background: '#0a0a0a' }}>目前圖片</div>
+              </div>
+            )}
+            <button disabled={uploading} onClick={() => fileRef.current?.click()}
+              style={{ width: '100%', padding: 14, borderRadius: 8, border: '1px solid #2a2520', cursor: 'pointer', fontWeight: 600, fontSize: 14, background: uploading ? '#333' : '#1a1714', color: uploading ? '#666' : '#e8dcc8', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 8 }}>
+              <Camera size={18} /> {uploading ? '上傳中…' : '📷 拍照 / 選擇檔案'}
+            </button>
+            <div style={{ fontSize: 11, color: '#5a554e', textAlign: 'center' }}>支援 JPG / PNG / WebP</div>
+          </div>
+        </div>
+      )}
+
       {selected && (
         <div style={s.overlay} onClick={() => setSelected(null)}>
           <div style={s.modal} onClick={e => e.stopPropagation()}>
