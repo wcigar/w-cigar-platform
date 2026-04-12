@@ -44,6 +44,15 @@ function classifyItem(n, cat) {
   return '餐食'
 }
 function isSoftDrink(n) { return /可樂|雪碧|蘋果汁|礦泉水|可爾必思|zero|coke|sprite/i.test(n || '') }
+
+// Drink customization
+const DRINK_CATS = new Set(['莊園品茗', '奶茶咖啡', '氣泡飲品'])
+function isDrink(p) { return DRINK_CATS.has(p?._cat) }
+const SUGAR_OPTS = ['正常糖', '半糖', '少糖', '微糖', '無糖']
+const TEMP_OPTS = ['冷飲', '熱飲']
+const ICE_OPTS = ['正常冰', '少冰', '去冰']
+const CUSTOM_DEFAULTS = { sugar: '正常糖', temp: '冷飲', ice: '正常冰' }
+function customLabel(c) { if (!c) return ''; const parts = []; if (c.sugar && c.sugar !== '正常糖') parts.push(c.sugar); parts.push(c.temp === '熱飲' ? '熱飲' : (c.ice && c.ice !== '正常冰' ? c.ice : '')); if (c.temp === '冷飲' && c.ice === '正常冰' && c.sugar === '正常糖') return ''; return parts.filter(Boolean).join('｜') }
 function calcMemberDiscount(tier, items) {
   if (!tier || tier.id === '非會員') return { discount: 0, details: [] }
   let tot = 0; const d = []
@@ -105,6 +114,7 @@ export default function StaffPOS() {
   const [detailProduct, setDetailProduct] = useState(null)
   const [detailQty, setDetailQty] = useState(1)
   const [detailNote, setDetailNote] = useState('')
+  const [detailCustom, setDetailCustom] = useState({ ...CUSTOM_DEFAULTS })
   const [payMethod, setPayMethod] = useState('cash')
   const [payAmount, setPayAmount] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -189,18 +199,21 @@ export default function StaffPOS() {
     return list
   }, [products, activeCategory, search, sortBy])
 
-  function addToCart(p, qty, note) {
+  function addToCart(p, qty, note, custom) {
     if (p._stock === '缺貨' || p._price <= 0) return
-    setCart(prev => { const i = prev.findIndex(c => c.id === p.id); if (i >= 0) { const a = [...prev]; a[i] = { ...a[i], qty: a[i].qty + qty, note: note || a[i].note }; return a } return [...prev, { id: p.id, name: p.name, brand: p.brand || '', price: p._price, _originalPrice: p._price, qty, _cat: p._cat, inv_master_id: p.inv_master_id, note: note || '' }] })
+    const cl = customLabel(custom)
+    // For drinks with customization, use a composite key so "半糖去冰" and "正常" are separate cart lines
+    const cartKey = cl ? p.id + '|' + cl : p.id
+    setCart(prev => { const i = prev.findIndex(c => c._cartKey === cartKey); if (i >= 0) { const a = [...prev]; a[i] = { ...a[i], qty: a[i].qty + qty, note: note || a[i].note }; return a } return [...prev, { _cartKey: cartKey, id: p.id, name: p.name, brand: p.brand || '', price: p._price, _originalPrice: p._price, qty, _cat: p._cat, inv_master_id: p.inv_master_id, note: note || '', _customLabel: cl, _custom: custom || null }] })
   }
-  function openDetail(p) { if (p._stock === '缺貨' || p._price <= 0) return; setDetailProduct(p); setDetailQty(1); setDetailNote('') }
-  function updateQty(id, d) { setCart(prev => prev.map(c => c.id === id ? { ...c, qty: Math.max(1, c.qty + d) } : c)) }
-  function removeItem(id) { setCart(prev => prev.filter(c => c.id !== id)) }
-  function applyPriceOverride(id) {
+  function openDetail(p) { if (p._stock === '缺貨' || p._price <= 0) return; setDetailProduct(p); setDetailQty(1); setDetailNote(''); setDetailCustom({ ...CUSTOM_DEFAULTS }) }
+  function updateQty(key, d) { setCart(prev => prev.map(c => (c._cartKey || c.id) === key ? { ...c, qty: Math.max(1, c.qty + d) } : c)) }
+  function removeItem(key) { setCart(prev => prev.filter(c => (c._cartKey || c.id) !== key)) }
+  function applyPriceOverride(key) {
     const newPrice = Math.max(0, Math.round(+editPriceVal || 0))
-    const item = cart.find(c => c.id === id)
+    const item = cart.find(c => (c._cartKey || c.id) === key)
     if (!item || newPrice === item.price) { setEditPriceId(null); return }
-    setCart(prev => prev.map(c => c.id === id ? { ...c, price: newPrice, _overridden: true } : c))
+    setCart(prev => prev.map(c => (c._cartKey || c.id) === key ? { ...c, price: newPrice, _overridden: true } : c))
     logAudit('price_override', `${item.name}: $${item._originalPrice || item.price} → $${newPrice}${editPriceReason ? ' 原因: ' + editPriceReason : ''}`, user?.name || 'UNKNOWN')
     setEditPriceId(null); setEditPriceVal(''); setEditPriceReason('')
   }
@@ -222,7 +235,7 @@ export default function StaffPOS() {
     try {
       const { data, error } = await supabase.rpc('pos_checkout', {
         p_employee_id: user.employee_id || user.id, p_employee_name: user.name,
-        p_items: cart.map(c => ({ product_id: c.id, product_name: (c.brand ? c.brand + ' ' : '') + c.name, qty: c.qty, unit_price: c.price })),
+        p_items: cart.map(c => ({ product_id: c.id, product_name: (c.brand ? c.brand + ' ' : '') + c.name + (c._customLabel ? ' (' + c._customLabel + ')' : ''), qty: c.qty, unit_price: c.price })),
         p_payment_method: payMethod, p_payment_amount: payMethod === 'cash' ? +payAmount : total,
         p_discount: memberDiscount.discount + manualDiscountAmt, p_table_no: tableNo || null, p_vip_id: customer?.id || null,
         p_notes: [customer ? `客戶: ${customer.name}` : '', guestCount > 1 ? `人數: ${guestCount}` : '', serviceFeePct > 0 ? `服務費: ${serviceFeePct}%` : '', invoiceEnabled ? `統編: ${taxId} 載具: ${carrier}` : '', orderNote, ...cart.filter(c => c._overridden).map(c => `[改價] ${c.name}: $${c._originalPrice}→$${c.price}`), ...cart.filter(c => c.note).map(c => `[${c.name}] ${c.note}`)].filter(Boolean).join(' | ') || null,
@@ -273,13 +286,14 @@ export default function StaffPOS() {
   // ── Shared: cart items list ──
   function CartItems() {
     return <>
-      {cart.map(c => <div key={c.id} style={{ padding: '6px 0', borderBottom: '1px solid #2a2520' }}>
+      {cart.map(c => { const ck = c._cartKey || c.id; return <div key={ck} style={{ padding: '6px 0', borderBottom: '1px solid #2a2520' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: '#e8dcc8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</div>
+            {c._customLabel && <div style={{ fontSize: 9, color: '#c9a84c', marginTop: 1 }}>{c._customLabel}</div>}
             <div style={{ fontSize: 10, color: '#8a7e6e', fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center', gap: 3 }}>
-              {editPriceId === c.id ? null : <>
-                <span onClick={canOverridePrice ? () => { setEditPriceId(c.id); setEditPriceVal(String(c.price)); setEditPriceReason('') } : undefined}
+              {editPriceId === ck ? null : <>
+                <span onClick={canOverridePrice ? () => { setEditPriceId(ck); setEditPriceVal(String(c.price)); setEditPriceReason('') } : undefined}
                   style={{ cursor: canOverridePrice ? 'pointer' : 'default', borderBottom: canOverridePrice ? '1px dashed #8a7e6e' : 'none' }}>
                   ${c.price.toLocaleString()}
                 </span>
@@ -289,25 +303,25 @@ export default function StaffPOS() {
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <button onClick={() => updateQty(c.id, -1)} style={{ width: 24, height: 24, borderRadius: 6, border: '1px solid #2a2520', background: '#0d0b09', color: '#e8dcc8', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Minus size={11} /></button>
+            <button onClick={() => updateQty(ck, -1)} style={{ width: 24, height: 24, borderRadius: 6, border: '1px solid #2a2520', background: '#0d0b09', color: '#e8dcc8', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Minus size={11} /></button>
             <span style={{ width: 22, textAlign: 'center', fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-mono)', color: '#e8dcc8' }}>{c.qty}</span>
-            <button onClick={() => updateQty(c.id, 1)} style={{ width: 24, height: 24, borderRadius: 6, border: '1px solid rgba(201,168,76,.3)', background: 'rgba(201,168,76,.1)', color: '#c9a84c', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Plus size={11} /></button>
+            <button onClick={() => updateQty(ck, 1)} style={{ width: 24, height: 24, borderRadius: 6, border: '1px solid rgba(201,168,76,.3)', background: 'rgba(201,168,76,.1)', color: '#c9a84c', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Plus size={11} /></button>
           </div>
           <span style={{ width: 54, textAlign: 'right', fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-mono)', color: '#c9a84c' }}>${(c.price * c.qty).toLocaleString()}</span>
-          <button onClick={() => removeItem(c.id)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', padding: 2 }}><Trash2 size={13} /></button>
+          <button onClick={() => removeItem(ck)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', padding: 2 }}><Trash2 size={13} /></button>
         </div>
-        {editPriceId === c.id && <div style={{ display: 'flex', gap: 4, marginTop: 4, alignItems: 'center' }}>
+        {editPriceId === ck && <div style={{ display: 'flex', gap: 4, marginTop: 4, alignItems: 'center' }}>
           <span style={{ fontSize: 10, color: '#f59e0b', flexShrink: 0 }}>$</span>
           <input type="number" inputMode="numeric" value={editPriceVal} onChange={e => setEditPriceVal(e.target.value)} autoFocus
             style={{ width: 90, fontSize: 12, padding: '3px 4px', background: '#0d0b09', border: '1px solid #f59e0b', borderRadius: 4, color: '#f59e0b', fontFamily: 'var(--font-mono)', textAlign: 'center' }}
-            onKeyDown={e => { if (e.key === 'Enter') applyPriceOverride(c.id); if (e.key === 'Escape') setEditPriceId(null) }} />
+            onKeyDown={e => { if (e.key === 'Enter') applyPriceOverride(ck); if (e.key === 'Escape') setEditPriceId(null) }} />
           <input placeholder="原因" value={editPriceReason} onChange={e => setEditPriceReason(e.target.value)}
             style={{ flex: 1, fontSize: 10, padding: '3px 4px', background: '#0d0b09', border: '1px solid #2a2520', borderRadius: 4, color: '#e8dcc8', minWidth: 0 }}
-            onKeyDown={e => { if (e.key === 'Enter') applyPriceOverride(c.id) }} />
-          <button onClick={() => applyPriceOverride(c.id)} style={{ fontSize: 10, padding: '3px 8px', background: '#f59e0b', color: '#000', border: 'none', borderRadius: 4, cursor: 'pointer', fontWeight: 700, flexShrink: 0 }}>✓</button>
+            onKeyDown={e => { if (e.key === 'Enter') applyPriceOverride(ck) }} />
+          <button onClick={() => applyPriceOverride(ck)} style={{ fontSize: 10, padding: '3px 8px', background: '#f59e0b', color: '#000', border: 'none', borderRadius: 4, cursor: 'pointer', fontWeight: 700, flexShrink: 0 }}>✓</button>
           <button onClick={() => setEditPriceId(null)} style={{ fontSize: 10, padding: '3px 6px', background: 'none', color: '#8a7e6e', border: '1px solid #2a2520', borderRadius: 4, cursor: 'pointer', flexShrink: 0 }}>✕</button>
         </div>}
-      </div>)}
+      </div> })}
       {memberDiscount.details.length > 0 && <div style={{ padding: '6px 0', borderBottom: '1px solid #2a2520' }}>
         {memberDiscount.details.map((d, i) => <div key={i} style={{ fontSize: 10, color: '#9b59b6', display: 'flex', justifyContent: 'space-between' }}><span>{d.name} · {d.rate === 0 ? '免費' : `${Math.round(d.rate * 10)}折`}</span><span>-${d.saved.toLocaleString()}</span></div>)}
       </div>}
@@ -450,10 +464,34 @@ export default function StaffPOS() {
               <span style={{ fontSize: 28, fontFamily: 'var(--font-mono)', fontWeight: 800, width: 50, textAlign: 'center' }}>{detailQty}</span>
               <button onClick={() => setDetailQty(q => q + 1)} style={{ width: 40, height: 40, borderRadius: 10, border: '1px solid rgba(201,168,76,.3)', background: 'rgba(201,168,76,.1)', color: '#c9a84c', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Plus size={18} /></button>
             </div>
-            <input value={detailNote} onChange={e => setDetailNote(e.target.value)} placeholder="備註（去冰、少糖...）" style={{ width: '100%', fontSize: 12, padding: '8px 10px', background: '#0d0b09', border: '1px solid #2a2520', borderRadius: 8, color: '#e8dcc8', marginBottom: 14, boxSizing: 'border-box' }} />
+            {/* Drink customization — only for drink categories */}
+            {isDrink(detailProduct) && <div style={{ marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {/* Sugar */}
+              <div>
+                <div style={{ fontSize: 10, color: '#8a7e6e', marginBottom: 4, fontWeight: 600 }}>糖度</div>
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                  {SUGAR_OPTS.map(s => <button key={s} onClick={() => setDetailCustom(p => ({ ...p, sugar: s }))} style={{ padding: '6px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: detailCustom.sugar === s ? '#c9a84c' : '#0d0b09', color: detailCustom.sugar === s ? '#0d0b09' : '#e8dcc8', border: detailCustom.sugar === s ? '1px solid #c9a84c' : '1px solid #2a2520' }}>{s}</button>)}
+                </div>
+              </div>
+              {/* Temperature */}
+              <div>
+                <div style={{ fontSize: 10, color: '#8a7e6e', marginBottom: 4, fontWeight: 600 }}>溫度</div>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {TEMP_OPTS.map(t => <button key={t} onClick={() => setDetailCustom(p => ({ ...p, temp: t, ...(t === '熱飲' ? { ice: '' } : { ice: p.ice || '正常冰' }) }))} style={{ padding: '6px 16px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: detailCustom.temp === t ? (t === '熱飲' ? '#e74c3c' : '#4d8ac4') : '#0d0b09', color: detailCustom.temp === t ? '#fff' : '#e8dcc8', border: detailCustom.temp === t ? 'none' : '1px solid #2a2520' }}>{t}</button>)}
+                </div>
+              </div>
+              {/* Ice — hidden when hot */}
+              {detailCustom.temp !== '熱飲' && <div>
+                <div style={{ fontSize: 10, color: '#8a7e6e', marginBottom: 4, fontWeight: 600 }}>冰量</div>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {ICE_OPTS.map(i => <button key={i} onClick={() => setDetailCustom(p => ({ ...p, ice: i }))} style={{ padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: detailCustom.ice === i ? '#4d8ac4' : '#0d0b09', color: detailCustom.ice === i ? '#fff' : '#e8dcc8', border: detailCustom.ice === i ? 'none' : '1px solid #2a2520' }}>{i}</button>)}
+                </div>
+              </div>}
+            </div>}
+            <input value={detailNote} onChange={e => setDetailNote(e.target.value)} placeholder={isDrink(detailProduct) ? '其他備註（去珍珠、加椰果...）' : '備註'} style={{ width: '100%', fontSize: 12, padding: '8px 10px', background: '#0d0b09', border: '1px solid #2a2520', borderRadius: 8, color: '#e8dcc8', marginBottom: 14, boxSizing: 'border-box' }} />
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setDetailProduct(null)} style={{ flex: 1, padding: 12, borderRadius: 10, border: '1px solid #2a2520', background: '#0d0b09', color: '#8a7e6e', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>取消</button>
-              <button onClick={() => { addToCart(detailProduct, detailQty, detailNote); setDetailProduct(null) }} style={{ flex: 2, padding: 12, borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #c9a84c, #b8943f)', color: '#000', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><ShoppingCart size={16} /> 加入 · ${(detailProduct._price * detailQty).toLocaleString()}</button>
+              <button onClick={() => { addToCart(detailProduct, detailQty, detailNote, isDrink(detailProduct) ? detailCustom : null); setDetailProduct(null) }} style={{ flex: 2, padding: 12, borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #c9a84c, #b8943f)', color: '#000', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><ShoppingCart size={16} /> 加入 · ${(detailProduct._price * detailQty).toLocaleString()}</button>
             </div>
           </div>
         </div>
