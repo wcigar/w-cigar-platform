@@ -153,14 +153,14 @@ export default function StaffPOS() {
       // Bar / food / drink items from inventory_master
       const { data: invItems } = await supabase
         .from('inventory_master')
-        .select('id, name, category, current_stock, safe_stock, retail_price, unit')
+        .select('id, name, category, current_stock, safe_stock, retail_price, unit, image_url')
         .eq('enabled', true)
         .in('category', ['吧台飲品', '餐飲', '酒類', '配件'])
       const otherProducts = (invItems || []).map(p => ({
         id: p.id,
         name: p.name,
         brand: p.category,
-        image_url: null,
+        image_url: p.image_url || null,
         inv_master_id: p.id,
         _source: 'inventory',
         _category: p.category,
