@@ -354,7 +354,7 @@ export default function StaffPOS() {
         </div>
 
         {/* ── CART PANEL ── */}
-        <div className="pos-cart-panel" style={{ width: 340, display: 'flex', flexDirection: 'column', background: 'var(--black-card)', overflow: 'hidden', height: 'calc(100vh - 50px)' }}>
+        <div className="pos-cart-panel" style={{ width: 340, display: 'flex', flexDirection: 'column', background: 'var(--black-card)', height: 'calc(100vh - 50px)' }}>
           <div style={{ padding: '8px 14px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
             <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--gold)', display: 'flex', alignItems: 'center', gap: 6 }}><ShoppingCart size={16} /> 購物車 ({cartCount})</span>
             {cart.length > 0 && <button onClick={clearAll} style={{ background: 'none', border: 'none', color: 'var(--red)', fontSize: 11, cursor: 'pointer' }}>清空</button>}
@@ -402,7 +402,7 @@ export default function StaffPOS() {
             {discountAmt > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#f59e0b' }}><span>折扣 {discountPct}%</span><span>-${discountAmt.toLocaleString()}</span></div>}
             {serviceFeeAmt > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-dim)' }}><span>服務費</span><span>+${serviceFeeAmt.toLocaleString()}</span></div>}
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 800, color: 'var(--gold)' }}><span>應收</span><span style={{ fontFamily: 'var(--font-mono)' }}>${total.toLocaleString()}</span></div>
-            <button onClick={() => cart.length > 0 && setShowCheckout(true)} disabled={!cart.length} style={{ width: '100%', padding: 12, fontSize: 15, fontWeight: 700, cursor: cart.length ? 'pointer' : 'not-allowed', background: cart.length ? 'linear-gradient(135deg, #c9a84c, #b8943f)' : 'var(--border)', border: 'none', borderRadius: 10, color: cart.length ? '#000' : 'var(--text-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><CreditCard size={16} /> 結帳 ${total.toLocaleString()}</button>
+            <button onClick={() => { if (cart.length > 0) setShowCheckout(true) }} disabled={!cart.length} style={{ width: '100%', padding: 12, fontSize: 15, fontWeight: 700, cursor: cart.length ? 'pointer' : 'not-allowed', background: cart.length ? 'linear-gradient(135deg, #c9a84c, #b8943f)' : 'var(--border)', border: 'none', borderRadius: 10, color: cart.length ? '#000' : 'var(--text-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><CreditCard size={16} /> 結帳 ${total.toLocaleString()}</button>
             <div style={{ display: 'flex', gap: 4 }}>
               <button onClick={() => alert('暫存訂單功能開發中')} style={{ flex: 1, padding: '5px 0', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer', background: 'rgba(37,99,235,.1)', color: '#60a5fa', border: '1px solid rgba(37,99,235,.3)' }}>暫存</button>
               <button onClick={() => alert('空訂單功能開發中')} style={{ flex: 1, padding: '5px 0', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer', background: 'rgba(161,98,7,.1)', color: '#fbbf24', border: '1px solid rgba(161,98,7,.3)' }}>空訂單</button>
@@ -414,7 +414,7 @@ export default function StaffPOS() {
 
       {/* ═══ PRODUCT DETAIL MODAL ═══ */}
       {detailProduct && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setDetailProduct(null)}>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,.85)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setDetailProduct(null)}>
           <div style={{ background: 'var(--black-card)', border: '1px solid var(--border-gold)', borderRadius: 20, width: '100%', maxWidth: 400, overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
             {detailProduct.image_url ? (
               <div style={{ height: 200, background: '#0f0d0a', overflow: 'hidden' }}>
@@ -450,7 +450,7 @@ export default function StaffPOS() {
 
       {/* ═══ CHECKOUT MODAL ═══ */}
       {showCheckout && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setShowCheckout(false)}>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,.85)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setShowCheckout(false)}>
           <div style={{ background: 'var(--black-card)', border: '1px solid var(--border-gold)', borderRadius: 20, padding: 24, width: '100%', maxWidth: 480, maxHeight: '90vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--gold)' }}>💰 結帳</span>
@@ -489,7 +489,7 @@ export default function StaffPOS() {
 
       {/* ═══ SUCCESS MODAL ═══ */}
       {lastOrder && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setLastOrder(null)}>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,.85)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setLastOrder(null)}>
           <div style={{ background: 'var(--black-card)', border: '2px solid rgba(77,168,108,.5)', borderRadius: 20, padding: 30, width: '100%', maxWidth: 380, textAlign: 'center' }} onClick={e => e.stopPropagation()}>
             <CheckCircle2 size={48} color="var(--green)" style={{ marginBottom: 12 }} />
             <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--green)', marginBottom: 4 }}>結帳成功！</div>
@@ -506,7 +506,7 @@ export default function StaffPOS() {
 
       {/* ═══ SHIFT MODAL ═══ */}
       {showShift && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setShowShift(false)}>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,.85)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setShowShift(false)}>
           <div style={{ background: 'var(--black-card)', border: '1px solid var(--border-gold)', borderRadius: 20, padding: 24, width: '100%', maxWidth: 400 }} onClick={e => e.stopPropagation()}>
             {!shift ? (<>
               <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--gold)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}><LogIn size={20} /> 開班</div>
@@ -530,7 +530,7 @@ export default function StaffPOS() {
 
       {/* ═══ MOBILE CART DRAWER ═══ */}
       {showMobileCart && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 200, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }} onClick={() => setShowMobileCart(false)}>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,.85)', zIndex: 300, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }} onClick={() => setShowMobileCart(false)}>
           <div style={{ background: 'var(--black-card)', borderRadius: '16px 16px 0 0', maxHeight: '85vh', overflow: 'auto', border: '1px solid var(--border-gold)', borderBottom: 'none' }} onClick={e => e.stopPropagation()}>
             <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: 'var(--black-card)', zIndex: 1 }}>
               <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--gold)' }}>購物車 ({cartCount})</span>
@@ -551,7 +551,7 @@ export default function StaffPOS() {
               ))}
               {!cart.length && <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-dim)', fontSize: 13 }}>購物車是空的</div>}
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 20, fontWeight: 800, color: 'var(--gold)', padding: '12px 0' }}><span>應收</span><span style={{ fontFamily: 'var(--font-mono)' }}>${total.toLocaleString()}</span></div>
-              <button onClick={() => { setShowMobileCart(false); cart.length > 0 && setShowCheckout(true) }} disabled={!cart.length} style={{ width: '100%', padding: 14, fontSize: 16, fontWeight: 700, cursor: cart.length ? 'pointer' : 'not-allowed', background: cart.length ? 'linear-gradient(135deg, #c9a84c, #b8943f)' : 'var(--border)', border: 'none', borderRadius: 12, color: cart.length ? '#000' : 'var(--text-dim)', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><CreditCard size={18} /> 結帳</button>
+              <button onClick={() => { if (!cart.length) return; setShowMobileCart(false); setTimeout(() => setShowCheckout(true), 100) }} disabled={!cart.length} style={{ width: '100%', padding: 14, fontSize: 16, fontWeight: 700, cursor: cart.length ? 'pointer' : 'not-allowed', background: cart.length ? 'linear-gradient(135deg, #c9a84c, #b8943f)' : 'var(--border)', border: 'none', borderRadius: 12, color: cart.length ? '#000' : 'var(--text-dim)', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><CreditCard size={18} /> 結帳</button>
             </div>
           </div>
         </div>
