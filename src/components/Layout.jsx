@@ -61,18 +61,19 @@ export default function Layout({ children }) {
         {children}
       </main>
 
-      <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, display: 'flex', justifyContent: 'space-around', padding: '8px 0 env(safe-area-inset-bottom, 8px)', borderTop: '1px solid #2a2520', background: 'rgba(17,17,17,.97)', zIndex: 10 }}>
+      <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, display: 'flex', justifyContent: 'space-around', padding: '6px 0 env(safe-area-inset-bottom, 6px)', borderTop: '1px solid #2a2520', background: 'rgba(17,17,17,.97)', zIndex: 10 }}>
         {nav.map(item => {
           const active = location.pathname === item.path
           const Icon = item.icon
           return (
-            <button key={item.path} onClick={() => navigate(item.path)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, background: 'none', border: 'none', color: active ? '#c9a84c' : '#5a554e', padding: '4px 8px', cursor: 'pointer', fontSize: 10, fontWeight: active ? 600 : 400, transition: 'color .2s' }}>
-              <Icon size={20} />
-              {item.label}
+            <button key={item.path} onClick={() => navigate(item.path)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, background: 'none', border: 'none', color: active ? '#c9a84c' : '#5a554e', padding: '4px 4px', cursor: 'pointer', fontSize: 9, fontWeight: active ? 600 : 400, transition: 'color .2s', minWidth: 0 }}>
+              <Icon size={18} />
+              <span className="nav-label">{item.label}</span>
             </button>
           )
         })}
       </nav>
+      <style>{`@media(max-width:767px){.nav-label{font-size:8px !important;}}`}</style>
     </div>
   )
 }
