@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
-import { Search, ShoppingCart, X, Plus, Minus, Trash2, CreditCard, DollarSign, ChevronLeft, ChevronUp, ChevronDown, CheckCircle2, LogIn, LogOut as LogOutIcon, Clock, User } from 'lucide-react'
+import { logAudit } from '../../lib/audit'
+import { Search, ShoppingCart, X, Plus, Minus, Trash2, CreditCard, DollarSign, ChevronLeft, ChevronUp, ChevronDown, CheckCircle2, LogIn, LogOut as LogOutIcon, Clock, User, Edit2 } from 'lucide-react'
 
 const PAY_METHODS = [
   { key: 'cash', label: '現金', icon: '💵', color: '#4da86c' },
@@ -111,6 +112,10 @@ export default function StaffPOS() {
   const [closingCash, setClosingCash] = useState('')
   const [showQuickAdd, setShowQuickAdd] = useState(false)
   const [newCust, setNewCust] = useState({ name: '', phone: '', belongs_to: '店內', notes: '' })
+  const [editPriceId, setEditPriceId] = useState(null)
+  const [editPriceVal, setEditPriceVal] = useState('')
+  const [editPriceReason, setEditPriceReason] = useState('')
+  const canOverridePrice = user?.is_admin === true
 
   const loadAll = useCallback(async () => {
     setLoading(true)
@@ -152,8 +157,32 @@ export default function StaffPOS() {
   const filtered = useMemo(() => {
     let list = products
     if (activeCategory !== 'all') list = list.filter(p => p._cat === activeCategory)
-    if (search) { const kw = search.toLowerCase(); list = list.filter(p => [p.brand, p.name, p._cat].filter(Boolean).join(' ').toLowerCase().includes(kw)) }
-    if (sortBy === 'menu') list = [...list].sort((a, b) => (CAT_ORDER[a._cat] ?? 99) - (CAT_ORDER[b._cat] ?? 99) || (a.name || '').localeCompare(b.name || ''))
+    if (search) {
+      const kw = search.toLowerCase().trim()
+      const scored = list.map(p => {
+        const brand = (p.brand || '').toLowerCase(), name = (p.name || '').toLowerCase(), spec = (p.spec || '').toLowerCase()
+        let score = 0
+        if (brand === kw) score = 100
+        else if (brand.startsWith(kw)) score = 80
+        else if (brand.includes(kw)) score = 60
+        else if (name.includes(kw)) score = 40
+        else if (spec.includes(kw)) score = 20
+        else if ([brand, name, spec, p._cat || ''].join(' ').includes(kw)) score = 10
+        return { ...p, _searchScore: score }
+      }).filter(p => p._searchScore > 0)
+      scored.sort((a, b) => b._searchScore - a._searchScore || (a.name || '').localeCompare(b.name || ''))
+      return scored
+    }
+    const normBrand = s => (s || '').toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]/g, '')
+    if (sortBy === 'menu') list = [...list].sort((a, b) => {
+      const catDiff = (CAT_ORDER[a._cat] ?? 99) - (CAT_ORDER[b._cat] ?? 99)
+      if (catDiff !== 0) return catDiff
+      if (a._cat === '古巴雪茄' || a._cat === 'Capadura') {
+        const brandCmp = normBrand(a.brand).localeCompare(normBrand(b.brand))
+        if (brandCmp !== 0) return brandCmp
+      }
+      return (a.name || '').localeCompare(b.name || '')
+    })
     else if (sortBy === 'price_desc') list = [...list].sort((a, b) => b._price - a._price)
     else if (sortBy === 'price_asc') list = [...list].sort((a, b) => a._price - b._price)
     else list = [...list].sort((a, b) => (a.name || '').localeCompare(b.name || ''))
@@ -162,11 +191,19 @@ export default function StaffPOS() {
 
   function addToCart(p, qty, note) {
     if (p._stock === '缺貨' || p._price <= 0) return
-    setCart(prev => { const i = prev.findIndex(c => c.id === p.id); if (i >= 0) { const a = [...prev]; a[i] = { ...a[i], qty: a[i].qty + qty, note: note || a[i].note }; return a } return [...prev, { id: p.id, name: p.name, brand: p.brand || '', price: p._price, qty, _cat: p._cat, inv_master_id: p.inv_master_id, note: note || '' }] })
+    setCart(prev => { const i = prev.findIndex(c => c.id === p.id); if (i >= 0) { const a = [...prev]; a[i] = { ...a[i], qty: a[i].qty + qty, note: note || a[i].note }; return a } return [...prev, { id: p.id, name: p.name, brand: p.brand || '', price: p._price, _originalPrice: p._price, qty, _cat: p._cat, inv_master_id: p.inv_master_id, note: note || '' }] })
   }
   function openDetail(p) { if (p._stock === '缺貨' || p._price <= 0) return; setDetailProduct(p); setDetailQty(1); setDetailNote('') }
   function updateQty(id, d) { setCart(prev => prev.map(c => c.id === id ? { ...c, qty: Math.max(1, c.qty + d) } : c)) }
   function removeItem(id) { setCart(prev => prev.filter(c => c.id !== id)) }
+  function applyPriceOverride(id) {
+    const newPrice = Math.max(0, Math.round(+editPriceVal || 0))
+    const item = cart.find(c => c.id === id)
+    if (!item || newPrice === item.price) { setEditPriceId(null); return }
+    setCart(prev => prev.map(c => c.id === id ? { ...c, price: newPrice, _overridden: true } : c))
+    logAudit('price_override', `${item.name}: $${item._originalPrice || item.price} → $${newPrice}${editPriceReason ? ' 原因: ' + editPriceReason : ''}`, user?.name || 'UNKNOWN')
+    setEditPriceId(null); setEditPriceVal(''); setEditPriceReason('')
+  }
   function clearAll() { setCart([]); setDiscountPct(0); setServiceFeePct(0); setInvoiceEnabled(false); setTaxId(''); setCarrier(''); setOrderNote(''); clearCustomer(); setAttributedTo('店內') }
 
   const cartCount = cart.reduce((s, c) => s + c.qty, 0)
@@ -188,7 +225,7 @@ export default function StaffPOS() {
         p_items: cart.map(c => ({ product_id: c.id, product_name: (c.brand ? c.brand + ' ' : '') + c.name, qty: c.qty, unit_price: c.price })),
         p_payment_method: payMethod, p_payment_amount: payMethod === 'cash' ? +payAmount : total,
         p_discount: memberDiscount.discount + manualDiscountAmt, p_table_no: tableNo || null, p_vip_id: customer?.id || null,
-        p_notes: [customer ? `客戶: ${customer.name}` : '', guestCount > 1 ? `人數: ${guestCount}` : '', serviceFeePct > 0 ? `服務費: ${serviceFeePct}%` : '', invoiceEnabled ? `統編: ${taxId} 載具: ${carrier}` : '', orderNote, ...cart.filter(c => c.note).map(c => `[${c.name}] ${c.note}`)].filter(Boolean).join(' | ') || null,
+        p_notes: [customer ? `客戶: ${customer.name}` : '', guestCount > 1 ? `人數: ${guestCount}` : '', serviceFeePct > 0 ? `服務費: ${serviceFeePct}%` : '', invoiceEnabled ? `統編: ${taxId} 載具: ${carrier}` : '', orderNote, ...cart.filter(c => c._overridden).map(c => `[改價] ${c.name}: $${c._originalPrice}→$${c.price}`), ...cart.filter(c => c.note).map(c => `[${c.name}] ${c.note}`)].filter(Boolean).join(' | ') || null,
       })
       if (error || !data?.success) throw new Error(error?.message || data?.error || '結帳失敗')
       try { await supabase.from('unified_orders').update({ attributed_to: customer ? (customer.belongs_to || '店內') : attributedTo }).eq('order_no', data.order_no) } catch {}
@@ -236,15 +273,40 @@ export default function StaffPOS() {
   // ── Shared: cart items list ──
   function CartItems() {
     return <>
-      {cart.map(c => <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 0', borderBottom: '1px solid #2a2520' }}>
-        <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 12, fontWeight: 600, color: '#e8dcc8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</div><div style={{ fontSize: 10, color: '#8a7e6e', fontFamily: 'var(--font-mono)' }}>${c.price.toLocaleString()} × {c.qty}{c.note ? ` · ${c.note}` : ''}</div></div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <button onClick={() => updateQty(c.id, -1)} style={{ width: 24, height: 24, borderRadius: 6, border: '1px solid #2a2520', background: '#0d0b09', color: '#e8dcc8', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Minus size={11} /></button>
-          <span style={{ width: 22, textAlign: 'center', fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-mono)', color: '#e8dcc8' }}>{c.qty}</span>
-          <button onClick={() => updateQty(c.id, 1)} style={{ width: 24, height: 24, borderRadius: 6, border: '1px solid rgba(201,168,76,.3)', background: 'rgba(201,168,76,.1)', color: '#c9a84c', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Plus size={11} /></button>
+      {cart.map(c => <div key={c.id} style={{ padding: '6px 0', borderBottom: '1px solid #2a2520' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#e8dcc8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</div>
+            <div style={{ fontSize: 10, color: '#8a7e6e', fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center', gap: 3 }}>
+              {editPriceId === c.id ? null : <>
+                <span onClick={canOverridePrice ? () => { setEditPriceId(c.id); setEditPriceVal(String(c.price)); setEditPriceReason('') } : undefined}
+                  style={{ cursor: canOverridePrice ? 'pointer' : 'default', borderBottom: canOverridePrice ? '1px dashed #8a7e6e' : 'none' }}>
+                  ${c.price.toLocaleString()}
+                </span>
+                {c._overridden && <span style={{ fontSize: 8, color: '#f59e0b', fontWeight: 600 }}>改</span>}
+                <span> × {c.qty}{c.note ? ` · ${c.note}` : ''}</span>
+              </>}
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <button onClick={() => updateQty(c.id, -1)} style={{ width: 24, height: 24, borderRadius: 6, border: '1px solid #2a2520', background: '#0d0b09', color: '#e8dcc8', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Minus size={11} /></button>
+            <span style={{ width: 22, textAlign: 'center', fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-mono)', color: '#e8dcc8' }}>{c.qty}</span>
+            <button onClick={() => updateQty(c.id, 1)} style={{ width: 24, height: 24, borderRadius: 6, border: '1px solid rgba(201,168,76,.3)', background: 'rgba(201,168,76,.1)', color: '#c9a84c', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Plus size={11} /></button>
+          </div>
+          <span style={{ width: 54, textAlign: 'right', fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-mono)', color: '#c9a84c' }}>${(c.price * c.qty).toLocaleString()}</span>
+          <button onClick={() => removeItem(c.id)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', padding: 2 }}><Trash2 size={13} /></button>
         </div>
-        <span style={{ width: 54, textAlign: 'right', fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-mono)', color: '#c9a84c' }}>${(c.price * c.qty).toLocaleString()}</span>
-        <button onClick={() => removeItem(c.id)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', padding: 2 }}><Trash2 size={13} /></button>
+        {editPriceId === c.id && <div style={{ display: 'flex', gap: 4, marginTop: 4, alignItems: 'center' }}>
+          <span style={{ fontSize: 10, color: '#f59e0b', flexShrink: 0 }}>$</span>
+          <input type="number" inputMode="numeric" value={editPriceVal} onChange={e => setEditPriceVal(e.target.value)} autoFocus
+            style={{ width: 60, fontSize: 12, padding: '3px 4px', background: '#0d0b09', border: '1px solid #f59e0b', borderRadius: 4, color: '#f59e0b', fontFamily: 'var(--font-mono)', textAlign: 'center' }}
+            onKeyDown={e => { if (e.key === 'Enter') applyPriceOverride(c.id); if (e.key === 'Escape') setEditPriceId(null) }} />
+          <input placeholder="原因" value={editPriceReason} onChange={e => setEditPriceReason(e.target.value)}
+            style={{ flex: 1, fontSize: 10, padding: '3px 4px', background: '#0d0b09', border: '1px solid #2a2520', borderRadius: 4, color: '#e8dcc8', minWidth: 0 }}
+            onKeyDown={e => { if (e.key === 'Enter') applyPriceOverride(c.id) }} />
+          <button onClick={() => applyPriceOverride(c.id)} style={{ fontSize: 10, padding: '3px 8px', background: '#f59e0b', color: '#000', border: 'none', borderRadius: 4, cursor: 'pointer', fontWeight: 700, flexShrink: 0 }}>✓</button>
+          <button onClick={() => setEditPriceId(null)} style={{ fontSize: 10, padding: '3px 6px', background: 'none', color: '#8a7e6e', border: '1px solid #2a2520', borderRadius: 4, cursor: 'pointer', flexShrink: 0 }}>✕</button>
+        </div>}
       </div>)}
       {memberDiscount.details.length > 0 && <div style={{ padding: '6px 0', borderBottom: '1px solid #2a2520' }}>
         {memberDiscount.details.map((d, i) => <div key={i} style={{ fontSize: 10, color: '#9b59b6', display: 'flex', justifyContent: 'space-between' }}><span>{d.name} · {d.rate === 0 ? '免費' : `${Math.round(d.rate * 10)}折`}</span><span>-${d.saved.toLocaleString()}</span></div>)}
@@ -286,6 +348,7 @@ export default function StaffPOS() {
         <div style={{ display: 'flex', gap: 10, fontSize: 10, color: '#8a7e6e' }}>
           <span>${(summary?.revenue?.total || 0).toLocaleString()}</span>
           <span>{summary?.orders || 0}單</span>
+          {user?.is_admin && <button onClick={() => navigate('/revenue')} style={{ background: 'none', border: 'none', color: '#8a7e6e', cursor: 'pointer', fontSize: 10, textDecoration: 'underline', padding: 0 }}>營收</button>}
         </div>
         <button onClick={() => setShowShift(true)} style={{ background: 'none', border: '1px solid #2a2520', borderRadius: 6, padding: '3px 8px', fontSize: 10, color: '#8a7e6e', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}><Clock size={11} /> {shift ? '關班' : '開班'}</button>
         {isMobile && <button onClick={() => setShowMobileCart(true)} style={{ position: 'relative', background: '#c9a84c', border: 'none', borderRadius: 8, padding: '4px 10px', cursor: 'pointer', color: '#000', fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center' }}>
@@ -298,7 +361,7 @@ export default function StaffPOS() {
         {/* LEFT: PRODUCTS */}
         <div style={{ flex: isMobile ? 1 : isTablet ? '0 0 55%' : '0 0 65%', display: 'flex', flexDirection: 'column', overflow: 'hidden', borderRight: isMobile ? 'none' : '1px solid #2a2520' }}>
           <div style={{ padding: '5px 8px', borderBottom: '1px solid #2a2520', display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }}>
-            <div style={{ position: 'relative', flex: 1, minWidth: 80 }}><Search size={13} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: '#8a7e6e' }} /><input placeholder="搜尋…" value={search} onChange={e => setSearch(e.target.value)} style={{ width: '100%', fontSize: 12, padding: '5px 6px 5px 28px', background: '#0d0b09', border: '1px solid #2a2520', borderRadius: 8, color: '#e8dcc8' }} /></div>
+            <div style={{ position: 'relative', flex: 1, minWidth: 80 }}><Search size={13} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: '#8a7e6e' }} /><input placeholder="搜尋品牌 / 品名 / SKU…" value={search} onChange={e => setSearch(e.target.value)} style={{ width: '100%', fontSize: 12, padding: '5px 6px 5px 28px', background: '#0d0b09', border: '1px solid #2a2520', borderRadius: 8, color: '#e8dcc8' }} /></div>
             <select value={sortBy} onChange={e => setSortBy(e.target.value)} style={{ fontSize: 10, padding: '5px 4px', background: '#0d0b09', border: '1px solid #2a2520', borderRadius: 6, color: '#e8dcc8' }}>{SORTS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}</select>
           </div>
           <div style={{ display: 'flex', gap: 2, padding: '3px 8px', overflowX: 'auto', flexShrink: 0, borderBottom: '1px solid #2a2520' }}>

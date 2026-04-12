@@ -7,12 +7,15 @@ import { format, endOfMonth } from 'date-fns'
 import { zhTW } from 'date-fns/locale'
 import AbnormalReport from '../../components/AbnormalReport'
 import { markNoticesRead } from '../../lib/noticeUtils'
+import { toTaipei } from '../../lib/timezone'
 
 export default function StaffHome() {
   const { user } = useAuth()
   const [shift, setShift] = useState(null)
   const [tasks, setTasks] = useState([])
   const [punch, setPunch] = useState(null)
+  const [punchIn, setPunchIn] = useState(null)
+  const [punchOut, setPunchOut] = useState(null)
   const [notices, setNotices] = useState([])
   const [leaderboard, setLeaderboard] = useState([])
   const [showAbnormal, setShowAbnormal] = useState(false)
@@ -34,11 +37,16 @@ export default function StaffHome() {
     const [sRes, tRes, pRes, nRes, lbRes] = await Promise.all([
       supabase.from('schedules').select('*').eq('employee_id', user.employee_id).eq('date', today).maybeSingle(),
       supabase.from('task_status').select('*').eq('owner', user.employee_id).eq('date', today).order('task_id'),
-      supabase.from('punch_records').select('*').eq('employee_id', user.employee_id).eq('date', today).order('time', { ascending: false }).limit(1).maybeSingle(),
+      supabase.from('punch_records').select('*').eq('employee_id', user.employee_id).eq('date', today).order('time', { ascending: true }),
       supabase.from('notices').select('*').eq('enabled', true).order('created_at', { ascending: false }).limit(3),
       supabase.from('task_status').select('completed_by').eq('owner', 'ALL').eq('completed', true).gte('date', month + '-01').lte('date', format(endOfMonth(new Date(month + '-01')), 'yyyy-MM-dd')),
     ])
     setShift(sRes.data); setTasks(tRes.data || []); setPunch(pRes.data); setNotices(nRes.data || [])
+    const punchRecords = pRes.data || []
+    const pIn = punchRecords.find(r => r.punch_type === '上班')
+    const pOut = [...punchRecords].reverse().find(r => r.punch_type === '下班')
+    setPunchIn(pIn || null)
+    setPunchOut(pOut || null)
     const counts = {}
     ;(lbRes.data || []).forEach(r => { if (r.completed_by) counts[r.completed_by] = (counts[r.completed_by] || 0) + 1 })
     setLeaderboard(Object.entries(counts).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count))
@@ -147,10 +155,24 @@ export default function StaffHome() {
           <div style={{ fontSize: 16, color: 'var(--blue)' }}>今日{shiftName}</div>
         ) : <div style={{ fontSize: 14, color: 'var(--text-dim)' }}>尚未排班</div>}
         {shiftInfo?.start && (
-          <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+          <>
+          <div style={{ display: 'flex', gap: 12, marginTop: 12, padding: '8px 10px', background: 'rgba(201,168,76,.06)', borderRadius: 8 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>上班打卡</div>
+              {punchIn ? <div style={{ fontSize: 16, fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--green)' }}>{toTaipei(punchIn.time, true)}</div>
+                : <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>尚未上班打卡</div>}
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>下班打卡</div>
+              {punchOut ? <div style={{ fontSize: 16, fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--blue)' }}>{toTaipei(punchOut.time, true)}</div>
+                : <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>尚未下班打卡</div>}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
             <button className="btn-gold" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }} onClick={() => openPunchCam('上班')}><MapPin size={14} />上班打卡</button>
             <button className="btn-outline" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }} onClick={() => openPunchCam('下班')}><MapPin size={14} />下班打卡</button>
           </div>
+          </>
         )}
       </div>
 

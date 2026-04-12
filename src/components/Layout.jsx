@@ -9,7 +9,6 @@ const STAFF_NAV = [
   { path: '/schedule', icon: Calendar, label: '排班' },
   { path: '/expense', icon: DollarSign, label: '支出' },
   { path: '/pos', icon: ShoppingCart, label: '收銀' },
-  { path: '/revenue', label: '營收', icon: DollarSign },
   { path: '/kpi', icon: BarChart3, label: 'KPI' },
 ]
 
