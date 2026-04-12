@@ -442,8 +442,8 @@ export default function StaffPOS() {
               <div style={{ fontSize: 9, color: '#8a7e6e' }}>業績歸屬：<span style={{ color: '#c9a84c' }}>{customer.belongs_to}</span></div>
             )}
           </div>
-          {/* Cart items — scrollable */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '4px 12px' }}>
+          {/* Cart items + settings — scrollable middle area */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '4px 12px', minHeight: 0 }}>
             {!cart.length ? <div style={{ textAlign: 'center', padding: 40, color: '#8a7e6e', fontSize: 13 }}>點選商品加入購物車</div> : cart.map(c => (
               <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 0', borderBottom: '1px solid #2a2520' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -463,21 +463,24 @@ export default function StaffPOS() {
             {memberDiscount.details.length > 0 && <div style={{ padding: '6px 0', borderBottom: '1px solid #2a2520' }}>
               {memberDiscount.details.map((d, i) => <div key={i} style={{ fontSize: 10, color: '#9b59b6', display: 'flex', justifyContent: 'space-between' }}><span>{d.name} · {d.rate === 0 ? '免費' : `${Math.round(d.rate * 100) / 10}折`}</span><span>-${d.saved.toLocaleString()}</span></div>)}
             </div>}
+            {/* Discount / invoice / note — inside scroll area so they don't eat bottom space */}
+            {cart.length > 0 && <div style={{ padding: '8px 0 4px', display: 'flex', flexDirection: 'column', gap: 4, borderTop: '1px solid #2a2520', marginTop: 4 }}>
+              <div style={{ display: 'flex', gap: 4 }}>
+                <div style={{ flex: 1 }}><div style={{ fontSize: 8, color: '#8a7e6e' }}>折扣%</div><input type="number" min={0} max={100} value={discountPct || ''} onChange={e => setDiscountPct(Math.min(100, Math.max(0, +e.target.value || 0)))} placeholder="0" style={{ width: '100%', fontSize: 11, padding: '3px 4px', fontFamily: 'var(--font-mono)', background: '#0d0b09', border: '1px solid #2a2520', borderRadius: 6, color: '#e8dcc8' }} /></div>
+                <div style={{ flex: 1 }}><div style={{ fontSize: 8, color: '#8a7e6e' }}>服務費%</div><input type="number" min={0} max={100} value={serviceFeePct || ''} onChange={e => setServiceFeePct(Math.min(100, Math.max(0, +e.target.value || 0)))} placeholder="0" style={{ width: '100%', fontSize: 11, padding: '3px 4px', fontFamily: 'var(--font-mono)', background: '#0d0b09', border: '1px solid #2a2520', borderRadius: 6, color: '#e8dcc8' }} /></div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10, color: '#8a7e6e', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}><input type="checkbox" checked={invoiceEnabled} onChange={e => setInvoiceEnabled(e.target.checked)} /> 開發票</label>
+              </div>
+              {invoiceEnabled && <div style={{ display: 'flex', gap: 4 }}><input value={taxId} onChange={e => setTaxId(e.target.value)} placeholder="統一編號" style={{ flex: 1, fontSize: 10, padding: '3px 4px', background: '#0d0b09', border: '1px solid #2a2520', borderRadius: 6, color: '#e8dcc8' }} /><input value={carrier} onChange={e => setCarrier(e.target.value)} placeholder="載具" style={{ flex: 1, fontSize: 10, padding: '3px 4px', background: '#0d0b09', border: '1px solid #2a2520', borderRadius: 6, color: '#e8dcc8' }} /></div>}
+              <input value={orderNote} onChange={e => setOrderNote(e.target.value)} placeholder="備註…" style={{ width: '100%', fontSize: 10, padding: '3px 4px', background: '#0d0b09', border: '1px solid #2a2520', borderRadius: 6, color: '#e8dcc8' }} />
+            </div>}
           </div>
-          {/* STICKY BOTTOM */}
-          <div style={{ flexShrink: 0, borderTop: '1px solid rgba(201,168,76,.3)', background: 'rgba(201,168,76,.04)', padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <div style={{ display: 'flex', gap: 4 }}>
-              <div style={{ flex: 1 }}><div style={{ fontSize: 8, color: '#8a7e6e' }}>折扣%</div><input type="number" min={0} max={100} value={discountPct || ''} onChange={e => setDiscountPct(Math.min(100, Math.max(0, +e.target.value || 0)))} placeholder="0" style={{ width: '100%', fontSize: 11, padding: '3px 4px', fontFamily: 'var(--font-mono)', background: '#0d0b09', border: '1px solid #2a2520', borderRadius: 6, color: '#e8dcc8' }} /></div>
-              <div style={{ flex: 1 }}><div style={{ fontSize: 8, color: '#8a7e6e' }}>服務費%</div><input type="number" min={0} max={100} value={serviceFeePct || ''} onChange={e => setServiceFeePct(Math.min(100, Math.max(0, +e.target.value || 0)))} placeholder="0" style={{ width: '100%', fontSize: 11, padding: '3px 4px', fontFamily: 'var(--font-mono)', background: '#0d0b09', border: '1px solid #2a2520', borderRadius: 6, color: '#e8dcc8' }} /></div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10, color: '#8a7e6e', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}><input type="checkbox" checked={invoiceEnabled} onChange={e => setInvoiceEnabled(e.target.checked)} /> 開發票</label>
-            </div>
-            {invoiceEnabled && <div style={{ display: 'flex', gap: 4 }}><input value={taxId} onChange={e => setTaxId(e.target.value)} placeholder="統一編號" style={{ flex: 1, fontSize: 10, padding: '3px 4px', background: '#0d0b09', border: '1px solid #2a2520', borderRadius: 6, color: '#e8dcc8' }} /><input value={carrier} onChange={e => setCarrier(e.target.value)} placeholder="載具" style={{ flex: 1, fontSize: 10, padding: '3px 4px', background: '#0d0b09', border: '1px solid #2a2520', borderRadius: 6, color: '#e8dcc8' }} /></div>}
-            <input value={orderNote} onChange={e => setOrderNote(e.target.value)} placeholder="備註…" style={{ width: '100%', fontSize: 10, padding: '3px 4px', background: '#0d0b09', border: '1px solid #2a2520', borderRadius: 6, color: '#e8dcc8' }} />
+          {/* STICKY BOTTOM — only totals + buttons, always visible */}
+          <div style={{ flexShrink: 0, borderTop: '2px solid rgba(201,168,76,.4)', background: '#0d0b09', padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 3 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#8a7e6e' }}><span>共 {cartCount} 件</span><span style={{ fontFamily: 'var(--font-mono)' }}>${subtotal.toLocaleString()}</span></div>
             {memberDiscount.discount > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#9b59b6' }}><span>會員折扣</span><span>-${memberDiscount.discount.toLocaleString()}</span></div>}
-            {manualDiscountAmt > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#f59e0b' }}><span>手動折扣 {discountPct}%</span><span>-${manualDiscountAmt.toLocaleString()}</span></div>}
+            {manualDiscountAmt > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#f59e0b' }}><span>折扣 {discountPct}%</span><span>-${manualDiscountAmt.toLocaleString()}</span></div>}
             {serviceFeeAmt > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#8a7e6e' }}><span>服務費</span><span>+${serviceFeeAmt.toLocaleString()}</span></div>}
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 800, color: '#c9a84c' }}><span>應收</span><span style={{ fontFamily: 'var(--font-mono)' }}>${total.toLocaleString()}</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 20, fontWeight: 800, color: '#c9a84c', padding: '2px 0' }}><span>應收</span><span style={{ fontFamily: 'var(--font-mono)' }}>${total.toLocaleString()}</span></div>
             <button onClick={() => { if (cart.length) setShowCheckout(true) }} disabled={!cart.length} style={{ width: '100%', padding: 12, fontSize: 15, fontWeight: 700, cursor: cart.length ? 'pointer' : 'not-allowed', background: cart.length ? 'linear-gradient(135deg, #c9a84c, #b8943f)' : '#2a2520', border: 'none', borderRadius: 10, color: cart.length ? '#000' : '#8a7e6e', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><CreditCard size={16} /> 結帳 ${total.toLocaleString()}</button>
             <div style={{ display: 'flex', gap: 4 }}>
               <button onClick={() => alert('暫存功能開發中')} style={{ flex: 1, padding: '5px 0', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer', background: 'rgba(37,99,235,.1)', color: '#60a5fa', border: '1px solid rgba(37,99,235,.3)' }}>暫存</button>
