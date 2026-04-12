@@ -104,15 +104,49 @@ export default function StaffPOS() {
         supabase.from('unified_orders').select('*').eq('channel', 'store').gte('created_at', new Date().toISOString().slice(0, 10)).order('created_at', { ascending: false }).limit(20),
       ])
 
-      // Cigar products from RPC
-      const cigarProducts = (prodR.data?.products || []).map(p => ({
-        ...p,
-        _source: 'products',
-        _category: p.brand?.toLowerCase().includes('capadura') ? 'Capadura' : '古巴雪茄',
-        _price: p.suggest_price || p.price_a || 0,
-        _stock: p.stock_status || '現貨',
-      }))
-      setBrands(prodR.data?.brands || [])
+      // Debug: inspect RPC response shape
+      console.log('[POS] pos_get_products raw:', JSON.stringify(prodR.data).slice(0, 500))
+      console.log('[POS] prodR.error:', prodR.error)
+
+      // Try RPC first; if it returns products in an unexpected shape, fallback to direct query
+      let cigarProducts = []
+      let rpcBrands = []
+
+      const rpcProducts = prodR.data?.products
+      if (Array.isArray(rpcProducts) && rpcProducts.length > 0 && rpcProducts[0].name) {
+        // RPC returned expected shape: { products: [...], brands: [...] }
+        console.log('[POS] Using RPC data, sample:', rpcProducts[0])
+        cigarProducts = rpcProducts.map(p => ({
+          ...p,
+          _source: 'products',
+          _category: p.brand?.toLowerCase().includes('capadura') ? 'Capadura' : '古巴雪茄',
+          _price: p.suggest_price || p.price_a || 0,
+          _stock: p.stock_status || '現貨',
+        }))
+        rpcBrands = prodR.data?.brands || []
+      } else {
+        // RPC shape unexpected — fallback to direct query
+        console.warn('[POS] RPC shape unexpected, falling back to direct products query. prodR.data sample:', JSON.stringify(prodR.data).slice(0, 300))
+        const { data: directProducts, error: directErr } = await supabase
+          .from('products')
+          .select('id, brand, name, spec, pack, price_a, price_b, price_vip, suggest_price, image_url, stock_status, is_active, inv_master_id, sections')
+          .eq('is_active', true)
+          .order('sort_order', { ascending: true })
+        if (directErr) console.error('[POS] direct query error:', directErr)
+        console.log('[POS] direct query got', directProducts?.length, 'products, sample:', directProducts?.[0])
+        cigarProducts = (directProducts || []).map(p => ({
+          ...p,
+          _source: 'products',
+          _category: p.brand?.toLowerCase().includes('capadura') ? 'Capadura' : '古巴雪茄',
+          _price: p.suggest_price || p.price_a || 0,
+          _stock: p.stock_status || '現貨',
+        }))
+        // Derive brands from products
+        const brandSet = new Set()
+        cigarProducts.forEach(p => { if (p.brand) brandSet.add(p.brand) })
+        rpcBrands = Array.from(brandSet).sort()
+      }
+      setBrands(rpcBrands)
 
       // Bar / food / drink items from inventory_master
       const { data: invItems } = await supabase
