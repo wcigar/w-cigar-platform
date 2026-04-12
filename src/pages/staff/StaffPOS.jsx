@@ -475,7 +475,7 @@ export default function StaffPOS() {
             </div>}
           </div>
           {/* STICKY BOTTOM — only totals + buttons, always visible */}
-          <div style={{ flexShrink: 0, borderTop: '2px solid rgba(201,168,76,.4)', background: '#0d0b09', padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <div style={{ flexShrink: 0, position: 'sticky', bottom: 0, zIndex: 2, borderTop: '2px solid rgba(201,168,76,.4)', background: '#0d0b09', padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 3 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#8a7e6e' }}><span>共 {cartCount} 件</span><span style={{ fontFamily: 'var(--font-mono)' }}>${subtotal.toLocaleString()}</span></div>
             {memberDiscount.discount > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#9b59b6' }}><span>會員折扣</span><span>-${memberDiscount.discount.toLocaleString()}</span></div>}
             {manualDiscountAmt > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#f59e0b' }}><span>折扣 {discountPct}%</span><span>-${manualDiscountAmt.toLocaleString()}</span></div>}
