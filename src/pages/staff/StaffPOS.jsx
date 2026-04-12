@@ -461,7 +461,7 @@ export default function StaffPOS() {
             <div style={{ fontSize: 24, fontFamily: 'var(--font-mono)', fontWeight: 800, color: '#c9a84c', marginBottom: 12 }}>${detailProduct._price.toLocaleString()}</div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, marginBottom: 12 }}>
               <button onClick={() => setDetailQty(q => Math.max(1, q - 1))} style={{ width: 40, height: 40, borderRadius: 10, border: '1px solid #2a2520', background: '#0d0b09', color: '#e8dcc8', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Minus size={18} /></button>
-              <span style={{ fontSize: 28, fontFamily: 'var(--font-mono)', fontWeight: 800, width: 50, textAlign: 'center' }}>{detailQty}</span>
+              <input type="number" inputMode="numeric" value={detailQty} onChange={e => { const v = Math.max(1, Math.round(+e.target.value || 1)); setDetailQty(v) }} style={{ fontSize: 28, fontFamily: 'var(--font-mono)', fontWeight: 800, width: 60, textAlign: 'center', background: 'transparent', border: '1px solid #2a2520', borderRadius: 8, color: '#e8dcc8', padding: '4px 0' }} />
               <button onClick={() => setDetailQty(q => q + 1)} style={{ width: 40, height: 40, borderRadius: 10, border: '1px solid rgba(201,168,76,.3)', background: 'rgba(201,168,76,.1)', color: '#c9a84c', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Plus size={18} /></button>
             </div>
             {/* Drink customization — only for drink categories */}
