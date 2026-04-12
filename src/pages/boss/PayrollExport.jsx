@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import { Printer, FileText } from 'lucide-react'
 import { format, subMonths, endOfMonth } from 'date-fns'
 import { calcLaborIns, calcHealthIns, calcLaborPension, calcLaborInsER, calcHealthInsER, findBracket, calcOvertimePay, LABOR_INS_BRACKETS, HEALTH_INS_BRACKETS, SHIFTS, LATE_GRACE_MIN, OT_GRACE_MIN } from '../../lib/constants'
+import { taipeiHM } from '../../lib/timezone'
 
 export default function PayrollExport() {
   const [month, setMonth] = useState(format(new Date(), 'yyyy-MM'))
@@ -51,12 +52,12 @@ export default function PayrollExport() {
         const clockIn = dayPunches.find(p => p.punch_type === '上班')
         const clockOut = dayPunches.find(p => p.punch_type === '下班')
         if (clockIn?.time) {
-          const [h, m] = clockIn.time.slice(11, 16).split(':').map(Number)
+          const [h, m] = taipeiHM(clockIn.time)
           const pm = h * 60 + m, sm = shift.startH * 60 + shift.startM + LATE_GRACE_MIN
           if (pm > sm) { lateCount++; lateMinutes += pm - sm }
         }
         if (clockOut?.time) {
-          const [h, m] = clockOut.time.slice(11, 16).split(':').map(Number)
+          const [h, m] = taipeiHM(clockOut.time)
           let pm = h * 60 + m
           if (v === '晚班' && h < 12) pm += 1440
           const endMin = shift.endH * 60 + shift.endM

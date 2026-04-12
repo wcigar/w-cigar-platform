@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { SHIFTS, LEAVE_TYPES } from '../../lib/constants'
+import { toTaipei } from '../../lib/timezone'
 import { isHoliday, getHolidayName, calcMonthRestDays } from '../../lib/holidays'
 import { ChevronLeft, ChevronRight, Clock } from 'lucide-react'
 import { format, startOfMonth, endOfMonth, addMonths, subMonths, eachDayOfInterval, isSameDay, getDay } from 'date-fns'
@@ -137,7 +138,7 @@ function ScheduleContent() {
             <div key={date} className="card" style={{ padding: 12, marginBottom: 6 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--gold)', marginBottom: 6 }}>{date}</div>
               {recs.map(r => <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '3px 0', borderBottom: '1px dotted var(--border)' }}>
-                <span>{r.punch_type} {r.time?.slice(11, 19)}</span>
+                <span>{r.punch_type} {toTaipei(r.time, true)}</span>
                 <span style={{ color: r.is_valid ? 'var(--green)' : 'var(--red)', fontWeight: 600 }}>{r.distance_m}m {r.is_valid ? '✓' : '✗'}</span>
               </div>)}
             </div>

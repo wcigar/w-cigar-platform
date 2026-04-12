@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { SHIFTS, LEAVE_TYPES } from '../../lib/constants'
 import { isHoliday, getHolidayName, calcMonthRestDays, TW_HOLIDAYS_2026 } from '../../lib/holidays'
+import { toTaipei } from '../../lib/timezone'
 import { ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react'
 import { format, startOfMonth, endOfMonth, addMonths, subMonths, eachDayOfInterval } from 'date-fns'
 import SmartScheduleBtn from '../../components/SmartSchedule'
@@ -227,7 +228,7 @@ export default function HRSchedule() {
               <div key={p.id} className="card" style={{ padding: 12, marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 600 }}>{p.name} · {p.punch_type}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{p.time?.slice(11, 19)}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{toTaipei(p.time, true)}</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: 14, fontFamily: 'var(--font-mono)', color: p.is_valid ? 'var(--green)' : 'var(--red)', fontWeight: 600 }}>{p.distance_m}m</div>

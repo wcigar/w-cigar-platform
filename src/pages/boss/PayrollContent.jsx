@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import { logAudit } from '../../lib/audit'
 import { calcLaborIns, calcHealthIns, calcLaborPension, calcLaborInsER, calcHealthInsER, findBracket, calcOvertimePay, LABOR_INS_BRACKETS, HEALTH_INS_BRACKETS, SHIFTS, LATE_GRACE_MIN, OT_GRACE_MIN } from '../../lib/constants'
 import { ChevronDown, ChevronUp, Plus, Trash2, Save, FileText, Printer, Edit3, Clock, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react'
+import { taipeiHM } from '../../lib/timezone'
 import { format, subMonths, endOfMonth } from 'date-fns'
 
 /* ================================================================
@@ -297,14 +298,12 @@ export default function Payroll() {
       let autoLate = false, autoEarly = false, lateMins = 0, earlyMins = 0
 
       if (shift && clockIn?.time) {
-        const t = clockIn.time.slice(11, 16)
-        const [h, m] = t.split(':').map(Number)
+        const [h, m] = taipeiHM(clockIn.time)
         const pm = h * 60 + m, sm = shift.startH * 60 + shift.startM + LATE_GRACE_MIN
         if (pm > sm) { autoLate = true; lateMins = pm - sm }
       }
       if (shift && clockOut?.time) {
-        const t = clockOut.time.slice(11, 16)
-        const [h, m] = t.split(':').map(Number)
+        const [h, m] = taipeiHM(clockOut.time)
         let pm = h * 60 + m
         if (s.shift === '晚班' && h < 12) pm += 1440
         const endMin = shift.endH * 60 + shift.endM

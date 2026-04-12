@@ -43,7 +43,8 @@ export function calcAttendanceDetail(schedules, punches, monthlysalary) {
 
       // Late check
       if (clockIn?.time) {
-        const [h, m] = clockIn.time.slice(11, 16).split(':').map(Number)
+        const _d = new Date(clockIn.time); const _t = new Date(_d.toLocaleString('en-US', { timeZone: 'Asia/Taipei' }))
+        const [h, m] = [_t.getHours(), _t.getMinutes()]
         const punchMin = h * 60 + m
         const shiftStartMin = shift.startH * 60 + shift.startM + LATE_GRACE_MIN
         if (punchMin > shiftStartMin) {
@@ -54,7 +55,8 @@ export function calcAttendanceDetail(schedules, punches, monthlysalary) {
 
       // Overtime check
       if (clockOut?.time) {
-        const [h, m] = clockOut.time.slice(11, 16).split(':').map(Number)
+        const _d2 = new Date(clockOut.time); const _t2 = new Date(_d2.toLocaleString('en-US', { timeZone: 'Asia/Taipei' }))
+        const [h, m] = [_t2.getHours(), _t2.getMinutes()]
         let punchMin = h * 60 + m
         // Handle midnight crossing for 晚班
         if (v === '晚班' && h < 12) punchMin += 24 * 60
