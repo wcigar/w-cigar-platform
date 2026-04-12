@@ -19,6 +19,7 @@ export default function BossHome() {
   const [loading, setLoading] = useState(true)
   const [monthRevenue, setMonthRevenue] = useState(0)
   const [pendingHandover, setPendingHandover] = useState(0)
+  const [dealerPending, setDealerPending] = useState(0)
   const today = format(new Date(), 'yyyy-MM-dd')
   const month = format(new Date(), 'yyyy-MM')
 
@@ -53,6 +54,7 @@ export default function BossHome() {
     setPunches(punchR.data || [])
     setMonthRevenue((revR.data || []).reduce((s, r) => s + (+r.total || 0), 0))
     setPendingHandover((hoR.data || []).length)
+    try { const { data: dpData } = await supabase.rpc('get_dealer_pending_orders'); if (dpData?.count !== undefined) setDealerPending(dpData.count) } catch {}
 
     // Build danger list
     const dangerList = []
@@ -129,6 +131,7 @@ export default function BossHome() {
         <SB label="月營收" value={monthRevenue ? '$' + monthRevenue.toLocaleString() : '$0'} color="var(--gold)" tap={() => navigate('/operations')} />
         <SB label="待確認交班" value={pendingHandover} color={pendingHandover > 0 ? '#f59e0b' : 'var(--text-muted)'} />
         <SB label="低庫存" value={stats.lowStock} color={stats.lowStock > 0 ? 'var(--red)' : 'var(--green)'} tap={() => navigate('/operations')} />
+        <SB label="經銷商待出貨" value={dealerPending} color={dealerPending > 0 ? 'var(--red)' : 'var(--text-muted)'} tap={() => navigate('/dealer-orders')} />
       </div>
 
       {/* 🔥 Today's Top 5 Dangers */}

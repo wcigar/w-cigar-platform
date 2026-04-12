@@ -57,6 +57,7 @@ export default function App() {
           <Route path="/boss-inventory" element={<BossInventory />} />
           <Route path="/commission" element={<Commission />} />
           <Route path="/customers" element={<Customers />} />
+          <Route path="/dealer-orders" element={<div style={{ padding: 20, color: '#e8dcc8' }}><h2 style={{ color: '#c9a84c', marginBottom: 8 }}>經銷商訂單管理</h2><p style={{ color: '#8a7e6e' }}>開發中…</p></div>} />
           <Route path="/settings" element={<BossSettings />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
