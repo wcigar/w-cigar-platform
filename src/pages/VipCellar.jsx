@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 
 /* ═══ CONSTANTS ═══ */
@@ -158,15 +159,18 @@ function LoginView({ onVipLogin, onStaffLogin }) {
 function StaffView({ employee, onViewVip }) {
   const [members, setMembers] = useState([]); const [search, setSearch] = useState(''); const [loading, setLoading] = useState(true)
   const [showNewOrder, setShowNewOrder] = useState(false)
+  const [productCatalog, setProductCatalog] = useState([])
 
   useEffect(() => { load() }, [])
   async function load() {
     setLoading(true)
-    const [mR, cR, oR] = await Promise.all([
+    const [mR, cR, oR, pR] = await Promise.all([
       supabase.from('vip_members').select('id, name, cabinet_opened, cabinet_expires, is_active').eq('is_active', true).order('name'),
       supabase.from('vip_cabinets').select('vip_id, quantity, unit_price').gt('quantity', 0),
       supabase.from('vip_orders').select('vip_id, balance, is_voided').eq('is_voided', false),
+      supabase.from('products').select('id, name, brand, price_a, price_vip').eq('is_active', true).order('brand').order('name'),
     ])
+    setProductCatalog(pR.data || [])
     const ml = mR.data || []; const cab = cR.data || []; const ord = oR.data || []
     setMembers(ml.map(m => {
       const myCab = cab.filter(c => c.vip_id === m.id)
@@ -203,7 +207,7 @@ function StaffView({ employee, onViewVip }) {
       <span style={{ color:C.muted, fontSize:22 }}>›</span>
     </div>)}
 
-    {showNewOrder && <NewOrderModal employee={employee} onClose={() => setShowNewOrder(false)} onDone={() => { setShowNewOrder(false); load() }} />}
+    {showNewOrder && <NewOrderModal employee={employee} productCatalog={productCatalog} onClose={() => setShowNewOrder(false)} onDone={() => { setShowNewOrder(false); load() }} />}
   </div>
 }
 
@@ -464,11 +468,10 @@ function PaymentModal({ order, member, employee, onClose, onDone }) {
 }
 
 /* ═══ NEW ORDER MODAL ═══ */
-function NewOrderModal({ employee, onClose, onDone }) {
+function NewOrderModal({ employee, productCatalog, onClose, onDone }) {
   const [vipId, setVipId] = useState(''); const [vipName, setVipName] = useState(''); const [orderType, setOrderType] = useState('現貨購買')
   const [items, setItems] = useState([{ name:'', price:'', qtyCab:0, qtyOut:0, qtySite:0, qtyPend:0, cab:'', _showDrop:false }])
-  const [productList, setProductList] = useState([])
-  useEffect(() => { supabase.from('products').select('id, name, brand, price_a, price_vip').eq('is_active', true).order('brand', { ascending:true }).order('name', { ascending:true }).then(({ data }) => setProductList(data || [])) }, [])
+  const productList = productCatalog || []
   const [payMethod, setPayMethod] = useState('現金'); const [paidAmt, setPaidAmt] = useState(''); const [note, setNote] = useState(''); const [srcTags, setSrcTags] = useState([])
   const sigRef = useRef(null); const [sigData, setSigData] = useState(null); const [busy, setBusy] = useState(false)
   const receiptRef = useRef(null); const [receiptData, setReceiptData] = useState(null); const [receiptPreview, setReceiptPreview] = useState(null)
@@ -523,10 +526,13 @@ function NewOrderModal({ employee, onClose, onDone }) {
     <textarea placeholder="指定年份、禮盒包裝、特殊需求..." value={note} onChange={e => setNote(e.target.value)} rows={2} style={{ width:'100%', fontSize:12, padding:'10px 12px', background:'#1a1714', border:`1px solid ${C.border}`, borderRadius:12, color:C.text, resize:'vertical', marginBottom:12, boxSizing:'border-box' }} />
     <SigCanvas sigRef={sigRef} sigData={sigData} setSigData={setSigData} />
     <GoldBtn onClick={submit} disabled={busy} style={{ width:'100%', opacity:busy?.5:1 }}>{busy ? '建立中...' : '確認建立訂單'}</GoldBtn>
-    {/* Fixed portal dropdown — escapes Modal overflow */}
-    {dd.vis && dd.matches.length > 0 && <div onMouseDown={e => e.preventDefault()} style={{ position:'fixed', top:dd.top+2, left:dd.left, width:dd.w, background:'#222', border:'1px solid #444', borderRadius:10, maxHeight:280, overflowY:'auto', zIndex:99999, boxShadow:'0 8px 32px rgba(0,0,0,.5)' }}>
-      {dd.matches.map(p => { const vp = p.price_vip || p.price_a || 0; return <div key={p.id} onClick={() => { upd(dd.ri,'name',p.name); upd(dd.ri,'price',String(vp)); setDd(d=>({...d,vis:false})) }} style={{ padding:'10px 14px', cursor:'pointer', fontSize:13, color:'#ddd', borderBottom:'1px solid #2a2a2a', display:'flex', justifyContent:'space-between' }}><span><span style={{ color:C.gold }}>{p.brand}</span> · {p.name}</span><span style={{ color:C.gold, fontSize:12 }}>{fc(vp)}</span></div> })}
-    </div>}
+    {/* Dropdown via createPortal — renders on document.body, escapes all overflow */}
+    {dd.vis && dd.matches.length > 0 && createPortal(
+      <div onMouseDown={e => e.preventDefault()} style={{ position:'fixed', top:dd.top+2, left:dd.left, width:dd.w, background:'#222', border:'1px solid #555', borderRadius:10, maxHeight:280, overflowY:'auto', zIndex:99999, boxShadow:'0 8px 32px rgba(0,0,0,.6)' }}>
+        {dd.matches.map(p => { const vp = p.price_vip || p.price_a || 0; return <div key={p.id} onClick={() => { upd(dd.ri,'name',p.name); upd(dd.ri,'price',String(vp)); setDd(d=>({...d,vis:false})) }} style={{ padding:'10px 14px', cursor:'pointer', fontSize:13, color:'#ddd', borderBottom:'1px solid #2a2a2a', display:'flex', justifyContent:'space-between', alignItems:'center' }} onMouseEnter={e => e.currentTarget.style.background='#333'} onMouseLeave={e => e.currentTarget.style.background='transparent'}><span><span style={{ color:C.gold, marginRight:6 }}>{p.brand}</span>{p.name}</span><span style={{ color:C.gold, fontSize:12, flexShrink:0, marginLeft:8 }}>{fc(vp)}</span></div> })}
+      </div>,
+      document.body
+    )}
   </Modal>
 }
 
