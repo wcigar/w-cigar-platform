@@ -1,0 +1,38 @@
+<div class="section-head">
+  <div><h2>系統資料維護後台</h2><p>Google 試算表正式資料庫管理／改密碼／ERP CSV 匯入</p></div>
+</div>
+<div class="admin-grid">
+  <div class="view-card admin-card">
+    <div class="panel-head"><div><h3>📊 正式資料庫資訊</h3><div class="subtle">前台與後台都以此為來源</div></div></div>
+    <div class="info-table">
+      <div class="info-row"><span>資料庫名稱</span><strong id="adminDbName">載入中...</strong></div>
+      <div class="info-row"><span>試算表 ID</span><strong class="mono" id="adminDbId">載入中...</strong></div>
+      <div class="info-row"><span>最後同步時間</span><strong id="adminLastUpdated">載入中...</strong></div>
+      <div class="info-row column"><span>資料庫連結</span><div class="link-wrap" id="adminDbUrl">載入中...</div></div>
+    </div>
+    <div class="field-stack top-gap">
+      <button type="button" class="primary-btn" onclick="adminOpenDb()">開啟目前正式資料庫</button>
+      <button type="button" class="secondary-btn" style="border-color: var(--gold); color: var(--gold);" onclick="adminOptimizeDb()">✨ 自動整理與排序庫存明細</button>
+      <button type="button" class="secondary-btn" onclick="operatorLogout()">登出後台管理</button>
+    </div>
+  </div>
+  <div class="view-card admin-card">
+    <div class="panel-head"><div><h3>🔐 後台密碼設定</h3><div class="subtle">初始密碼為 123456</div></div></div>
+    <div class="field"><label>目前密碼</label><input class="input" id="adminCurrentPassword" type="password"></div>
+    <div class="field"><label>新密碼</label><input class="input" id="adminNewPassword" type="password"></div>
+    <div class="field"><label>確認新密碼</label><input class="input" id="adminConfirmPassword" type="password"></div>
+    <button type="button" class="primary-btn top-gap" onclick="adminChangePassword()">儲存新密碼</button>
+  </div>
+  <div class="view-card admin-card full-span">
+    <div class="panel-head"><div><h3>⬆ 歷史帳務與庫存補登 (CSV)</h3><div class="subtle">將舊訂單或盤點明細匯入</div></div></div>
+    <div class="tip-box" style="margin-bottom:12px;">
+      <div>支援 <strong>ERP 格式</strong> (含訂單編號) 或 <strong>庫存格式</strong> (無訂單編號)。</div>
+      <div>建議欄位：日期 / 會員編號 / 訂單編號 / 雪茄名稱 / 訂購數量 / 已入櫃數量 / 單價 / 本次付款金額 / 員工代碼</div>
+    </div>
+    <input type="file" id="csvFileInput" accept=".csv" style="display:none;">
+    <div class="admin-actions">
+      <button type="button" class="primary-btn" id="csvUploadBtn" onclick="document.getElementById('csvFileInput').click()">選擇 CSV 檔案並匯入</button>
+    </div>
+    <div id="csvStatus" style="margin-top:12px;"></div>
+  </div>
+</div>

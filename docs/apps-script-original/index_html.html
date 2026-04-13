@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <base target="_top">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>W CIGAR BAR VIP 系統</title>
+    <?!= include('styles'); ?>
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="topbar">
+        <div class="topbar-inner">
+          <div class="brand" onclick="location.reload()">
+            <h1>W CIGAR BAR</h1>
+            <small>VIP Concierge & Assets</small>
+          </div>
+          <div style="display:flex; gap:12px; align-items:center;">
+             <button class="icon-btn hidden" onclick="togglePrivacy()" title="隱私模式" id="privacyBtn"><span id="privacyIcon">👁️</span></button>
+             <div class="operator-badge hidden" id="operatorBadge"></div>
+             <button type="button" class="icon-btn hidden" id="homeBtn" onclick="goHome()" title="返回首頁">🏠</button>
+             <button type="button" class="icon-btn hidden" id="operatorLogoutBtn" onclick="operatorLogout()" title="員工登出">⎋</button>
+             <button type="button" class="icon-btn" id="adminBtn" onclick="promptAdmin()" title="管理登入">🔒</button>
+          </div>
+        </div>
+      </header>
+
+      <main class="content-wrap">
+        <div id="globalMessage"></div>
+        
+        <div id="loginView" class="home-wrap">
+           <div class="view-card login-card">
+             <div class="login-mark">⚜️</div>
+             <div class="center"><h2 class="home-title">VIP 尊榮登入</h2><p class="subtle">請輸入專屬編號檢視您的窖藏資產</p></div>
+             <div class="field"><input id="vipIdInput" class="input center-xl" type="tel" placeholder="00000"></div>
+             <button class="primary-btn top-gap" id="loginBtn" onclick="handleVipLogin()">探索我的窖藏</button>
+             
+             <div style="margin-top:50px; border-top:1px solid #222; padding-top:24px;">
+               <div class="center subtle" style="font-size:14px; margin-bottom:12px;">現場管家登入通道</div>
+               <div class="field"><input id="operatorCodeInput" class="input" type="password" placeholder="輸入管家專屬號碼"></div>
+               <button class="secondary-btn top-gap" onclick="handleOperatorLogin()">登入內部系統</button>
+             </div>
+           </div>
+        </div>
+
+        <div id="staffView" style="display:none;">
+          <div style="margin-bottom:20px;"><h2 style="color:var(--gold); font-size:30px; margin:0;">管家作業模式</h2></div>
+          <div class="cabinet-block">
+            <div class="cabinet-head">
+              <input id="operatorLookupInput" class="input" placeholder="🔍 搜尋客戶姓名或會員編號..." oninput="updateOperatorLookup()">
+            </div>
+            <div id="operatorLookupResultsContainer" style="padding:20px;"></div>
+          </div>
+        </div>
+
+        <div id="adminView" style="display:none;">
+           <?!= include('admin'); ?>
+        </div>
+
+        <div id="appView" style="display:none;">
+           <div class="hero-card" id="assetDashboard">
+              <div class="hero-head">
+                <div>
+                  <h2 class="vip-name" id="dispVipName">---</h2>
+                  <div style="color:#888; font-size:15px; margin-top:8px; font-weight:bold;" id="dispVipId">ID: ---</div>
+                </div>
+              </div>
+              <div class="hero-grid">
+                <div class="metric-box"><small class="metric-label">歷史購買總額</small><strong class="metric-value gold money-value" id="valHistTotal">$0</strong></div>
+                <div class="metric-box"><small class="metric-label">目前房內總值</small><strong class="metric-value gold money-value" id="valStockTotal">$0</strong></div>
+                <div class="metric-box"><small class="metric-label" id="labelBalance">帳戶餘額/欠款</small><strong class="metric-value money-value" id="valBalance">$0</strong></div>
+                <div class="metric-box"><small class="metric-label">目前房內總數</small><strong class="metric-value" id="valStockQty">0 支</strong></div>
+              </div>
+           </div>
+
+           <div class="tab-container">
+             <button class="tab-btn active" id="btnTabStock" onclick="switchTab('stock')">📦 專屬窖藏</button>
+             <button class="tab-btn" id="btnTabHistory" onclick="switchTab('history')">📜 領取軌跡</button>
+             <button class="tab-btn" id="btnTabFinance" onclick="switchTab('finance')">🧾 財務總帳</button>
+           </div>
+
+           <div id="tab-stock">
+              <div class="view-toggle-container">
+                 <button class="view-toggle-btn active" id="btnViewCabinet" onclick="setInventoryView('cabinet')">🗄️ 依實體櫃位檢視</button>
+                 <button class="view-toggle-btn" id="btnViewBrand" onclick="setInventoryView('brand')">🏷️ 依品牌系列檢視</button>
+              </div>
+              <div id="inventoryContainer"></div>
+           </div>
+
+           <div id="tab-history" style="display:none;"></div>
+           <div id="tab-finance" style="display:none;"></div>
+        </div>
+      </main>
+
+      <footer>
+        <div class="footer-inner" style="text-align:center; color:#666; font-size:13px; padding:20px;">
+          <div id="syncStatus">系統連線中...</div>
+          <div style="margin-top:8px;">© W CIGAR BAR CAPADURA</div>
+        </div>
+      </footer>
+    </div>
+
+    <div id="consumeModal" class="modal-overlay">
+      <div class="modal-card">
+        <h2 style="color:var(--gold); margin:0; font-size:28px;">產品領取確認</h2>
+        <div id="consumeInfo" style="margin-top:20px; background:rgba(255,255,255,0.03); padding:20px; border-radius:16px; border:1px solid #333;"></div>
+        
+        <div class="field">
+          <label style="color:var(--gold);">選擇去向</label>
+          <div class="segment-control">
+            <div class="segment-item active" onclick="setConsumeType('現場享用', this)">現場享用</div>
+            <div class="segment-item" onclick="setConsumeType('外帶離店', this)">外帶離店</div>
+            <div class="segment-item" onclick="setConsumeType('轉贈招待', this)">轉贈招待</div>
+          </div>
+          <input type="hidden" id="consumeTypeInput" value="現場享用">
+        </div>
+        
+        <div class="field">
+          <label>本次領取數量</label>
+          <input type="number" id="consumeQty" class="input center-xl" value="1" min="1">
+        </div>
+
+        <div class="field">
+          <label>請客戶親筆簽名 (畫押)</label>
+          <div class="canvas-wrap"><canvas id="sigCanvas"></canvas></div>
+          <button class="action-btn btn-sm" style="width:100%; margin-top:8px;" onclick="clearSig()">清除重簽</button>
+        </div>
+
+        <div class="field-stack top-gap" style="margin-top:30px;">
+          <button class="primary-btn" id="submitBtn" onclick="submitConsume()">確認領取並扣除庫存</button>
+          <button class="secondary-btn" onclick="closeModal()">取消返回</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="paymentModal" class="modal-overlay">
+      <div class="modal-card">
+        <h2 style="color:var(--gold); margin:0; font-size:28px;">帳款結清與拍照憑證</h2>
+        <div id="paymentOrderInfo" style="margin-top:20px; background:rgba(255,255,255,0.03); padding:20px; border-radius:16px; border:1px solid #333;"></div>
+        
+        <div class="field">
+          <label>本次實收金額 (TWD)</label>
+          <input type="number" id="paymentAmountInput" class="input center-xl" placeholder="請輸入金額">
+        </div>
+        <div class="field">
+          <label>拍攝刷卡單或匯款明細</label>
+          <div class="camera-btn-wrapper" style="margin-top:10px;">
+            <button type="button" class="secondary-btn" style="width:100%; pointer-events:none; padding:16px; font-size:16px;">📷 開啟相機拍攝單據</button>
+            <input type="file" accept="image/*" capture="environment" id="receiptImageInput">
+          </div>
+          <img id="receiptPreviewImg" class="photo-preview" style="margin-top:16px;">
+        </div>
+        <div class="field-stack top-gap" style="margin-top:30px;">
+          <button type="button" class="primary-btn" id="confirmPaymentBtn" onclick="submitPayment()">確定收款並上傳單據</button>
+          <button type="button" class="secondary-btn" onclick="closePaymentModal()">取消返回</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let STATE = { 
+        vipId: '', data: null, isPrivacy: false, currentOperator: null, adminAuthed: false, 
+        targetCigar: null, isSubmitting: false, inventoryViewMode: 'cabinet', paymentOrderId: '', receiptBase64: ''
+      };
+
+      function runServer(fn, args=[]) { return new Promise((res, rej) => { google.script.run.withSuccessHandler(res).withFailureHandler(rej)[fn](...args); }); }
+      
+      window.onload = async () => { 
+        try { 
+          const r = await runServer('getBootstrapData'); 
+          if(r && r.ok){ STATE.data = r; document.getElementById('syncStatus').innerText = '最後同步：' + r.lastUpdated; } 
+        } catch(e) { document.getElementById('syncStatus').innerText = '連線失敗，請重整網頁'; } 
+      };
+
+      function escapeHtml(str) { return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m]); }
+      function escapeJs(str) { return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
+      function formatCurrency(n) { return new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', minimumFractionDigits: 0 }).format(n); }
+      function getErrMsg(err) { return err && err.message ? err.message : (typeof err==='string'?err:'未知錯誤'); }
+      
+      function showMsg(msg, isErr=false) { 
+        const el = document.getElementById('globalMessage'); 
+        el.innerHTML = `<div class="${isErr?'error-box':'success-box'}">${escapeHtml(msg)}</div>`; 
+        window.scrollTo({top:0,behavior:'smooth'}); 
+        setTimeout(()=>el.innerHTML='', 5000); 
+      }
+
+      // --- 頁面導覽 ---
+      function goHome() {
+        STATE.vipId = ''; STATE.targetCigar = null;
+        document.getElementById('loginView').style.display = 'none';
+        document.getElementById('staffView').style.display = 'none';
+        document.getElementById('adminView').style.display = 'none';
+        document.getElementById('appView').style.display = 'none';
+        document.getElementById('privacyBtn').classList.add('hidden');
+        
+        if (STATE.adminAuthed) { document.getElementById('adminView').style.display = 'block'; initAdminPanel(); }
+        else if (STATE.currentOperator) document.getElementById('staffView').style.display = 'block';
+        else document.getElementById('loginView').style.display = 'block';
+      }
+
+      function operatorLogout() { STATE.currentOperator = null; STATE.adminAuthed = false; document.getElementById('operatorBadge').classList.add('hidden'); document.getElementById('operatorLogoutBtn').classList.add('hidden'); document.getElementById('homeBtn').classList.add('hidden'); goHome(); showMsg('已安全登出。'); }
+
+      // --- VIP 登入 ---
+      async function handleVipLogin() {
+        const btn = document.getElementById('loginBtn');
+        const originalText = btn.innerText;
+        try {
+          const id = document.getElementById('vipIdInput').value.trim();
+          if(!id) return showMsg('請輸入會員編號', true);
+          btn.innerText = '資料驗證中...'; btn.style.opacity = '0.7'; btn.disabled = true;
+
+          if(!STATE.data || !STATE.data.inventory) {
+            document.getElementById('syncStatus').innerText = '重新連線中...';
+            const r = await runServer('getBootstrapData');
+            if(r && r.ok) STATE.data = r;
+          }
+          if(!STATE.data || !STATE.data.inventory) return showMsg('系統連線失敗，請檢查網路或重新整理網頁', true);
+          if(!STATE.data.inventory[id] && (!STATE.data.erpData || !STATE.data.erpData[id])) return showMsg('查無此會員編號，請確認是否輸入正確', true);
+
+          STATE.vipId = id;
+          document.getElementById('loginView').style.display = 'none';
+          document.getElementById('staffView').style.display = 'none';
+          document.getElementById('adminView').style.display = 'none';
+          document.getElementById('appView').style.display = 'block'; 
+          document.getElementById('privacyBtn').classList.remove('hidden'); 
+          document.getElementById('homeBtn').classList.remove('hidden');
+          
+          switchTab('stock');
+          renderApp();
+        } catch(e) { showMsg('發生錯誤: ' + getErrMsg(e), true); } 
+        finally { btn.innerText = originalText; btn.style.opacity = '1'; btn.disabled = false; }
+      }
+
+      // --- 管家登入 ---
+      async function handleOperatorLogin() {
+        const code = document.getElementById('operatorCodeInput').value.trim();
+        if(!code) return showMsg('請輸入管家號碼', true);
+        try {
+          const r = await runServer('verifyOperatorCode', [code]);
+          if(r.ok) {
+            STATE.currentOperator = r.operator;
+            document.getElementById('operatorBadge').innerHTML = `<span style="font-size:14px; font-weight:bold;">👤 ${escapeHtml(r.operator.name)}</span>`;
+            document.getElementById('operatorBadge').classList.remove('hidden');
+            document.getElementById('operatorLogoutBtn').classList.remove('hidden');
+            document.getElementById('operatorCodeInput').value = '';
+            goHome();
+            showMsg(r.message);
+          }
+        } catch(e) { showMsg(getErrMsg(e), true); }
+      }
+
+      // --- 後台管理登入 ---
+      async function promptAdmin() {
+        const pwd = window.prompt('請輸入總部會計/管理員密碼', '');
+        if(!pwd) return;
+        try {
+          const r = await runServer('verifyAdminPassword', [pwd, STATE.currentOperator||{}]);
+          if(r.ok) {
+            STATE.adminAuthed = true;
+            document.getElementById('homeBtn').classList.remove('hidden');
+            document.getElementById('operatorLogoutBtn').classList.remove('hidden');
+            goHome();
+            showMsg('已進入財務與 ERP 系統後台。');
+          }
+        } catch(e) { showMsg(getErrMsg(e), true); }
+      }
+
+      // --- 後台面板初始化 ---
+      function initAdminPanel() {
+        if(!STATE.data || !STATE.data.dbInfo) return;
+        const db = STATE.data.dbInfo;
+        document.getElementById('adminDbName').innerText = db.spreadsheetName || '未知';
+        document.getElementById('adminDbId').innerText = db.spreadsheetId || '未知';
+        document.getElementById('adminLastUpdated').innerText = STATE.data.lastUpdated || '未知';
+        const urlEl = document.getElementById('adminDbUrl');
+        if(db.spreadsheetUrl) {
+          urlEl.innerHTML = `<a href="${escapeHtml(db.spreadsheetUrl)}" target="_blank">${escapeHtml(db.spreadsheetUrl)}</a>`;
+        } else {
+          urlEl.innerText = '未取得連結';
+        }
+      }
+
+      function adminOpenDb() {
+        if(STATE.data && STATE.data.dbInfo && STATE.data.dbInfo.spreadsheetUrl) {
+          window.open(STATE.data.dbInfo.spreadsheetUrl, '_blank');
+        } else { showMsg('無法取得資料庫連結', true); }
+      }
+
+      async function adminOptimizeDb() {
+        if(!confirm('確定要自動整理並排序庫存明細？')) return;
+        try {
+          showMsg('正在整理資料庫，請稍候...');
+          const r = await runServer('optimizeDatabaseLayout', [STATE.currentOperator||{}]);
+          if(r.ok) { STATE.data.inventory = r.inventory; showMsg(r.message); }
+        } catch(e) { showMsg('整理失敗: ' + getErrMsg(e), true); }
+      }
+
+      async function adminChangePassword() {
+        const cur = document.getElementById('adminCurrentPassword').value;
+        const nw = document.getElementById('adminNewPassword').value;
+        const cf = document.getElementById('adminConfirmPassword').value;
+        if(!cur) return showMsg('請輸入目前密碼', true);
+        if(!nw) return showMsg('請輸入新密碼', true);
+        if(nw !== cf) return showMsg('新密碼與確認密碼不一致', true);
+        if(nw.length < 4) return showMsg('新密碼至少需要 4 個字元', true);
+        try {
+          const r = await runServer('changeAdminPassword', [cur, nw]);
+          if(r.ok) {
+            showMsg(r.message);
+            document.getElementById('adminCurrentPassword').value = '';
+            document.getElementById('adminNewPassword').value = '';
+            document.getElementById('adminConfirmPassword').value = '';
+          }
+        } catch(e) { showMsg(getErrMsg(e), true); }
+      }
+
+      // --- CSV 匯入 ---
+      document.getElementById('csvFileInput').addEventListener('change', function(e) {
+        const f = e.target.files[0];
+        if(!f) return;
+        const statusEl = document.getElementById('csvStatus');
+        statusEl.innerHTML = '<div class="success-box">正在讀取 ' + escapeHtml(f.name) + '...</div>';
+        const reader = new FileReader();
+        reader.onload = async function(ev) {
+          try {
+            statusEl.innerHTML = '<div class="success-box">正在匯入，請稍候...</div>';
+            const r = await runServer('importCsvContent', [ev.target.result, { operator: STATE.currentOperator||{} }]);
+            if(r.ok) {
+              STATE.data.inventory = r.inventory;
+              if(r.erpData) STATE.data.erpData = r.erpData;
+              statusEl.innerHTML = '<div class="success-box">' + escapeHtml(r.message) + '</div>';
+              showMsg(r.message);
+            }
+          } catch(err) {
+            statusEl.innerHTML = '<div class="error-box">匯入失敗: ' + escapeHtml(getErrMsg(err)) + '</div>';
+          }
+        };
+        reader.readAsText(f);
+        e.target.value = '';
+      });
+
+      // --- 管家搜尋 ---
+      function updateOperatorLookup() { 
+        const kw = document.getElementById('operatorLookupInput').value.trim().toLowerCase(); 
+        const res = kw ? STATE.data.vipOptions.filter(r=>r.searchText.includes(kw)).slice(0,10) : []; 
+        const c = document.getElementById('operatorLookupResultsContainer'); 
+        if(!kw) { c.innerHTML = '<div class="empty-card">輸入客戶姓名或編號即可自動搜尋</div>'; return; } 
+        c.innerHTML = res.length ? res.map(r=>`<div class="cigar-row" style="border:1px solid #333; border-radius:16px; margin-bottom:12px; background:#161616;"><div class="cigar-info"><div class="cigar-name" style="color:var(--gold); font-size:22px;">${escapeHtml(r.vipName)}</div><div class="cigar-meta" style="font-size:16px;">編號: ${escapeHtml(r.vipId)}</div></div><button class="primary-btn" style="width:auto;" onclick="document.getElementById('vipIdInput').value='${escapeJs(r.vipId)}';handleVipLogin();">為他開櫃</button></div>`).join('') : '<div style="text-align:center; color:#888; font-size:18px;">找不到相符的客戶</div>'; 
+      }
+
+      function togglePrivacy() { STATE.isPrivacy = !STATE.isPrivacy; document.body.classList.toggle('privacy-hidden', STATE.isPrivacy); document.getElementById('privacyIcon').innerText = STATE.isPrivacy ? '🙈' : '👁️'; }
+      
+      function switchTab(t) { 
+        document.getElementById('tab-stock').style.display = (t === 'stock') ? 'block' : 'none';
+        document.getElementById('tab-history').style.display = (t === 'history') ? 'block' : 'none';
+        document.getElementById('tab-finance').style.display = (t === 'finance') ? 'block' : 'none';
+        document.getElementById('btnTabStock').classList.toggle('active', t === 'stock');
+        document.getElementById('btnTabHistory').classList.toggle('active', t === 'history');
+        document.getElementById('btnTabFinance').classList.toggle('active', t === 'finance');
+      }
+
+      function getAging(dateStr) {
+        if(!dateStr) return { label:'年份未知', class:'tag-new' };
+        const diff = (new Date() - new Date(dateStr)) / (1000*60*60*24*30);
+        if(diff < 3) return { label:'🟡 醇化中', class:'tag-new' };
+        if(diff < 12) return { label:'🟢 適飲期', class:'tag-ready' };
+        return { label:'👑 完美熟成', class:'tag-perfect' };
+      }
+
+      function extractBrand(name) {
+        const n = name.toUpperCase();
+        if(n.includes('ROMEO Y JULIETA')) return 'ROMEO Y JULIETA';
+        if(n.includes('HOYO DE MONTERREY')) return 'HOYO DE MONTERREY';
+        if(n.includes('H.UPMANN') || n.includes('H. UPMANN')) return 'H.UPMANN';
+        if(n.includes('SANCHO PANZA')) return 'SANCHO PANZA';
+        if(n.includes('PARTAGAS')) return 'PARTAGAS';
+        if(n.includes('BOLIVAR')) return 'BOLIVAR';
+        if(n.includes('TRINIDAD')) return 'TRINIDAD';
+        if(n.includes('COHIBA')) return 'COHIBA';
+        if(n.includes('MONTECRISTO')) return 'MONTECRISTO';
+        if(n.includes('RAMON ALLONES')) return 'RAMON ALLONES';
+        if(n.includes('DAVIDOFF')) return 'DAVIDOFF';
+        return n.split(' ')[0] || '其他精選收藏';
+      }
+
+      // --- 主渲染 ---
+      function renderApp() {
+        const vip = STATE.data.inventory[STATE.vipId] || { name: 'VIP', stats: { smoked:0, taken:0 }, cabinets: {}, retrievals: [] };
+        const erp = STATE.data.erpData[STATE.vipId] || { summary: { totalPurchased:0, totalUnpaid:0 }, orders: {} };
+        
+        let stockVal = 0, stockQty = 0; 
+        Object.values(vip.cabinets).forEach(c => Object.values(c).forEach(i => { stockVal += (i.qty * i.price); stockQty += i.qty; }));
+        
+        document.getElementById('dispVipName').innerText = vip.name; 
+        document.getElementById('dispVipId').innerText = 'VIP ID: ' + STATE.vipId;
+        
+        const histTotal = Math.max(erp.summary.totalPurchased || 0, stockVal);
+        document.getElementById('valHistTotal').innerText = formatCurrency(histTotal); 
+        document.getElementById('valStockTotal').innerText = formatCurrency(stockVal); 
+        document.getElementById('valStockQty').innerText = stockQty + ' 支';
+        
+        const bal = erp.summary.totalUnpaid || 0; 
+        const balEl = document.getElementById('valBalance');
+        balEl.innerText = formatCurrency(Math.abs(bal));
+        
+        if (bal > 0) { 
+          balEl.className = 'metric-value money-value danger'; 
+          document.getElementById('labelBalance').innerText = '期末應收 (待結帳)'; 
+        } else if (bal < 0) { 
+          balEl.className = 'metric-value money-value success'; 
+          document.getElementById('labelBalance').innerText = '帳戶餘額 (可用儲值)'; 
+        } else { 
+          balEl.className = 'metric-value money-value'; 
+          document.getElementById('labelBalance').innerText = '帳款狀態 (已結清)'; 
+        }
+
+        renderInventoryContainer(vip.cabinets); 
+        renderHistoryTab(vip.retrievals); 
+        renderFinanceTab(erp.orders); 
+      }
+
+      function setInventoryView(mode) {
+        STATE.inventoryViewMode = mode;
+        document.getElementById('btnViewCabinet').classList.toggle('active', mode === 'cabinet');
+        document.getElementById('btnViewBrand').classList.toggle('active', mode === 'brand');
+        const vip = STATE.data.inventory[STATE.vipId] || { cabinets: {} };
+        renderInventoryContainer(vip.cabinets);
+      }
+
+      function renderInventoryContainer(cabinets) {
+        if(!cabinets) return;
+        const container = document.getElementById('inventoryContainer');
+        const isBrandView = (STATE.inventoryViewMode === 'brand');
+
+        if (!isBrandView) {
+          const activeCabNos = Object.keys(cabinets).sort((a,b)=>a==='未指定櫃位'?1:b==='未指定櫃位'?-1:Number(a)-Number(b));
+          container.innerHTML = activeCabNos.map(cabNo => {
+            let cabVal = 0, cabQty = 0;
+            const itemsHtml = Object.keys(cabinets[cabNo]).map(name => {
+              const i = cabinets[cabNo][name]; cabVal += (i.qty * i.price); cabQty += i.qty;
+              return generateCigarRowHtml(cabNo, name, i);
+            }).join('');
+            return `<div class="cabinet-block"><div class="cabinet-head"><h3 class="cabinet-title">📦 ${cabNo==='未指定櫃位'?'未指定':'NO. ' + cabNo} 櫃位</h3><div style="display:flex; gap:10px;"><span class="cabinet-price-badge" style="background:#1a1a1a; color:#888; border-color:#333;">共 ${cabQty} 支</span><span class="cabinet-price-badge money-value">總額 ${formatCurrency(cabVal)}</span></div></div>${itemsHtml}</div>`;
+          }).join('') || '<div class="empty-card">尚無庫存資料</div>';
+        } else {
+          const brandMap = {};
+          Object.keys(cabinets).forEach(cabNo => {
+            Object.keys(cabinets[cabNo]).forEach(name => {
+              const brand = extractBrand(name);
+              if(!brandMap[brand]) brandMap[brand] = { qty: 0, val: 0, items: [] };
+              const item = cabinets[cabNo][name];
+              brandMap[brand].qty += item.qty; brandMap[brand].val += (item.qty * item.price);
+              brandMap[brand].items.push({ cabNo, name, data: item });
+            });
+          });
+          const sortedBrands = Object.keys(brandMap).sort();
+          container.innerHTML = sortedBrands.map(b => {
+            const bData = brandMap[b];
+            const itemsHtml = bData.items.map(itm => generateCigarRowHtml(itm.cabNo, itm.name, itm.data)).join('');
+            return `<div class="cabinet-block"><div class="cabinet-head"><h3 class="cabinet-title">👑 ${escapeHtml(b)}</h3><div style="display:flex; gap:10px;"><span class="cabinet-price-badge" style="background:#1a1a1a; color:#888; border-color:#333;">系列共 ${bData.qty} 支</span></div></div>${itemsHtml}</div>`;
+          }).join('') || '<div class="empty-card">尚無庫存資料</div>';
+        }
+      }
+
+      function generateCigarRowHtml(cabNo, name, itemData) {
+        const aging = getAging(itemData.date);
+        const isLowStock = itemData.qty <= 5;
+        const lowStockHtml = isLowStock ? `<div class="low-stock-text">⚠️ 窖藏見底，建議您儘速為此款雪茄補貨。</div>` : '';
+        const actionBtns = `
+          ${STATE.currentOperator ? `<button class="action-btn" onclick="openConsume('${escapeJs(cabNo)}','${escapeJs(name)}',${itemData.qty})">✍️ 現場領取</button>` : ''}
+          ${isLowStock 
+             ? `<button class="action-btn restock-btn" style="background:linear-gradient(90deg, #c43a3a, #8b1c1c); color:#fff; border:none;" onclick="lineRestock('${escapeJs(name)}', ${itemData.qty})">🛎️ 聯絡管家補貨</button>` 
+             : `<button class="action-btn concierge-btn" style="color:#3db27d; border-color:rgba(61,178,125,.4);" onclick="lineReserve('${escapeJs(name)}','${escapeJs(cabNo)}')">🛎️ 預約管家準備</button>`}
+        `;
+        return `
+          <div class="cigar-row" style="${isLowStock ? 'background: rgba(228, 93, 93, 0.05);' : ''}">
+            <div class="cigar-info">
+              <div class="cigar-name">${escapeHtml(name)} <span class="aging-tag ${aging.class}">${aging.label}</span></div>
+              <div class="cigar-meta money-value">📍 存放於：NO. ${cabNo} 櫃位 ｜ 單價：${formatCurrency(itemData.price)} ｜ 總值：<strong style="color:var(--gold);">${formatCurrency(itemData.qty * itemData.price)}</strong></div>
+              ${lowStockHtml}
+              <div style="margin-top:16px; display:flex; gap:12px; flex-wrap:wrap;">${actionBtns}</div>
+            </div>
+            <div class="cigar-qty"><span class="qty-num">${itemData.qty}</span><span class="qty-label">剩餘庫存</span></div>
+          </div>
+        `;
+      }
+
+      function renderHistoryTab(retrievals) {
+        const container = document.getElementById('tab-history');
+        if(!retrievals || !retrievals.length) { container.innerHTML = '<div class="empty-card">尚無任何領取軌跡</div>'; return; }
+        container.innerHTML = `<div class="history-list">` + retrievals.slice(0, 30).map(r => `
+          <div class="history-card">
+            <div class="history-top">
+              <div class="history-time">${escapeHtml(r.time)}</div>
+              <div class="badge ${r.note.includes('外帶')?'gold':r.note.includes('招待')?'danger':'success'}">${escapeHtml(r.note)}</div>
+            </div>
+            <div class="history-title">${escapeHtml(r.itemName)}</div>
+            <div class="history-grid">
+              <div><span>出庫櫃位</span><strong>${r.cabinetNo==='未指定櫃位'?'未指定':'NO.'+escapeHtml(r.cabinetNo)}</strong></div>
+              <div><span>領取數量</span><strong style="color:var(--gold); font-size:20px;">${r.qty} 支</strong></div>
+              <div><span>服務管家</span><strong>${escapeHtml(r.operatorName)}</strong></div>
+              <div><span>領後剩餘</span><strong>${r.remainingQty} 支</strong></div>
+            </div>
+            <div style="border-top:1px dashed #444; padding-top:16px; display:flex; align-items:center; gap:20px; margin-top:16px;">
+              <span style="font-size:15px; color:#a39d91; font-weight:bold;">客戶親筆畫押</span>
+              ${r.signature ? `<img src="${r.signature}" class="signature-img">` : `<span style="color:#666;font-size:14px;font-weight:bold;">(無簽名紀錄)</span>`}
+            </div>
+          </div>
+        `).join('') + `</div>`;
+      }
+
+      function renderFinanceTab(orders) {
+        const container = document.getElementById('tab-finance');
+        if(!orders || Object.keys(orders).length===0) { container.innerHTML = '<div class="empty-card">尚無帳務紀錄</div>'; return; }
+        
+        const vip = STATE.data.inventory[STATE.vipId] || { cabinets: {}, retrievals: [] };
+
+        container.innerHTML = `<div style="padding:10px 0;">` + Object.values(orders).sort((a,b)=>new Date(b.date)-new Date(a.date)).map(o => {
+          const itemsHtml = o.items.map(i => {
+            let stockLocations = [];
+            let totalRetrieved = 0;
+            if (vip.cabinets) {
+              Object.keys(vip.cabinets).forEach(cab => { if (vip.cabinets[cab][i.name]) stockLocations.push(`NO.${cab} (${vip.cabinets[cab][i.name].qty}支)`); });
+            }
+            if (vip.retrievals) {
+              vip.retrievals.forEach(r => { if (r.itemName === i.name) totalRetrieved += r.qty; });
+            }
+
+            let locHtml = '';
+            if (i.missingQty > 0) locHtml += `<div style="color:var(--danger); margin-bottom:6px; font-size:14px; font-weight:bold;">⏳ 尚欠交 ${i.missingQty} 支 (預購未到貨)</div>`;
+            if (i.arriveQty > 0) {
+               if (stockLocations.length > 0) locHtml += `<div style="color:#78dda8; margin-bottom:6px; font-size:14px;">📍 現正存放於：<strong style="color:#fff;">${stockLocations.join('、')}</strong> 進行醇化</div>`;
+               if (totalRetrieved > 0) locHtml += `<div style="color:#a39d91; font-size:14px;">🚬 歷史已提領/享用：共 <strong style="color:#fff;">${totalRetrieved} 支</strong></div>`;
+               if (stockLocations.length === 0 && totalRetrieved === 0) locHtml += `<div style="color:#78dda8; font-size:14px;">📍 已全數交付入庫</div>`;
+            }
+
+            return `
+              <div style="padding:16px; border:1px solid #333; background:#111; border-radius:16px; margin-bottom:12px;">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
+                  <div style="font-size:18px; font-weight:bold; color:var(--gold); line-height:1.4;">${escapeHtml(i.name)}</div>
+                  <div style="text-align:right; min-width:80px;">
+                    <div style="color:#fff; font-size:18px; font-weight:bold;">${i.orderQty} <span style="font-size:14px; color:#888;">支</span></div>
+                  </div>
+                </div>
+                <div style="display:flex; justify-content:space-between; font-size:14px; color:#aaa; margin-bottom:12px; border-bottom:1px dashed #333; padding-bottom:12px;">
+                  <span>約定單價：${formatCurrency(i.price || 0)}</span>
+                  <span>小計金額：<strong style="color:#fff; font-size:16px;">${formatCurrency((i.price || 0) * i.orderQty)}</strong></span>
+                </div>
+                <div style="background:#1a1a1a; padding:12px; border-radius:10px; border:1px solid #2a2a2a;">
+                  <div style="color:#888; font-size:12px; margin-bottom:8px; font-weight:bold; letter-spacing:1px;">📦 物流與存放動向</div>
+                  ${locHtml}
+                  <div style="margin-top:6px; font-size:12px; color:#666; border-top:1px dotted #333; padding-top:6px;">💡 詳細存放狀態與出庫紀錄，請見「專屬窖藏」與「領取軌跡」。</div>
+                </div>
+              </div>`;
+          }).join('');
+          
+          return `
+            <div class="history-card" style="margin-bottom:24px; box-shadow:0 10px 30px rgba(0,0,0,0.5);">
+              <div class="history-top" style="border-bottom:1px solid #2a2a2a; padding-bottom:16px;">
+                <div>
+                  <div style="color:var(--gold); font-size:22px; font-family:'Times New Roman',serif; font-weight:bold;">${escapeHtml(o.orderId)}</div>
+                  <div style="color:#888; font-size:14px; margin-top:8px;">開立時間：${escapeHtml(o.date)} ｜ 帳務經辦：${escapeHtml(o.staff)}</div>
+                </div>
+                <div class="badge" style="padding:10px 16px; font-size:16px; font-weight:bold; border-radius:12px; background:${o.balance<=0?'rgba(61,178,125,0.15)':'rgba(208,165,79,0.15)'}; border:1px solid ${o.balance<=0?'rgba(61,178,125,0.3)':'rgba(208,165,79,0.3)'}; color:${o.balance<=0?'var(--success)':'var(--gold)'};">${o.status}</div>
+              </div>
+              
+              <div class="history-grid money-value" style="grid-template-columns: repeat(3, 1fr); margin-top:16px;">
+                <div>
+                  <span>訂單總金額</span>
+                  <strong style="font-size:22px;">${formatCurrency(o.total)}</strong>
+                </div>
+                <div>
+                  <span>已付/扣款</span>
+                  <strong style="color:var(--success); font-size:22px;">${formatCurrency(o.paid)}</strong>
+                </div>
+                <div>
+                  <span>期末未付餘額</span>
+                  <strong style="color:var(--danger); font-size:22px;">${formatCurrency(o.balance)}</strong>
+                </div>
+              </div>
+              
+              <div style="margin:20px 0;">
+                <h4 style="color:#fff; font-size:18px; margin:0 0 16px 0; display:flex; align-items:center; gap:8px;">🛒 購買品項與物流追蹤</h4>
+                ${itemsHtml}
+              </div>
+
+              ${o.payments && o.payments.length > 0 ? `
+                <div style="background:rgba(255,255,255,0.02); padding:16px; border-radius:16px; border:1px dashed #333;">
+                  <div style="color:#888; font-size:14px; font-weight:bold; margin-bottom:12px;">💳 歷史付款與沖帳憑證</div>
+                  ${o.payments.map(p => `
+                    <div style="display:flex; justify-content:space-between; align-items:center; font-size:14px; color:#bbb; padding:8px 0; border-bottom:1px solid #222;">
+                      <span>${escapeHtml(p.date)} (${escapeHtml(p.staff)})</span>
+                      <span><strong style="color:#fff; margin-right:12px;">${formatCurrency(p.amt)}</strong> ${p.url?`<a href="${p.url}" target="_blank" style="color:var(--gold); text-decoration:underline;">查看單據</a>`:'無單據'}</span>
+                    </div>
+                  `).join('')}
+                </div>
+              ` : ''}
+
+              ${(STATE.currentOperator || STATE.adminAuthed) && o.balance > 0 ? `
+                <div style="text-align:right; margin-top:24px;">
+                  <button class="primary-btn" style="width:100%; font-size:18px; padding:16px;" onclick="openPayment('${escapeJs(o.orderId)}', ${o.balance})">💳 結帳與拍單據</button>
+                </div>
+              ` : ''}
+            </div>
+          `;
+        }).join('') + `</div>`;
+      }
+
+      function lineReserve(name, cab) { const text = encodeURIComponent(`W CIGAR 團隊您好，我是 ${STATE.data.inventory[STATE.vipId].name}，請幫我準備好 NO.${cab} 櫃位的 [ ${name} ]，我預計稍後過去享用。`); window.open(`https://line.me/R/ti/p/@374lpmfi?text=${text}`, '_blank'); }
+      function lineRestock(name, qty) { const text = encodeURIComponent(`W CIGAR 團隊您好，我是 ${STATE.data.inventory[STATE.vipId].name}，我發現我的 [ ${name} ] 庫存只剩 ${qty} 支了，請幫我查詢目前報價並安排進貨。`); window.open(`https://line.me/R/ti/p/@374lpmfi?text=${text}`, '_blank'); }
+
+      // --- 領取與畫押邏輯 ---
+      function setConsumeType(type, el) { document.getElementById('consumeTypeInput').value = type; document.querySelectorAll('#consumeModal .segment-item').forEach(n => n.classList.remove('active')); el.classList.add('active'); }
+      
+      function openConsume(cab, name, max) { 
+        STATE.targetCigar = { cabinetNo: cab, itemName: name, qty: 1 }; 
+        document.getElementById('consumeInfo').innerHTML = `<div style="color:var(--gold); font-size:24px; font-weight:bold; margin-bottom:12px; line-height:1.4;">${escapeHtml(name)}</div><div style="color:#ccc; font-size:16px; display:flex; justify-content:space-between; align-items:center;"><span>來源：${cab==='未指定櫃位'?'未指定':'NO. '+cab}</span><span>現有庫存：<strong style="color:#fff; font-size:20px;">${max} 支</strong></span></div>`; 
+        document.getElementById('consumeQty').max = max; 
+        document.getElementById('consumeQty').value = 1; 
+        document.getElementById('consumeModal').classList.add('active'); 
+        setTimeout(() => { initCanvas(); clearSig(); }, 100); 
+      }
+      
+      function closeModal() { document.getElementById('consumeModal').classList.remove('active'); }
+
+      let sigCtx, isDrawing = false, hasDrawn = false;
+      function initCanvas() { 
+        const cvs = document.getElementById('sigCanvas'); if(!cvs) return; 
+        sigCtx = cvs.getContext('2d'); cvs.width = cvs.offsetWidth; cvs.height = 200; 
+        sigCtx.strokeStyle = '#111'; sigCtx.lineWidth = 6; sigCtx.lineCap = 'round'; sigCtx.lineJoin = 'round'; 
+        const getPos = e => { const r = cvs.getBoundingClientRect(); return { x: (e.touches ? e.touches[0].clientX : e.clientX) - r.left, y: (e.touches ? e.touches[0].clientY : e.clientY) - r.top }; }; 
+        const start = e => { e.preventDefault(); isDrawing=true; hasDrawn=true; const p=getPos(e); sigCtx.beginPath(); sigCtx.moveTo(p.x,p.y); }; 
+        const draw = e => { e.preventDefault(); if(!isDrawing)return; const p=getPos(e); sigCtx.lineTo(p.x,p.y); sigCtx.stroke(); }; 
+        const stop = () => { isDrawing=false; }; 
+        cvs.onmousedown = start; cvs.onmousemove = draw; window.onmouseup = stop; cvs.ontouchstart = start; cvs.ontouchmove = draw; window.ontouchend = stop; 
+      }
+      
+      function clearSig() { 
+        if(sigCtx) { const cvs=document.getElementById('sigCanvas'); sigCtx.clearRect(0,0,cvs.width,cvs.height); hasDrawn=false; sigCtx.beginPath(); } 
+      }
+
+      async function submitConsume() {
+        if(STATE.isSubmitting) return; 
+        const qty = parseInt(document.getElementById('consumeQty').value, 10); 
+        if(isNaN(qty) || qty <= 0) return showMsg('請輸入正確數量', true); 
+        if(!hasDrawn) return showMsg('請讓客戶親筆簽名畫押。', true);
+        
+        STATE.targetCigar.qty = qty; 
+        const cType = document.getElementById('consumeTypeInput').value;
+        const cvs = document.getElementById('sigCanvas'); 
+        const tC = document.createElement('canvas'); tC.width = cvs.width; tC.height = cvs.height; 
+        const tCtx = tC.getContext('2d'); tCtx.fillStyle = "#fff"; tCtx.fillRect(0,0,tC.width,tC.height); tCtx.drawImage(cvs,0,0); 
+        const b64 = tC.toDataURL('image/jpeg', 0.6);
+        
+        STATE.isSubmitting = true; 
+        const btn = document.getElementById('submitBtn'); btn.innerText = '系統處理與扣除中...';
+        try { 
+          const r = await runServer('consumeItemsBatch', [STATE.vipId, [STATE.targetCigar], cType, b64, STATE.currentOperator||{}]); 
+          if(r.ok) { STATE.data.inventory = r.inventory; STATE.data.erpData = r.erpData; STATE.data.lastUpdated = r.lastUpdated; closeModal(); renderApp(); showMsg(r.message); } 
+        } catch(e) { showMsg(getErrMsg(e), true); closeModal(); } 
+        finally { STATE.isSubmitting = false; btn.innerText = '確認領取並扣除庫存'; }
+      }
+
+      // --- 收款與拍照邏輯 ---
+      function openPayment(oId, bal) {
+        STATE.paymentOrderId = oId; STATE.receiptBase64 = '';
+        document.getElementById('paymentOrderInfo').innerHTML = `結算訂單：<strong style="color:var(--gold); font-size:18px;">${escapeHtml(oId)}</strong><br>待補尾款：<strong style="color:var(--danger); font-size:18px;">${formatCurrency(bal)}</strong>`;
+        document.getElementById('paymentAmountInput').value = bal;
+        document.getElementById('receiptImageInput').value = '';
+        document.getElementById('receiptPreviewImg').style.display = 'none';
+        document.getElementById('paymentModal').classList.add('active');
+      }
+
+      function closePaymentModal() { document.getElementById('paymentModal').classList.remove('active'); }
+      
+      document.getElementById('receiptImageInput').addEventListener('change', e => {
+        const f = e.target.files[0]; if(!f) return; 
+        const rd = new FileReader();
+        rd.onload = ev => { 
+          const i = new Image(); 
+          i.onload = () => {
+            const cvs = document.createElement('canvas'); const MW = 1200; let w=i.width, h=i.height; 
+            if(w>MW){ h=Math.round(h*MW/w); w=MW; }
+            cvs.width=w; cvs.height=h; cvs.getContext('2d').drawImage(i,0,0,w,h); 
+            STATE.receiptBase64 = cvs.toDataURL('image/jpeg', 0.6);
+            const pv = document.getElementById('receiptPreviewImg'); 
+            pv.src = STATE.receiptBase64; pv.style.display = 'block';
+          }; 
+          i.src = ev.target.result; 
+        }; 
+        rd.readAsDataURL(f);
+      });
+
+      async function submitPayment() {
+        if(STATE.isSubmitting) return;
+        const amt = parseInt(document.getElementById('paymentAmountInput').value, 10);
+        if(isNaN(amt) || amt <= 0) return showMsg('請輸入大於 0 的實收金額', true);
+        if(!STATE.receiptBase64) return showMsg('請務必拍攝或上傳單據照片', true);
+        
+        STATE.isSubmitting = true;
+        const btn = document.getElementById('confirmPaymentBtn'); btn.innerText = '單據上傳與沖帳中...請勿關閉';
+        
+        try {
+          const r = await runServer('addPaymentWithPhoto', [STATE.vipId, STATE.paymentOrderId, amt, STATE.receiptBase64, STATE.currentOperator||{}]);
+          if(r.ok) {
+            STATE.data.inventory = r.inventory; STATE.data.erpData = r.erpData; STATE.data.lastUpdated = r.lastUpdated;
+            closePaymentModal(); renderApp(); showMsg(r.message);
+          }
+        } catch(e) { showMsg('上傳失敗: ' + getErrMsg(e), true); closePaymentModal(); }
+        finally { STATE.isSubmitting = false; btn.innerText = '確定收款並上傳單據'; }
+      }
+    </script>
+  </body>
+</html>
