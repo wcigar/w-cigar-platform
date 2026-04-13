@@ -87,7 +87,7 @@ export default function VipCellar() {
   function loginAsVip(m) { setMember(m); setVipId(m.id); sessionStorage.setItem('vipMember', JSON.stringify(m)); setView('app') }
   function loginAsStaff(e) { setEmployee(e); sessionStorage.setItem('employee', JSON.stringify(e)); setView(e.is_admin ? 'admin' : 'staff') }
   function logout() { sessionStorage.removeItem('vipMember'); sessionStorage.removeItem('employee'); setMember(null); setEmployee(null); setVipId(null); setView('login') }
-  function staffViewVip(m) { setMember(m); setVipId(m.id); sessionStorage.setItem('vipMember', JSON.stringify(m)); setView('app') }
+  function staffViewVip(m) { setMember(m); setVipId(m.vip_code || m.id); sessionStorage.setItem('vipMember', JSON.stringify(m)); setView('app') }
   function backToStaff() { sessionStorage.removeItem('vipMember'); setMember(null); setVipId(null); setView('staff') }
 
   return <div style={{ minHeight:'100vh', background:C.bg, color:C.text, overflowY:'auto' }}>
@@ -218,7 +218,8 @@ function AppView({ member, employee, privacy, onBack }) {
   const [cellarView, setCellarView] = useState('cabinet')
   const [consumeItem, setConsumeItem] = useState(null); const [payingOrder, setPayingOrder] = useState(null); const [showPrint, setShowPrint] = useState(false)
 
-  const load = useCallback(async () => { setLoading(true); try { const d = await loadVipFull(member.id); setData(d) } catch(e) { console.error(e) } setLoading(false) }, [member?.id])
+  const vid = member?.vip_code || member?.vip_id || member?.id
+  const load = useCallback(async () => { setLoading(true); try { const d = await loadVipFull(vid); setData(d) } catch(e) { console.error(e) } setLoading(false) }, [vid])
   useEffect(() => { if (member?.id) load() }, [load])
 
   if (loading) return <div style={{ padding:40, textAlign:'center', color:C.muted }}>載入中…</div>
@@ -247,7 +248,7 @@ function AppView({ member, employee, privacy, onBack }) {
 
     {/* Hero */}
     <div style={{ fontSize:24, fontWeight:800, color:C.gold, marginBottom:2 }}>{member.name}</div>
-    <div style={{ fontSize:11, color:C.muted, marginBottom:16 }}>VIP ID: {member.id}</div>
+    <div style={{ fontSize:11, color:C.muted, marginBottom:16 }}>VIP ID: {member.vip_code || member.vip_id || member.id}</div>
     <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:10, marginBottom:16 }}>
       <MetricBox label="歷史購買總額" value={$$(sm.totalSpent)} color={C.gold} blur={privacy} />
       <MetricBox label="目前房內總值" value={$$(sm.cellarVal)} color={C.gold} blur={privacy} />
@@ -384,13 +385,13 @@ function ConsumeModal({ item, member, employee, onClose, onDone }) {
     if (!sigData) return alert('請客戶簽名')
     setBusy(true)
     try {
-      const { data, error } = await supabase.rpc('vip_withdraw', { p_vip_id:member.id, p_cabinet_id:item.id, p_qty:qty, p_destination:dest, p_staff_id:employee.login_code||employee.id, p_staff_name:employee.name, p_signature_url:sigData, p_notes:'' })
+      const { data, error } = await supabase.rpc('vip_withdraw', { p_vip_id:member.vip_code||member.id, p_cabinet_id:item.id, p_qty:qty, p_destination:dest, p_staff_id:employee.login_code||employee.id, p_staff_name:employee.name, p_signature_url:sigData, p_notes:'' })
       if (error) throw error
       if (data && !data.success) throw new Error(data.error || '領取失敗')
     } catch (e) {
       // Fallback to direct update if RPC doesn't exist
       await supabase.from('vip_cabinets').update({ quantity: item.qty - qty, updated_at: new Date().toISOString() }).eq('id', item.id)
-      await supabase.from('vip_withdrawals').insert({ vip_id:member.id, vip_name:member.name, cabinet_id:item.id, cabinet_no:item.cabinet_no, product_name:item.product_name, qty_withdrawn:qty, qty_remaining:item.qty-qty, destination:dest, staff_id:employee.login_code||employee.id, staff_name:employee.name, signature_url:sigData, withdrawn_at:new Date().toISOString() })
+      await supabase.from('vip_withdrawals').insert({ vip_id:member.vip_code||member.id, vip_name:member.name, cabinet_id:item.id, cabinet_no:item.cabinet_no, product_name:item.product_name, qty_withdrawn:qty, qty_remaining:item.qty-qty, destination:dest, staff_id:employee.login_code||employee.id, staff_name:employee.name, signature_url:sigData, withdrawn_at:new Date().toISOString() })
     }
     setBusy(false); onDone()
   }
@@ -433,7 +434,7 @@ function PaymentModal({ order, member, employee, onClose, onDone }) {
   async function submit() {
     const a = +amt || 0; if (a <= 0) return alert('請填寫金額')
     setBusy(true)
-    await supabase.from('vip_payments').insert({ order_id:order.id, order_no:order.order_no, vip_id:member.id, amount:a, payment_method:method, staff_id:employee.login_code||employee.id, staff_name:employee.name, notes:note||null, receipt_url:receiptData||null, remit_code:remitCode||null })
+    await supabase.from('vip_payments').insert({ order_id:order.id, order_no:order.order_no, vip_id:member.vip_code||member.id, amount:a, payment_method:method, staff_id:employee.login_code||employee.id, staff_name:employee.name, notes:note||null, receipt_url:receiptData||null, remit_code:remitCode||null })
     const oldPaid = (order.order_total||0) - (order.balance||0)
     const np = oldPaid + a
     const newBalance = Math.max(0, (order.order_total||0) - np)
@@ -535,7 +536,7 @@ function PrintInventoryModal({ member, inv, byCab, sm, onClose }) {
   return <Modal onClose={onClose} title="🖨️ 列印窖藏清單" wide>
     <div id="vip-print" style={{ background:'#fff', color:'#000', padding:16, borderRadius:12, fontSize:12 }}>
       <div style={{ textAlign:'center', marginBottom:12 }}><div style={{ fontSize:18, fontWeight:800 }}>W CIGAR BAR</div><div style={{ fontSize:10, color:'#999' }}>VIP 窖藏庫存清單 | 列印日期：{fd(new Date())}</div></div>
-      <div style={{ display:'flex', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid #ddd', marginBottom:12 }}><span>會員姓名：<b>{member.name}</b></span><span>會員編號：<b>{member.id}</b></span><span>開櫃日期：<b>{fd(member.cabinet_opened)}</b></span></div>
+      <div style={{ display:'flex', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid #ddd', marginBottom:12 }}><span>會員姓名：<b>{member.name}</b></span><span>會員編號：<b>{member.vip_code||member.id}</b></span><span>開櫃日期：<b>{fd(member.cabinet_opened)}</b></span></div>
       {Object.entries(byCab).map(([cab,items]) => <div key={cab} style={{ marginBottom:12 }}>
         <div style={{ fontWeight:700, marginBottom:4, color:'#8B7355' }}>NO.{cab} 號櫃</div>
         {items.map(i => <div key={i.id} style={{ display:'flex', justifyContent:'space-between', padding:'3px 0', borderBottom:'1px solid #eee', fontSize:11 }}><span style={{ flex:2 }}>{i.product_name}</span><span style={{ width:40, textAlign:'center' }}>{i.qty}支</span><span style={{ width:60, textAlign:'right' }}>{fc(i.unit_price)}</span><span style={{ width:70, textAlign:'right', color:'#8B7355' }}>{fc(i.qty*i.unit_price)}</span><span style={{ width:70, textAlign:'right', color:'#999' }}>{fd(i.stored_at)}</span></div>)}
