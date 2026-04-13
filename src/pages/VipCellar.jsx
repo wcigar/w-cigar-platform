@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 
 /* ═══ CONSTANTS ═══ */
@@ -8,8 +7,8 @@ const PAY_OPTS = ['ACPAY刷卡機','臺灣企銀刷卡機(美國運通/銀聯)',
 const SRC_TAGS = ['老闆客戶','老闆娘客戶','店內新客戶','友人介紹','LINE訂購']
 const DEST_OPTS = [{ k:'現場享用', icon:'🚬', c:C.success }, { k:'外帶離店', icon:'🛍️', c:C.gold }, { k:'轉贈招待', icon:'🎁', c:C.danger }]
 const fc = n => new Intl.NumberFormat('zh-TW', { style:'currency', currency:'TWD', minimumFractionDigits:0 }).format(n || 0)
-const fd = d => d ? new Date(d).toLocaleDateString('zh-TW', { timeZone:'Asia/Taipei' }) : ''
-const fdt = d => d ? new Date(d).toLocaleString('zh-TW', { timeZone:'Asia/Taipei', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' }) : ''
+const fd = d => { if(!d) return '—'; const x=new Date(d); return isNaN(x.getTime()) ? '—' : x.toLocaleDateString('zh-TW', { timeZone:'Asia/Taipei' }) }
+const fdt = d => { if(!d) return '—'; const x=new Date(d); return isNaN(x.getTime()) ? '—' : x.toLocaleString('zh-TW', { timeZone:'Asia/Taipei', year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' }) }
 
 function getAging(ds) { if (!ds) return null; const m = Math.floor((Date.now() - new Date(ds).getTime()) / (30.44*86400000)); return m < 3 ? { l:'🟡 醇化中', c:C.warning } : m < 12 ? { l:'🟢 適飲期', c:C.success } : { l:'👑 完美熟成', c:C.purple } }
 function extractBrand(n) { const brands = ['COHIBA','MONTECRISTO','ROMEO Y JULIETA','PARTAGAS','H. UPMANN','HOYO DE MONTERREY','BOLIVAR','TRINIDAD','PUNCH','QUAI D\'ORSAY','DIPLOMATICOS','SAINT LUIS REY','RAMON ALLONES','CAPADURA','VEGUEROS','SAN CRISTOBAL']; const up = (n||'').toUpperCase(); return brands.find(b => up.startsWith(b)) || (n||'').split(' ')[0] || '其他' }
@@ -58,9 +57,11 @@ const Inp = p => <input {...p} style={{ width:'100%', fontSize:14, padding:'12px
 const MetricBox = ({label,value,color,blur}) => <div style={{ background:C.card, borderRadius:16, padding:14, border:`1px solid ${C.border}` }}><div style={{ fontSize:10, color:C.muted, marginBottom:4 }}>{label}</div><div style={{ fontSize:20, fontWeight:700, color:color||C.text, fontFamily:'var(--font-mono)', filter:blur?'blur(6px)':'none' }}>{value}</div></div>
 function Modal({onClose,title,children,wide}) { return <div style={{ position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,.92)', zIndex:400, overflowY:'auto', WebkitOverflowScrolling:'touch' }} onClick={onClose}><div style={{ maxWidth:wide?700:520, margin:'20px auto', background:'#1a1714', border:`1px solid ${C.gold}40`, borderRadius:24, padding:24, boxShadow:'0 18px 40px rgba(0,0,0,.45)', maxHeight:'90vh', overflowY:'auto' }} onClick={e=>e.stopPropagation()}><div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}><span style={{ fontSize:18, fontWeight:700, color:C.gold }}>{title}</span><button onClick={onClose} style={{ background:'none', border:'none', color:C.muted, cursor:'pointer', fontSize:22 }}>✕</button></div>{children}</div></div> }
 function SigCanvas({sigRef,sigData,setSigData}) {
-  function clear() { const c = sigRef.current; if(c) { c.getContext('2d').clearRect(0,0,c.width,c.height); setSigData(null) } }
+  function clear() { const c = sigRef.current; if(c) { const ctx=c.getContext('2d'); ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,c.width,c.height); setSigData(null) } }
+  function initCanvas(c) { if(!c) return; const ctx=c.getContext('2d'); ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,c.width,c.height) }
+  useEffect(() => { if(sigRef.current) initCanvas(sigRef.current) }, [])
   return <><div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}><span style={{ fontSize:12, color:C.muted }}>客戶簽名確認</span><button onClick={clear} style={{ fontSize:10, color:C.muted, background:'none', border:`1px solid ${C.border}`, borderRadius:6, padding:'2px 10px', cursor:'pointer' }}>清除</button></div>
-    <canvas ref={sigRef} width={400} height={120} style={{ width:'100%', height:120, background:'#fff', border:`1px solid ${C.border}`, borderRadius:12, marginBottom:12, touchAction:'none' }}
+    <canvas ref={el => { sigRef.current = el; if(el) initCanvas(el) }} width={400} height={120} style={{ width:'100%', height:120, background:'#fff', border:`1px solid ${C.border}`, borderRadius:12, marginBottom:12, touchAction:'none' }}
       onPointerDown={e => { const c=sigRef.current; if(!c) return; const ctx=c.getContext('2d'); ctx.strokeStyle='#000'; ctx.lineWidth=2; ctx.beginPath(); const r=c.getBoundingClientRect(); ctx.moveTo((e.clientX-r.left)*(c.width/r.width),(e.clientY-r.top)*(c.height/r.height)); c.onpointermove=ev=>{ ctx.lineTo((ev.clientX-r.left)*(c.width/r.width),(ev.clientY-r.top)*(c.height/r.height)); ctx.stroke() }; c.onpointerup=()=>{ c.onpointermove=null; setSigData(c.toDataURL('image/jpeg',0.6)) } }} /></>
 }
 
@@ -235,7 +236,7 @@ function AppView({ member, employee, privacy, onBack }) {
   const tabs = [{ k:'cellar', l:'📦 專屬窖藏' }, { k:'history', l:'📜 領取軌跡' }, { k:'finance', l:'🧾 財務總帳' }]
 
   return <div style={{ padding:'16px 20px', paddingBottom:80 }}>
-    <style>{`@media print { body * { visibility:hidden; } #vip-print, #vip-print * { visibility:visible; } #vip-print { position:absolute; left:0; top:0; width:100%; color:#000; background:#fff; padding:20px; font-size:12px; } }`}</style>
+    <style>{`@media print { body * { visibility:hidden; } #vip-print, #vip-print * { visibility:visible; } #vip-print { position:absolute; left:0; top:0; width:100%; color:#000; background:#fff; padding:20px; font-size:12px; } } @media (max-width:768px) { .vip-metric-val { font-size:24px !important; } .vip-tab-btn { font-size:16px !important; padding:12px 16px !important; } .vip-cigar-name { font-size:18px !important; } .vip-qty-num { font-size:34px !important; } .vip-history-card { font-size:15px !important; } }`}</style>
     {onBack && <button onClick={onBack} style={{ fontSize:12, color:C.muted, background:'none', border:`1px solid ${C.border}`, borderRadius:10, padding:'6px 14px', cursor:'pointer', marginBottom:12 }}>← 返回會員列表</button>}
 
     {/* Alert banners */}
@@ -278,9 +279,9 @@ function AppView({ member, employee, privacy, onBack }) {
             <div style={{ flex:1 }}>
               <div style={{ fontSize:15, fontWeight:600 }}>{i.product_name} {age && <span style={{ fontSize:10, color:age.c }}>{age.l}</span>}</div>
               <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>存放於：NO.{i.cabinet_no} 櫃位 ｜ 單價：{fc(i.unit_price)} ｜ <span style={{ color:C.gold }}>總值：{$$(i.qty*i.unit_price)}</span></div>
-              {isLow && <div style={{ fontSize:11, color:C.danger, marginTop:4 }}>⚠️ 庫存偏低，建議補貨 <button style={{ fontSize:10, padding:'2px 8px', borderRadius:6, background:`${C.danger}15`, color:C.danger, border:`1px solid ${C.danger}30`, cursor:'pointer', marginLeft:4 }}>🛎️ 聯絡管家補貨</button></div>}
+              {isLow && <div style={{ fontSize:11, color:C.danger, marginTop:4 }}>⚠️ 庫存偏低，建議補貨 <button onClick={() => window.open('https://line.me/R/ti/p/@374lpmfi','_blank')} style={{ fontSize:10, padding:'2px 8px', borderRadius:6, background:`${C.danger}15`, color:C.danger, border:`1px solid ${C.danger}30`, cursor:'pointer', marginLeft:4 }}>🛎️ 聯絡管家補貨</button></div>}
               {employee && <button onClick={() => setConsumeItem(i)} style={{ marginTop:6, fontSize:11, padding:'5px 14px', borderRadius:8, background:`${C.gold}15`, color:C.gold, border:`1px solid ${C.gold}30`, cursor:'pointer' }}>✍️ 現場領取</button>}
-              {!isLow && !employee && <button style={{ marginTop:6, fontSize:11, padding:'5px 14px', borderRadius:8, background:`${C.success}15`, color:C.success, border:`1px solid ${C.success}30`, cursor:'pointer' }}>🛎️ 預約管家準備</button>}
+              {!isLow && !employee && <button onClick={() => window.open('https://line.me/R/ti/p/@374lpmfi','_blank')} style={{ marginTop:6, fontSize:11, padding:'5px 14px', borderRadius:8, background:`${C.success}15`, color:C.success, border:`1px solid ${C.success}30`, cursor:'pointer' }}>🛎️ 預約管家準備</button>}
             </div>
             <div style={{ textAlign:'center', minWidth:60 }}><div style={{ fontSize:28, fontWeight:800, color:C.text }}>{i.qty}</div><div style={{ fontSize:9, color:C.muted }}>剩餘庫存</div></div>
           </div>
@@ -308,7 +309,7 @@ function AppView({ member, employee, privacy, onBack }) {
         </div>
         <div style={{ borderTop:`1px solid ${C.border}`, marginTop:10, paddingTop:8 }}>
           <div style={{ fontSize:10, color:C.muted, marginBottom:4 }}>客戶親筆畫押</div>
-          {p.sig ? <img src={p.sig} alt="簽名" style={{ maxWidth:200, width:'100%', borderRadius:8, border:`1px solid ${C.border}` }} /> : <span style={{ fontSize:10, color:C.muted }}>(無簽名紀錄)</span>}
+          {p.sig ? <img src={p.sig} alt="簽名" style={{ maxWidth:200, width:'100%', borderRadius:8, border:`1px solid ${C.border}`, background:'#fff', padding:4 }} /> : <span style={{ fontSize:10, color:C.muted }}>(無簽名紀錄)</span>}
         </div>
         {p.notes && <div style={{ fontSize:10, color:C.muted, marginTop:6 }}>備註：{p.notes}</div>}
       </div> })}
@@ -474,8 +475,6 @@ function NewOrderModal({ employee, productCatalog, onClose, onDone }) {
   const [payMethod, setPayMethod] = useState('現金'); const [paidAmt, setPaidAmt] = useState(''); const [note, setNote] = useState(''); const [srcTags, setSrcTags] = useState([])
   const sigRef = useRef(null); const [sigData, setSigData] = useState(null); const [busy, setBusy] = useState(false)
   const receiptRef = useRef(null); const [receiptData, setReceiptData] = useState(null); const [receiptPreview, setReceiptPreview] = useState(null)
-  const [dd, setDd] = useState({ vis:false, top:0, left:0, w:0, matches:[], ri:0 })
-
   const total = orderType === '客戶寄存' ? 0 : items.reduce((s,i) => s + (+i.price||0) * ((+i.qtyCab||0)+(+i.qtyOut||0)+(+i.qtySite||0)+(+i.qtyPend||0)), 0)
 
   async function submit() {
@@ -497,14 +496,16 @@ function NewOrderModal({ employee, productCatalog, onClose, onDone }) {
   const upd = (idx,k,v) => { const a=[...items]; a[idx][k]=v; setItems(a) }
 
   return <Modal onClose={onClose} title="＋ 新增訂單 / 開櫃" wide>
+    {/* Product datalist */}
+    <datalist id="vip-prod-list">{productList.map(p => <option key={p.id} value={p.name} />)}</datalist>
     <div style={{ display:'flex', gap:8, marginBottom:12 }}>
-      <Inp value={vipId} onChange={e => setVipId(e.target.value)} type="tel" placeholder="會員編號 *" style={{ flex:1, marginBottom:0 }} />
+      <Inp value={vipId} onChange={async e => { setVipId(e.target.value); if(e.target.value.length>=2) { const { data } = await supabase.from('customers').select('id,name,phone').ilike('name','%'+e.target.value+'%').limit(5); if(data?.length===1) setVipName(data[0].name) } }} type="tel" placeholder="會員編號 *" style={{ flex:1, marginBottom:0 }} />
       <Inp value={vipName} onChange={e => setVipName(e.target.value)} placeholder="姓名（新客戶填）" style={{ flex:1, marginBottom:0 }} />
     </div>
     <div style={{ display:'flex', gap:6, marginBottom:12 }}>{['現貨購買','預購訂貨','客戶寄存'].map(t => <button key={t} onClick={() => setOrderType(t)} style={{ flex:1, padding:8, borderRadius:10, fontSize:12, fontWeight:600, cursor:'pointer', background:orderType===t?C.gold:'transparent', color:orderType===t?'#000':C.text, border:`1px solid ${orderType===t?C.gold:C.border}` }}>{t}</button>)}</div>
 
     {items.map((item,idx) => <div key={idx} style={{ background:'#0d0b09', borderRadius:14, padding:12, marginBottom:10, border:`1px solid ${C.border}` }}>
-      <div style={{ display:'flex', gap:6, marginBottom:8 }}><Inp autoComplete="off" placeholder="搜尋雪茄品名或品牌 *" value={item.name} onChange={e => { upd(idx,'name',e.target.value); const r=e.target.getBoundingClientRect(); const q=e.target.value.toLowerCase(); const m=productList.filter(p=>(p.brand||'').toLowerCase().includes(q)||(p.name||'').toLowerCase().includes(q)).slice(0,30); setDd({ vis:m.length>0&&q.length>=1, top:r.bottom, left:r.left, w:r.width, matches:m, ri:idx }) }} onFocus={e => { const r=e.target.getBoundingClientRect(); const q=item.name.toLowerCase(); const m=q.length>=1?productList.filter(p=>(p.brand||'').toLowerCase().includes(q)||(p.name||'').toLowerCase().includes(q)).slice(0,30):[]; setDd({ vis:m.length>0, top:r.bottom, left:r.left, w:r.width, matches:m, ri:idx }) }} onBlur={() => setTimeout(()=>setDd(d=>({...d,vis:false})),200)} style={{ flex:2, marginBottom:0 }} /><Inp type="number" placeholder="單價 $" value={item.price} onChange={e => upd(idx,'price',e.target.value)} style={{ flex:1, marginBottom:0 }} />{items.length>1 && <button onClick={() => setItems(items.filter((_,i)=>i!==idx))} style={{ color:C.danger, background:'none', border:'none', cursor:'pointer', fontSize:16 }}>✕</button>}</div>
+      <div style={{ display:'flex', gap:6, marginBottom:8 }}><Inp list="vip-prod-list" autoComplete="off" placeholder="搜尋雪茄品名或品牌 *" value={item.name} onChange={e => { const val=e.target.value; upd(idx,'name',val); const found=productList.find(p=>p.name===val); if(found) upd(idx,'price',String(found.price_vip||found.price_a||0)) }} style={{ flex:2, marginBottom:0 }} /><Inp type="number" placeholder="單價 $" value={item.price} onChange={e => upd(idx,'price',e.target.value)} style={{ flex:1, marginBottom:0 }} />{items.length>1 && <button onClick={() => setItems(items.filter((_,i)=>i!==idx))} style={{ color:C.danger, background:'none', border:'none', cursor:'pointer', fontSize:16 }}>✕</button>}</div>
       <div style={{ fontSize:10, color:C.muted, marginBottom:4 }}>購買支數 <b style={{ color:C.text }}>{(+item.qtyCab||0)+(+item.qtyOut||0)+(+item.qtySite||0)+(+item.qtyPend||0)}</b></div>
       <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:6, marginBottom:6 }}>{[['qtyCab','📦 入櫃'],['qtyOut','🛍️ 外帶'],['qtySite','🚬 現場'],['qtyPend','✈️ 未到貨']].map(([k,l]) => <div key={k}><div style={{ fontSize:9, color:C.muted, marginBottom:2 }}>{l}</div><input type="number" min={0} value={item[k]} onChange={e => upd(idx,k,+e.target.value||0)} style={{ width:'100%', fontSize:13, padding:'8px 4px', background:'#1a1714', border:`1px solid ${C.border}`, borderRadius:8, color:C.text, textAlign:'center' }} /></div>)}</div>
       {(+item.qtyCab||0) > 0 && <Inp placeholder="入櫃 → 櫃位號碼" value={item.cab} onChange={e => upd(idx,'cab',e.target.value)} style={{ borderColor:`${C.gold}50`, color:C.gold, marginBottom:4 }} />}
@@ -525,13 +526,6 @@ function NewOrderModal({ employee, productCatalog, onClose, onDone }) {
     <textarea placeholder="指定年份、禮盒包裝、特殊需求..." value={note} onChange={e => setNote(e.target.value)} rows={2} style={{ width:'100%', fontSize:12, padding:'10px 12px', background:'#1a1714', border:`1px solid ${C.border}`, borderRadius:12, color:C.text, resize:'vertical', marginBottom:12, boxSizing:'border-box' }} />
     <SigCanvas sigRef={sigRef} sigData={sigData} setSigData={setSigData} />
     <GoldBtn onClick={submit} disabled={busy} style={{ width:'100%', opacity:busy?.5:1 }}>{busy ? '建立中...' : '確認建立訂單'}</GoldBtn>
-    {/* Dropdown via createPortal — renders on document.body, escapes all overflow */}
-    {dd.vis && dd.matches.length > 0 && createPortal(
-      <div onMouseDown={e => e.preventDefault()} style={{ position:'fixed', top:dd.top+2, left:dd.left, width:dd.w, background:'#222', border:'1px solid #555', borderRadius:10, maxHeight:280, overflowY:'auto', zIndex:99999, boxShadow:'0 8px 32px rgba(0,0,0,.6)' }}>
-        {dd.matches.map(p => { const vp = p.price_vip || p.price_a || 0; return <div key={p.id} onClick={() => { upd(dd.ri,'name',p.name); upd(dd.ri,'price',String(vp)); setDd(d=>({...d,vis:false})) }} style={{ padding:'10px 14px', cursor:'pointer', fontSize:13, color:'#ddd', borderBottom:'1px solid #2a2a2a', display:'flex', justifyContent:'space-between', alignItems:'center' }} onMouseEnter={e => e.currentTarget.style.background='#333'} onMouseLeave={e => e.currentTarget.style.background='transparent'}><span><span style={{ color:C.gold, marginRight:6 }}>{p.brand}</span>{p.name}</span><span style={{ color:C.gold, fontSize:12, flexShrink:0, marginLeft:8 }}>{fc(vp)}</span></div> })}
-      </div>,
-      document.body
-    )}
   </Modal>
 }
 
