@@ -13,7 +13,7 @@ const NAV_ITEMS = [
   { path: '/pos-app/inventory', icon: Package, label: '庫存' },
 ]
 
-export default function PosLayout({ session, shift, summary, cartCount, onLogout, onSwitchOperator, children }) {
+export default function PosLayout({ session, shift, summary, cartCount, heldCount, onLogout, onSwitchOperator, onShowHeld, onShowOrders, children }) {
   const navigate = useNavigate()
   const location = useLocation()
   const [showSwitchConfirm, setShowSwitchConfirm] = useState(false)
@@ -76,6 +76,13 @@ export default function PosLayout({ session, shift, summary, cartCount, onLogout
           </span>
         )}
 
+        {/* Held orders badge */}
+        {heldCount > 0 && (
+          <button onClick={onShowHeld} style={{ fontSize: 10, background: 'rgba(245,158,11,.12)', color: '#f59e0b', padding: '3px 10px', borderRadius: 10, fontWeight: 600, border: '1px solid rgba(245,158,11,.2)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+            ⏸ 掛單 <span style={{ background: '#e74c3c', color: '#fff', borderRadius: '50%', width: 16, height: 16, fontSize: 9, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{heldCount}</span>
+          </button>
+        )}
+
         {/* Spacer */}
         <div style={{ flex: 1 }} />
 
@@ -84,6 +91,9 @@ export default function PosLayout({ session, shift, summary, cartCount, onLogout
           <span>${(summary?.revenue?.total || 0).toLocaleString()}</span>
           <span>{summary?.orders || 0}單</span>
         </div>
+
+        {/* Today orders */}
+        <button onClick={onShowOrders} style={{ background: 'none', border: '1px solid #2a2520', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3, color: '#8a7e6e', fontSize: 10 }}>📋 訂單</button>
 
         {/* Operator */}
         <div style={{

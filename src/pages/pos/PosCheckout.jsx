@@ -19,7 +19,7 @@ import {
   DRINK_CATS, calcMemberDiscount, scoreSearch, sortProducts, todayTaipei,
 } from './posUtils'
 
-export default function PosCheckout({ session, shift, onShiftChange, onCartCountChange }) {
+export default function PosCheckout({ session, shift, onShiftChange, onCartCountChange, onHeldCountChange, showHeldFromLayout, onHeldFromLayoutDone, showOrdersFromLayout, onOrdersFromLayoutDone }) {
   // Responsive
   const [winW, setWinW] = useState(window.innerWidth)
   useEffect(() => {
@@ -28,7 +28,7 @@ export default function PosCheckout({ session, shift, onShiftChange, onCartCount
     return () => window.removeEventListener('resize', h)
   }, [])
   const isMobile = winW < 768
-  const isTablet = winW >= 768 && winW < 1024
+  const isTablet = winW >= 768 && winW < 1280
 
   // Data
   const [products, setProducts] = useState([])
@@ -85,6 +85,16 @@ export default function PosCheckout({ session, shift, onShiftChange, onCartCount
   const [editPriceReason, setEditPriceReason] = useState('')
   const canOverridePrice = session?.is_admin === true
 
+  // Hold orders
+  const [heldOrders, setHeldOrders] = useState([])
+  const [showHeldModal, setShowHeldModal] = useState(false)
+  // Today orders
+  const [todayOrders, setTodayOrders] = useState([])
+  const [showOrdersModal, setShowOrdersModal] = useState(false)
+  // Void
+  const [voidingOrder, setVoidingOrder] = useState(null)
+  const [voidReason, setVoidReason] = useState('')
+
   // ── Load data ──
   const loadAll = useCallback(async () => {
     setLoading(true)
@@ -116,6 +126,48 @@ export default function PosCheckout({ session, shift, onShiftChange, onCartCount
 
   useEffect(() => { loadAll() }, [loadAll])
   useEffect(() => { onCartCountChange?.(cart.reduce((s, c) => s + c.qty, 0)) }, [cart, onCartCountChange])
+
+  // ── Hold Orders ──
+  async function loadHeldOrders() {
+    const { data } = await supabase.from('pos_held_orders').select('*').eq('status', 'held').order('created_at', { ascending: false })
+    setHeldOrders(data || []); onHeldCountChange?.(data?.length || 0)
+  }
+  useEffect(() => { loadHeldOrders() }, [])
+  useEffect(() => { if (showHeldFromLayout) { loadHeldOrders(); setShowHeldModal(true); onHeldFromLayoutDone?.() } }, [showHeldFromLayout])
+  useEffect(() => { if (showOrdersFromLayout) { loadTodayOrders(); setShowOrdersModal(true); onOrdersFromLayoutDone?.() } }, [showOrdersFromLayout])
+
+  async function holdCurrentOrder() {
+    if (!cart.length) return alert('購物車是空的')
+    const { error } = await supabase.from('pos_held_orders').insert({ table_no: tableNo || null, customer_id: customer?.id || null, customer_name: customer?.name || null, customer_tier: customer?.membership_tier || null, attributed_to: customer?.belongs_to || attributedTo, items_json: cart.map(c => ({ id: c.id, name: c.name, brand: c.brand, price: c.price, _originalPrice: c._originalPrice, qty: c.qty, _cat: c._cat, inv_master_id: c.inv_master_id, note: c.note, _overridden: c._overridden })), cart_count: cartCount, subtotal, discount_pct: discountPct, service_fee_pct: serviceFeePct, notes: orderNote || null, held_by: session?.operator_id || 'UNKNOWN', held_by_name: session?.name || 'UNKNOWN' })
+    if (error) return alert('暫存失敗: ' + error.message)
+    clearAll(); loadHeldOrders(); alert('✅ 已掛單暫存')
+  }
+
+  async function resumeHeldOrder(held) {
+    setCart((held.items_json || []).map(c => ({ ...c, price: c.price || 0, qty: c.qty || 1 })))
+    setTableNo(held.table_no || '')
+    if (held.customer_id && held.customer_name) { setCustomer({ id: held.customer_id, name: held.customer_name, membership_tier: held.customer_tier, belongs_to: held.attributed_to }); setCustomerTier(tiers.find(t => t.id === held.customer_tier) || null) }
+    setAttributedTo(held.attributed_to || '店內'); setDiscountPct(held.discount_pct || 0); setServiceFeePct(held.service_fee_pct || 0); setOrderNote(held.notes || '')
+    await supabase.from('pos_held_orders').update({ status: 'resumed', resumed_by: session?.operator_id, resumed_at: new Date().toISOString() }).eq('id', held.id)
+    loadHeldOrders(); setShowHeldModal(false); setShowMobileCart(false)
+  }
+
+  async function cancelHeldOrder(held) { if (!confirm('確定取消此掛單？')) return; await supabase.from('pos_held_orders').update({ status: 'cancelled' }).eq('id', held.id); loadHeldOrders() }
+
+  // ── Today Orders ──
+  async function loadTodayOrders() {
+    const td = todayTaipei()
+    const { data } = await supabase.from('unified_orders').select('*').in('channel', ['store', 'pos-v2']).gte('created_at', td + 'T00:00:00').lte('created_at', td + 'T23:59:59').order('created_at', { ascending: false })
+    setTodayOrders(data || [])
+  }
+
+  // ── Void ──
+  async function doVoidOrder() {
+    if (!voidingOrder || !voidReason.trim()) return alert('請輸入作廢原因')
+    const { data, error } = await supabase.rpc('pos_void_order', { p_order_no: voidingOrder.order_no, p_admin_id: session?.operator_id, p_admin_name: session?.name, p_reason: voidReason.trim() })
+    if (error || !data?.success) return alert('作廢失敗: ' + (data?.error || error?.message))
+    alert('✅ ' + data.message); setVoidingOrder(null); setVoidReason(''); loadTodayOrders(); loadAll()
+  }
 
   // ── Customer search ──
   async function searchCustomers(q) {
@@ -241,7 +293,7 @@ export default function PosCheckout({ session, shift, onShiftChange, onCartCount
 
       setUpgradeInfo(upg)
       setLastOrder({ ...data, items: cart, payMethod, total, memberDiscount: memberDiscount.discount, paid: payMethod === 'cash' ? +payAmount : total, change: data.change ?? change, customerName: customer?.name })
-      clearAll(); setPayAmount(''); setShowCheckout(false); setShowMobileCart(false); loadAll()
+      clearAll(); setPayAmount(''); setShowCheckout(false); setShowMobileCart(false); loadAll(); loadHeldOrders()
     } catch (e) { alert('結帳失敗: ' + e.message) } finally { setSubmitting(false) }
   }
 
@@ -291,9 +343,10 @@ export default function PosCheckout({ session, shift, onShiftChange, onCartCount
       {manualDiscountAmt > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#f59e0b' }}><span>折扣 {discountPct}%</span><span>-${manualDiscountAmt.toLocaleString()}</span></div>}
       {serviceFeeAmt > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#8a7e6e' }}><span>服務費</span><span>+${serviceFeeAmt.toLocaleString()}</span></div>}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', margin: '2px 0' }}><span style={{ fontSize: 16, fontWeight: 800, color: '#c9a84c' }}>應收</span><span style={{ fontSize: 24, fontWeight: 800, color: '#c9a84c', fontFamily: 'var(--font-mono)' }}>${total.toLocaleString()}</span></div>
-      <button onClick={() => { if (cart.length) setShowCheckout(true) }} disabled={!cart.length} style={{ width: '100%', padding: '10px 0', fontSize: 16, fontWeight: 700, cursor: cart.length ? 'pointer' : 'not-allowed', background: cart.length ? '#c9a84c' : '#2a2520', border: 'none', borderRadius: 8, color: cart.length ? '#0d0b09' : '#8a7e6e', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 4 }}><CreditCard size={16} /> 結帳 ${total.toLocaleString()}</button>
+      <button onClick={() => { if (cart.length) setShowCheckout(true) }} disabled={!cart.length} style={{ width: '100%', padding: isTablet ? '14px 0' : '10px 0', fontSize: isTablet ? 18 : 16, fontWeight: 700, cursor: cart.length ? 'pointer' : 'not-allowed', background: cart.length ? '#c9a84c' : '#2a2520', border: 'none', borderRadius: 8, color: cart.length ? '#0d0b09' : '#8a7e6e', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 4 }}><CreditCard size={16} /> 結帳 ${total.toLocaleString()}</button>
       <div style={{ display: 'flex', gap: 6 }}>
-        <button onClick={() => alert('暫存功能開發中')} style={{ flex: 1, padding: '6px 0', fontSize: 11, background: '#1a1714', color: '#c9a84c', border: '1px solid #2a2520', borderRadius: 6, cursor: 'pointer' }}>暫存</button>
+        <button onClick={holdCurrentOrder} style={{ flex: 1, padding: '6px 0', fontSize: 11, background: '#1a1714', color: '#c9a84c', border: '1px solid #2a2520', borderRadius: 6, cursor: 'pointer' }}>暫存</button>
+        <button onClick={() => { loadHeldOrders(); setShowHeldModal(true) }} style={{ flex: 1, padding: '6px 0', fontSize: 11, background: '#1a1714', color: heldOrders.length ? '#f59e0b' : '#c9a84c', border: '1px solid #2a2520', borderRadius: 6, cursor: 'pointer', position: 'relative' }}>掛單{heldOrders.length > 0 && <span style={{ position: 'absolute', top: -6, right: -4, background: '#e74c3c', color: '#fff', borderRadius: '50%', width: 16, height: 16, fontSize: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{heldOrders.length}</span>}</button>
         <button onClick={clearAll} style={{ flex: 1, padding: '6px 0', fontSize: 11, background: '#1a1714', color: '#e74c3c', border: '1px solid #2a2520', borderRadius: 6, cursor: 'pointer' }}>清除</button>
       </div>
     </>
@@ -319,9 +372,9 @@ export default function PosCheckout({ session, shift, onShiftChange, onCartCount
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <button onClick={() => updateQty(c.id, -1)} style={{ width: 24, height: 24, borderRadius: 6, border: '1px solid #2a2520', background: '#0d0b09', color: '#e8dcc8', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Minus size={11} /></button>
+              <button onClick={() => updateQty(c.id, -1)} style={{ width: isTablet ? 32 : 24, height: isTablet ? 32 : 24, borderRadius: 6, border: '1px solid #2a2520', background: '#0d0b09', color: '#e8dcc8', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Minus size={11} /></button>
               <span style={{ width: 22, textAlign: 'center', fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-mono)', color: '#e8dcc8' }}>{c.qty}</span>
-              <button onClick={() => updateQty(c.id, 1)} style={{ width: 24, height: 24, borderRadius: 6, border: '1px solid rgba(201,168,76,.3)', background: 'rgba(201,168,76,.1)', color: '#c9a84c', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Plus size={11} /></button>
+              <button onClick={() => updateQty(c.id, 1)} style={{ width: isTablet ? 32 : 24, height: isTablet ? 32 : 24, borderRadius: 6, border: '1px solid rgba(201,168,76,.3)', background: 'rgba(201,168,76,.1)', color: '#c9a84c', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Plus size={11} /></button>
             </div>
             <span style={{ width: 54, textAlign: 'right', fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-mono)', color: '#c9a84c' }}>${(c.price * c.qty).toLocaleString()}</span>
             <button onClick={() => removeItem(c.id)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', padding: 2 }}><Trash2 size={13} /></button>
@@ -385,7 +438,7 @@ export default function PosCheckout({ session, shift, onShiftChange, onCartCount
         <div style={{ position: 'relative', flex: 1, minWidth: 80 }}>
           <Search size={13} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: '#8a7e6e' }} />
           <input placeholder="搜尋品牌 / 品名 / SKU…" value={search} onChange={e => setSearch(e.target.value)}
-            style={{ width: '100%', fontSize: 12, padding: '5px 6px 5px 28px', background: '#0d0b09', border: '1px solid #2a2520', borderRadius: 8, color: '#e8dcc8' }} />
+            style={{ width: '100%', fontSize: 12, padding: isTablet ? '8px 8px 8px 32px' : '5px 6px 5px 28px', height: isTablet ? 44 : undefined, background: '#0d0b09', border: '1px solid #2a2520', borderRadius: 8, color: '#e8dcc8' }} />
         </div>
         <select value={sortBy} onChange={e => setSortBy(e.target.value)} style={{ fontSize: 10, padding: '5px 4px', background: '#0d0b09', border: '1px solid #2a2520', borderRadius: 6, color: '#e8dcc8' }}>
           {SORTS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
@@ -405,19 +458,19 @@ export default function PosCheckout({ session, shift, onShiftChange, onCartCount
           <div style={{ display: 'flex', gap: 2, padding: '3px 8px', overflowX: 'auto', flexShrink: 0, borderBottom: '1px solid #2a2520' }}>
             {CATEGORIES.map(cat => (
               <button key={cat.key} onClick={() => setActiveCategory(cat.key)}
-                style={{ padding: '2px 10px', borderRadius: 12, fontSize: isMobile ? 10 : 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', background: activeCategory === cat.key ? 'rgba(201,168,76,.15)' : 'transparent', color: activeCategory === cat.key ? '#c9a84c' : '#8a7e6e', border: activeCategory === cat.key ? '1px solid rgba(201,168,76,.3)' : '1px solid transparent' }}>
+                style={{ padding: isTablet ? '6px 14px' : '2px 10px', borderRadius: 12, fontSize: isTablet ? 13 : (isMobile ? 10 : 11), fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', background: activeCategory === cat.key ? 'rgba(201,168,76,.15)' : 'transparent', color: activeCategory === cat.key ? '#c9a84c' : '#8a7e6e', border: activeCategory === cat.key ? '1px solid rgba(201,168,76,.3)' : '1px solid transparent' }}>
                 {cat.label}
               </button>
             ))}
           </div>
           <div style={{ flex: 1, overflow: 'auto', padding: 8 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: gridCols, gap: 6 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: gridCols, gap: isTablet ? 10 : 6 }}>
               {filtered.map(p => <PCard key={p.id} p={p} />)}
             </div>
             {!filtered.length && <div style={{ textAlign: 'center', padding: 40, color: '#8a7e6e' }}>無符合商品</div>}
           </div>
           <div style={{ padding: '4px 8px', borderTop: '1px solid #2a2520', display: 'flex', gap: 3, justifyContent: 'center', flexShrink: 0 }}>
-            {QTY_PRESETS.map(n => <button key={n} onClick={() => setDetailQty(n)} style={{ padding: '3px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', background: detailQty === n ? 'rgba(201,168,76,.15)' : '#0d0b09', color: detailQty === n ? '#c9a84c' : '#8a7e6e', border: detailQty === n ? '1px solid rgba(201,168,76,.3)' : '1px solid #2a2520' }}>×{n}</button>)}
+            {QTY_PRESETS.map(n => <button key={n} onClick={() => setDetailQty(n)} style={{ padding: isTablet ? '8px 16px' : '3px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', background: detailQty === n ? 'rgba(201,168,76,.15)' : '#0d0b09', color: detailQty === n ? '#c9a84c' : '#8a7e6e', border: detailQty === n ? '1px solid rgba(201,168,76,.3)' : '1px solid #2a2520' }}>×{n}</button>)}
           </div>
         </div>
 
@@ -604,6 +657,62 @@ export default function PosCheckout({ session, shift, onShiftChange, onCartCount
       )}
 
       {/* Shift modal */}
+      {/* ══ HELD ORDERS MODAL ══ */}
+      {showHeldModal && <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,.85)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setShowHeldModal(false)}>
+        <div style={{ background: '#1a1714', border: '1px solid rgba(201,168,76,.3)', borderRadius: 20, padding: 20, width: '100%', maxWidth: 500, maxHeight: '80vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexShrink: 0 }}><span style={{ fontSize: 16, fontWeight: 700, color: '#f59e0b' }}>⏸ 掛單列表 ({heldOrders.length})</span><button onClick={() => setShowHeldModal(false)} style={{ background: 'none', border: 'none', color: '#8a7e6e', cursor: 'pointer' }}><X size={20} /></button></div>
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            {!heldOrders.length ? <div style={{ textAlign: 'center', padding: 40, color: '#8a7e6e' }}>目前沒有掛單</div> : heldOrders.map(h => (
+              <div key={h.id} style={{ background: '#0d0b09', borderRadius: 12, padding: 12, marginBottom: 8, border: '1px solid #2a2520' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}><span style={{ fontSize: 13, fontWeight: 600, color: '#e8dcc8' }}>{h.table_no || '無桌位'} {h.customer_name ? `· ${h.customer_name}` : ''}</span><span style={{ fontSize: 11, color: '#8a7e6e' }}>{new Date(h.created_at).toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit' })}</span></div>
+                <div style={{ fontSize: 11, color: '#8a7e6e', marginBottom: 6 }}>{(h.items_json || []).map(i => `${i.name}×${i.qty}`).join('、')}</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: '#c9a84c', fontFamily: 'var(--font-mono)' }}>${(h.subtotal || 0).toLocaleString()}</span>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={() => cancelHeldOrder(h)} style={{ padding: isTablet ? '8px 14px' : '6px 12px', fontSize: 11, background: 'rgba(231,76,60,.1)', color: '#e74c3c', border: '1px solid rgba(231,76,60,.3)', borderRadius: 8, cursor: 'pointer' }}>取消</button>
+                    <button onClick={() => resumeHeldOrder(h)} style={{ padding: isTablet ? '8px 18px' : '6px 16px', fontSize: 12, fontWeight: 700, background: '#c9a84c', color: '#000', border: 'none', borderRadius: 8, cursor: 'pointer' }}>恢復結帳</button>
+                  </div>
+                </div>
+                <div style={{ fontSize: 10, color: '#8a7e6e', marginTop: 4 }}>暫存：{h.held_by_name}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>}
+
+      {/* ══ TODAY ORDERS MODAL ══ */}
+      {showOrdersModal && <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,.85)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => { setShowOrdersModal(false); setVoidingOrder(null) }}>
+        <div style={{ background: '#1a1714', border: '1px solid rgba(201,168,76,.3)', borderRadius: 20, padding: 20, width: '100%', maxWidth: 560, maxHeight: '85vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexShrink: 0 }}><span style={{ fontSize: 16, fontWeight: 700, color: '#c9a84c' }}>📋 今日訂單 ({todayOrders.filter(o => o.status === 'completed').length}筆)</span><button onClick={() => { setShowOrdersModal(false); setVoidingOrder(null) }} style={{ background: 'none', border: 'none', color: '#8a7e6e', cursor: 'pointer' }}><X size={20} /></button></div>
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            {!todayOrders.length ? <div style={{ textAlign: 'center', padding: 40, color: '#8a7e6e' }}>今日尚無訂單</div> : todayOrders.map(o => (
+              <div key={o.id} style={{ background: '#0d0b09', borderRadius: 12, padding: 12, marginBottom: 8, border: `1px solid ${o.status === 'voided' ? 'rgba(231,76,60,.3)' : '#2a2520'}`, opacity: o.status === 'voided' ? 0.5 : 1 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}><span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: '#c9a84c' }}>{o.order_no}</span><span style={{ fontSize: 10, color: '#8a7e6e' }}>{new Date(o.created_at).toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit' })}</span></div>
+                <div style={{ fontSize: 12, color: '#e8dcc8', marginBottom: 4 }}>{o.items_text || '—'}</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <span style={{ fontSize: 16, fontWeight: 700, color: o.status === 'voided' ? '#e74c3c' : '#c9a84c', fontFamily: 'var(--font-mono)', textDecoration: o.status === 'voided' ? 'line-through' : 'none' }}>${(o.order_total || 0).toLocaleString()}</span>
+                    <span style={{ fontSize: 10, color: '#8a7e6e' }}>{PAY_METHODS.find(m => m.key === o.payment_method)?.label || o.payment_method}</span>
+                    {o.status === 'voided' && <span style={{ fontSize: 10, color: '#e74c3c', fontWeight: 600 }}>已作廢</span>}
+                  </div>
+                  {o.status === 'completed' && session?.is_admin && (
+                    voidingOrder?.id === o.id ? (
+                      <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                        <input placeholder="作廢原因" value={voidReason} onChange={e => setVoidReason(e.target.value)} autoFocus style={{ width: 120, fontSize: 11, padding: '4px 6px', background: '#0d0b09', border: '1px solid #e74c3c', borderRadius: 6, color: '#e8dcc8' }} onKeyDown={e => { if (e.key === 'Enter') doVoidOrder() }} />
+                        <button onClick={doVoidOrder} style={{ padding: '4px 10px', fontSize: 10, background: '#e74c3c', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 700 }}>確認作廢</button>
+                        <button onClick={() => { setVoidingOrder(null); setVoidReason('') }} style={{ padding: '4px 6px', fontSize: 10, background: 'none', color: '#8a7e6e', border: '1px solid #2a2520', borderRadius: 6, cursor: 'pointer' }}>✕</button>
+                      </div>
+                    ) : (
+                      <button onClick={() => setVoidingOrder(o)} style={{ padding: isTablet ? '6px 14px' : '4px 10px', fontSize: 10, background: 'rgba(231,76,60,.1)', color: '#e74c3c', border: '1px solid rgba(231,76,60,.3)', borderRadius: 6, cursor: 'pointer' }}>作廢</button>
+                    )
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>}
+
       {showShift && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,.85)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setShowShift(false)}>
           <div style={{ background: '#1a1714', border: '1px solid rgba(201,168,76,.3)', borderRadius: 20, padding: 24, width: '100%', maxWidth: 400 }} onClick={e => e.stopPropagation()}>

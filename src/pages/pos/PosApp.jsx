@@ -34,6 +34,9 @@ export default function PosApp() {
   const [shift, setShift] = useState(null)
   const [summary, setSummary] = useState(null)
   const [cartCount, setCartCount] = useState(0)
+  const [heldCount, setHeldCount] = useState(0)
+  const [showHeldFromLayout, setShowHeldFromLayout] = useState(false)
+  const [showOrdersFromLayout, setShowOrdersFromLayout] = useState(false)
 
   function handleLogin(sessionData) {
     const s = {
@@ -80,8 +83,11 @@ export default function PosApp() {
       shift={shift}
       summary={summary}
       cartCount={cartCount}
+      heldCount={heldCount}
       onLogout={handleLogout}
       onSwitchOperator={handleSwitchOperator}
+      onShowHeld={() => setShowHeldFromLayout(true)}
+      onShowOrders={() => setShowOrdersFromLayout(true)}
     >
       <Routes>
         <Route path="/" element={
@@ -90,6 +96,11 @@ export default function PosApp() {
             shift={shift}
             onShiftChange={handleShiftChange}
             onCartCountChange={handleCartCountChange}
+            onHeldCountChange={(count) => setHeldCount(count)}
+            showHeldFromLayout={showHeldFromLayout}
+            onHeldFromLayoutDone={() => setShowHeldFromLayout(false)}
+            showOrdersFromLayout={showOrdersFromLayout}
+            onOrdersFromLayoutDone={() => setShowOrdersFromLayout(false)}
           />
         } />
         <Route path="/inventory" element={<PosInventory />} />
