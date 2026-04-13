@@ -120,13 +120,13 @@ function LoginView({ onVipLogin, onStaffLogin }) {
     if (!vid.trim()) return setErr('請輸入 VIP 編號'); setErr(''); setBusy(true)
     try {
       // Try direct lookup first
-      const { data: m } = await supabase.from('vip_members').select('*').eq('id', vid.trim()).eq('is_active', true).maybeSingle()
+      const { data: m } = await supabase.from('customers').select('id, vip_code, name, phone, vip_password, cabinet_opened, cabinet_expires, line_id').eq('vip_code', vid.trim()).eq('enabled', true).maybeSingle()
       if (!m) { setBusy(false); return setErr('查無此 VIP 編號') }
-      if (m.password_hash) {
-        const { data } = await supabase.rpc('vip_login', { p_vip_id: vid.trim(), p_password: pwd || null })
-        if (!data?.success) { setBusy(false); if (data?.need_password) { setNeedPwd(true); return setErr('請輸入密碼') } return setErr(data?.error || '登入失敗') }
+      if (m.vip_password) {
+        if (!pwd) { setBusy(false); setNeedPwd(true); return setErr('請輸入密碼') }
+        if (pwd !== m.vip_password) { setBusy(false); return setErr('密碼錯誤') }
       }
-      onVipLogin({ id: m.id, name: m.name, vip_id: m.id, cabinet_opened: m.cabinet_opened, tier: m.tier || 'VIP' })
+      onVipLogin({ id: m.id, name: m.name, vip_id: m.vip_code, vip_code: m.vip_code, cabinet_opened: m.cabinet_opened, cabinet_expires: m.cabinet_expires, tier: 'VIP' })
     } catch (e) { setErr(e.message) }
     setBusy(false)
   }
@@ -167,14 +167,15 @@ function StaffView({ employee, onViewVip, productCatalog }) {
   async function load() {
     setLoading(true)
     const [mR, cR, oR] = await Promise.all([
-      supabase.from('vip_members').select('id, name, cabinet_opened, cabinet_expires, is_active').eq('is_active', true).order('name'),
+      supabase.from('customers').select('id, vip_code, name, phone, cabinet_opened, cabinet_expires').eq('is_vip', true).eq('enabled', true).order('name'),
       supabase.from('vip_cabinets').select('vip_id, quantity, unit_price').gt('quantity', 0),
       supabase.from('vip_orders').select('vip_id, balance, is_voided').eq('is_voided', false),
     ])
     const ml = mR.data || []; const cab = cR.data || []; const ord = oR.data || []
     setMembers(ml.map(m => {
-      const myCab = cab.filter(c => c.vip_id === m.id)
-      const myOrd = ord.filter(o => o.vip_id === m.id)
+      const vid = m.vip_code || m.id
+      const myCab = cab.filter(c => c.vip_id === vid || c.vip_id === m.id)
+      const myOrd = ord.filter(o => o.vip_id === vid || o.vip_id === m.id)
       const stockQty = myCab.reduce((s,c) => s + (c.quantity||0), 0)
       const stockVal = myCab.reduce((s,c) => s + (c.quantity||0) * (c.unit_price||0), 0)
       const lowCount = myCab.filter(c => (c.quantity||0) <= 5).length
@@ -184,7 +185,7 @@ function StaffView({ employee, onViewVip, productCatalog }) {
     }))
     setLoading(false)
   }
-  const filtered = members.filter(m => !search || (m.name||'').includes(search) || (m.id||'').includes(search))
+  const filtered = members.filter(m => !search || (m.name||'').toLowerCase().includes(search.toLowerCase()) || (m.vip_code||'').includes(search) || (m.phone||'').includes(search) || (m.id||'').includes(search))
 
   return <div style={{ padding:20, paddingBottom:80 }}>
     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
@@ -197,7 +198,7 @@ function StaffView({ employee, onViewVip, productCatalog }) {
     {filtered.map(m => <div key={m.id} onClick={() => onViewVip(m)} style={{ background:C.card, borderRadius:16, padding:16, marginBottom:10, border:`1px solid ${C.border}`, cursor:'pointer', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
       <div>
         <div style={{ fontSize:16, fontWeight:700, color:C.gold }}>{m.name}</div>
-        <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>ID: {m.id} | 窖藏 {m.stockQty} 支 | {fc(m.stockVal)}</div>
+        <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>VIP: {m.vip_code || m.id} | 窖藏 {m.stockQty} 支 | {fc(m.stockVal)}</div>
         <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:4 }}>
           {m.expDays !== null && m.expDays <= 30 && <span style={{ fontSize:9, padding:'2px 8px', borderRadius:10, background:m.expDays <= 0 ? `${C.danger}20` : `${C.warning}20`, color:m.expDays <= 0 ? C.danger : C.warning, fontWeight:600 }}>{m.expDays <= 0 ? '🚨 已到期' : `⏰ ${m.expDays}天到期`}</span>}
           {m.lowCount > 0 && <span style={{ fontSize:9, padding:'2px 8px', borderRadius:10, background:`${C.warning}20`, color:C.warning, fontWeight:600 }}>⚠️ {m.lowCount}品項低庫存</span>}
@@ -557,13 +558,13 @@ function AdminView({ employee, onViewVip }) {
   async function load() {
     setLoading(true)
     const [mR, cR, oR] = await Promise.all([
-      supabase.from('vip_members').select('id, name, phone, cabinet_opened, cabinet_expires, is_active').eq('is_active', true).order('name'),
+      supabase.from('customers').select('id, vip_code, name, phone, cabinet_opened, cabinet_expires').eq('is_vip', true).eq('enabled', true).order('name'),
       supabase.from('vip_cabinets').select('vip_id, quantity, unit_price').gt('quantity', 0),
       supabase.from('vip_orders').select('vip_id, order_total, balance, is_voided').eq('is_voided', false),
     ])
     const ml = mR.data||[]; const cab = cR.data||[]; const ord = oR.data||[]
     setMembers(ml.map(m => {
-      const mc = cab.filter(c => c.vip_id === m.id); const mo = ord.filter(o => o.vip_id === m.id && !o.is_voided)
+      const vid = m.vip_code || m.id; const mc = cab.filter(c => c.vip_id === vid || c.vip_id === m.id); const mo = ord.filter(o => (o.vip_id === vid || o.vip_id === m.id) && !o.is_voided)
       return { ...m, stockQty:mc.reduce((s,c)=>s+(c.quantity||0),0), cellarVal:mc.reduce((s,c)=>s+(c.quantity||0)*(c.unit_price||0),0), totalSpent:mo.reduce((s,o)=>s+(o.order_total||0),0), totalPaid:mo.reduce((s,o)=>s+((o.order_total||0)-(o.balance||0)),0), unpaid:mo.reduce((s,o)=>s+(o.balance||0),0) }
     }))
     setLoading(false)
@@ -589,14 +590,14 @@ function AdminView({ employee, onViewVip }) {
     {ur.length > 0 && <div style={{ marginBottom:20 }}>
       <div style={{ fontSize:15, fontWeight:700, color:C.danger, marginBottom:8 }}>💰 欠款客戶列表</div>
       {ur.map(v => <div key={v.id} onClick={() => onViewVip(v)} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 16px', background:C.card, borderRadius:12, marginBottom:6, border:`1px solid ${C.border}`, cursor:'pointer' }}>
-        <div><span style={{ fontSize:14, fontWeight:600 }}>{v.name}</span><span style={{ fontSize:10, color:C.muted, marginLeft:8 }}>ID:{v.id} · 窖藏{v.stockQty}支</span></div>
+        <div><span style={{ fontSize:14, fontWeight:600 }}>{v.name}</span><span style={{ fontSize:10, color:C.muted, marginLeft:8 }}>VIP:{v.vip_code||v.id} · 窖藏{v.stockQty}支</span></div>
         <span style={{ fontSize:16, fontWeight:700, color:C.danger, fontFamily:'var(--font-mono)' }}>{fc(v.unpaid)}</span>
       </div>)}
     </div>}
     <div style={{ fontSize:15, fontWeight:700, color:C.gold, marginBottom:8 }}>全部會員 ({tv})</div>
     <Inp value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 搜尋" style={{ marginBottom:12 }} />
     {fil.map(v => <div key={v.id} onClick={() => onViewVip(v)} style={{ background:C.card, borderRadius:14, padding:14, marginBottom:8, border:`1px solid ${C.border}`, cursor:'pointer', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-      <div><div style={{ fontSize:14, fontWeight:600 }}>{v.name}</div><div style={{ fontSize:10, color:C.muted }}>{v.id}{v.phone?` · ${v.phone}`:''} · {v.stockQty}支 · {fc(v.cellarVal)}</div></div>
+      <div><div style={{ fontSize:14, fontWeight:600 }}>{v.name}</div><div style={{ fontSize:10, color:C.muted }}>{v.vip_code||v.id}{v.phone?` · ${v.phone}`:''} · {v.stockQty}支 · {fc(v.cellarVal)}</div></div>
       <div style={{ textAlign:'right' }}><div style={{ fontSize:14, fontWeight:700, color:C.gold }}>{fc(v.totalSpent)}</div>{v.unpaid>0&&<div style={{ fontSize:10, color:C.danger }}>欠 {fc(v.unpaid)}</div>}</div>
     </div>)}
     <div style={{ textAlign:'center', fontSize:8, color:C.muted, marginTop:30 }}>W CIGAR BAR VIP 窖藏管理系統 ｜ Powered by CigarPrince™<br/>© 2025-2026 蔡勝濬（雪茄王子）版權所有</div>
