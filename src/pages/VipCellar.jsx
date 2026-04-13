@@ -43,7 +43,7 @@ function Login() {
   async function handleStaffLogin() {
     if (!staffCode.trim()) return setErr('請輸入員工代碼')
     setErr('')
-    const { data } = await supabase.from('employees').select('id, name, employee_id, is_admin').eq('employee_id', staffCode.trim()).eq('enabled', true).maybeSingle()
+    const { data } = await supabase.from('employees').select('id, name, is_admin, login_code').eq('login_code', String(staffCode).trim()).eq('enabled', true).maybeSingle()
     if (!data) return setErr('查無此員工')
     sessionStorage.setItem('vip_staff', JSON.stringify(data))
     window.location.href = data.is_admin ? '/vip-cellar/admin' : '/vip-cellar/staff'
