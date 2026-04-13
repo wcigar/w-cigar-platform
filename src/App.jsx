@@ -22,6 +22,7 @@ import Commission from './pages/boss/Commission'
 import Customers from './pages/boss/Customers'
 import DealerOrders from './pages/DealerOrders'
 import AmbassadorApp from './pages/ambassador/AmbassadorApp'
+import PosApp from './pages/pos/PosApp'
 
 export default function App() {
   const { user, loading } = useAuth()
@@ -34,6 +35,13 @@ export default function App() {
     <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a0a' }}>
       <div className="loading-shimmer" style={{ width: 120, height: 120, borderRadius: '50%' }} />
     </div>
+  )
+
+  // POS App has its own auth (independent from employee system)
+  if (window.location.pathname.startsWith('/pos-app')) return (
+    <Routes>
+      <Route path="/pos-app/*" element={<PosApp />} />
+    </Routes>
   )
 
   // Ambassador system has its own auth

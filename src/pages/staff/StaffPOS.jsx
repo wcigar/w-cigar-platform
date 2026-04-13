@@ -1,3 +1,10 @@
+/**
+ * @deprecated — 過渡備份
+ * 此檔案將由 /pos-app (src/pages/pos/PosCheckout.jsx) 取代。
+ * 員工系統的 /pos 入口暫時保留，等 Phase 1 穩定後規劃重導。
+ * 請勿在此檔案新增功能，新功能請加到 PosCheckout.jsx。
+ * ─── CigarPrince™ POS Phase 1 Migration ───
+ */
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
