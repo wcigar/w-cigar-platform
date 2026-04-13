@@ -36,7 +36,7 @@ export default function Layout({ children }) {
 
   if (isFullscreen) {
     return (
-      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#0a0a0a', overflow: 'hidden' }}>
+      <div style={{ minHeight: '100vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch', position: 'relative', background: '#0a0a0a' }}>
         {children}
       </div>
     )
