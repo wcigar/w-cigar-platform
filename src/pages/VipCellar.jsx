@@ -12,7 +12,7 @@ const fdt = d => d ? new Date(d).toLocaleString('zh-TW', { timeZone:'Asia/Taipei
 
 function getAging(ds) { if (!ds) return null; const m = Math.floor((Date.now() - new Date(ds).getTime()) / (30.44*86400000)); return m < 3 ? { l:'🟡 醇化中', c:C.warning } : m < 12 ? { l:'🟢 適飲期', c:C.success } : { l:'👑 完美熟成', c:C.purple } }
 function extractBrand(n) { const brands = ['COHIBA','MONTECRISTO','ROMEO Y JULIETA','PARTAGAS','H. UPMANN','HOYO DE MONTERREY','BOLIVAR','TRINIDAD','PUNCH','QUAI D\'ORSAY','DIPLOMATICOS','SAINT LUIS REY','RAMON ALLONES','CAPADURA','VEGUEROS','SAN CRISTOBAL']; const up = (n||'').toUpperCase(); return brands.find(b => up.startsWith(b)) || (n||'').split(' ')[0] || '其他' }
-function daysUntilExpiry(cabinetOpened) { if (!cabinetOpened) return null; const exp = new Date(cabinetOpened); exp.setFullYear(exp.getFullYear() + 1); return Math.ceil((exp - Date.now()) / 86400000) }
+function daysUntilExpiry(cabinetOpened, cabinetExpires) { if (cabinetExpires) return Math.floor((new Date(cabinetExpires) - Date.now()) / 86400000); if (!cabinetOpened) return null; const exp = new Date(cabinetOpened); exp.setFullYear(exp.getFullYear() + 1); return Math.floor((exp - Date.now()) / 86400000) }
 
 /* ═══ DATA LOADING ═══ */
 async function loadVipFull(mid) {
@@ -163,19 +163,20 @@ function StaffView({ employee, onViewVip }) {
   async function load() {
     setLoading(true)
     const [mR, cR, oR] = await Promise.all([
-      supabase.from('vip_members').select('id, name, cabinet_opened, is_active').eq('is_active', true).order('name'),
-      supabase.from('vip_cabinets').select('vip_id, quantity').gt('quantity', 0),
-      supabase.from('vip_orders').select('vip_id, balance, is_voided'),
+      supabase.from('vip_members').select('id, name, cabinet_opened, cabinet_expires, is_active').eq('is_active', true).order('name'),
+      supabase.from('vip_cabinets').select('vip_id, quantity, unit_price').gt('quantity', 0),
+      supabase.from('vip_orders').select('vip_id, balance, is_voided').eq('is_voided', false),
     ])
     const ml = mR.data || []; const cab = cR.data || []; const ord = oR.data || []
     setMembers(ml.map(m => {
       const myCab = cab.filter(c => c.vip_id === m.id)
-      const myOrd = ord.filter(o => o.vip_id === m.id && !o.is_voided)
+      const myOrd = ord.filter(o => o.vip_id === m.id)
       const stockQty = myCab.reduce((s,c) => s + (c.quantity||0), 0)
+      const stockVal = myCab.reduce((s,c) => s + (c.quantity||0) * (c.unit_price||0), 0)
       const lowCount = myCab.filter(c => (c.quantity||0) <= 5).length
       const unpaid = myOrd.reduce((s,o) => s + (o.balance||0), 0)
-      const expDays = daysUntilExpiry(m.cabinet_opened)
-      return { ...m, stockQty, lowCount, unpaid, expDays }
+      const expDays = daysUntilExpiry(m.cabinet_opened, m.cabinet_expires)
+      return { ...m, stockQty, stockVal, lowCount, unpaid, expDays }
     }))
     setLoading(false)
   }
@@ -192,7 +193,7 @@ function StaffView({ employee, onViewVip }) {
     {filtered.map(m => <div key={m.id} onClick={() => onViewVip(m)} style={{ background:C.card, borderRadius:16, padding:16, marginBottom:10, border:`1px solid ${C.border}`, cursor:'pointer', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
       <div>
         <div style={{ fontSize:16, fontWeight:700, color:C.gold }}>{m.name}</div>
-        <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>ID: {m.id} | 窖藏 {m.stockQty} 支</div>
+        <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>ID: {m.id} | 窖藏 {m.stockQty} 支 | {fc(m.stockVal)}</div>
         <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:4 }}>
           {m.expDays !== null && m.expDays <= 30 && <span style={{ fontSize:9, padding:'2px 8px', borderRadius:10, background:m.expDays <= 0 ? `${C.danger}20` : `${C.warning}20`, color:m.expDays <= 0 ? C.danger : C.warning, fontWeight:600 }}>{m.expDays <= 0 ? '🚨 已到期' : `⏰ ${m.expDays}天到期`}</span>}
           {m.lowCount > 0 && <span style={{ fontSize:9, padding:'2px 8px', borderRadius:10, background:`${C.warning}20`, color:C.warning, fontWeight:600 }}>⚠️ {m.lowCount}品項低庫存</span>}
@@ -350,9 +351,9 @@ function AppView({ member, employee, privacy, onBack }) {
         </div>
         {o.order_total > 0 && <div style={{ height:4, background:C.border, borderRadius:2, overflow:'hidden', marginBottom:8 }}><div style={{ height:'100%', background:oPaid>=o.order_total?C.success:C.gold, width:`${Math.min(100,o.order_total?oPaid/o.order_total*100:0)}%`, borderRadius:2 }} /></div>}
         {/* Items */}
-        {(om.items||[]).length > 0 && <div style={{ marginBottom:8 }}>
+        {<div style={{ marginBottom:8 }}>
           <div style={{ fontSize:10, color:C.muted, marginBottom:4 }}>🛒 購買品項</div>
-          {om.items.map((it,i) => <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize:11, padding:'3px 0', borderBottom:`1px solid ${C.border}20` }}><span style={{ flex:2 }}>{it.name}</span><span style={{ width:40, textAlign:'center' }}>{it.orderQty}支</span><span style={{ width:60, textAlign:'right' }}>{fc(it.price)}</span><span style={{ width:70, textAlign:'right', color:C.gold }}>{fc(it.orderQty*it.price)}</span></div>)}
+          {(om.items||[]).length > 0 ? om.items.map((it,i) => <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize:11, padding:'3px 0', borderBottom:`1px solid ${C.border}20` }}><span style={{ flex:2 }}>{it.name}</span><span style={{ width:40, textAlign:'center' }}>{it.orderQty}支</span><span style={{ width:60, textAlign:'right' }}>{fc(it.price)}</span><span style={{ width:70, textAlign:'right', color:C.gold }}>{fc(it.orderQty*it.price)}</span></div>) : <div style={{ color:'#666', fontSize:12, padding:6 }}>（歷史訂單，無品項明細）</div>}
         </div>}
         {/* Payments */}
         {(om.payments||[]).length > 0 && <div style={{ fontSize:10, color:C.muted, marginTop:4 }}>💳 收款 {om.payments.length} 次 · 累計 {fc(om.payments.reduce((s,p)=>s+p.amt,0))}</div>}
@@ -377,8 +378,15 @@ function ConsumeModal({ item, member, employee, onClose, onDone }) {
     if (qty > item.qty) return alert(`最多 ${item.qty} 支`)
     if (!sigData) return alert('請客戶簽名')
     setBusy(true)
-    await supabase.from('vip_cabinets').update({ quantity: item.qty - qty }).eq('id', item.id)
-    await supabase.from('vip_withdrawals').insert({ vip_id:member.id, vip_name:member.name, cabinet_no:item.cabinet_no, product_name:item.product_name, cigar_name:item.product_name, qty_withdrawn:qty, qty_remaining:item.qty-qty, destination:dest, purpose:dest, staff_name:employee.name, handled_by_name:employee.name, signature_url:sigData, withdrawn_at:new Date().toISOString() })
+    try {
+      const { data, error } = await supabase.rpc('vip_withdraw', { p_vip_id:member.id, p_cabinet_id:item.id, p_qty:qty, p_destination:dest, p_staff_id:employee.login_code||employee.id, p_staff_name:employee.name, p_signature_url:sigData, p_notes:'' })
+      if (error) throw error
+      if (data && !data.success) throw new Error(data.error || '領取失敗')
+    } catch (e) {
+      // Fallback to direct update if RPC doesn't exist
+      await supabase.from('vip_cabinets').update({ quantity: item.qty - qty, updated_at: new Date().toISOString() }).eq('id', item.id)
+      await supabase.from('vip_withdrawals').insert({ vip_id:member.id, vip_name:member.name, cabinet_id:item.id, cabinet_no:item.cabinet_no, product_name:item.product_name, qty_withdrawn:qty, qty_remaining:item.qty-qty, destination:dest, staff_id:employee.login_code||employee.id, staff_name:employee.name, signature_url:sigData, withdrawn_at:new Date().toISOString() })
+    }
     setBusy(false); onDone()
   }
   return <Modal onClose={onClose} title="產品領取確認">
@@ -420,9 +428,11 @@ function PaymentModal({ order, member, employee, onClose, onDone }) {
   async function submit() {
     const a = +amt || 0; if (a <= 0) return alert('請填寫金額')
     setBusy(true)
-    await supabase.from('vip_payments').insert({ order_id:order.id, order_no:order.order_no, vip_id:member.id, amount:a, payment_method:method, staff_name:employee.name, notes:note||null, receipt_url:receiptData||null, remit_code:remitCode||null, signature_url:sigData||null })
-    const np = ((order.order_total||0)-(order.balance||0)) + a
-    await supabase.from('vip_orders').update({ paid_amount:np, balance:Math.max(0,(order.order_total||0)-np), status:np>=(order.order_total||0)?'已沖平結清':'部分沖銷', updated_at:new Date().toISOString() }).eq('id', order.id)
+    await supabase.from('vip_payments').insert({ order_id:order.id, order_no:order.order_no, vip_id:member.id, amount:a, payment_method:method, staff_id:employee.login_code||employee.id, staff_name:employee.name, notes:note||null, receipt_url:receiptData||null, remit_code:remitCode||null })
+    const oldPaid = (order.order_total||0) - (order.balance||0)
+    const np = oldPaid + a
+    const newBalance = Math.max(0, (order.order_total||0) - np)
+    await supabase.from('vip_orders').update({ paid_amount:np, balance:newBalance, status:newBalance<=0?'已沖平結清':'部分沖銷', updated_at:new Date().toISOString() }).eq('id', order.id)
     setBusy(false); onDone()
   }
 
@@ -458,7 +468,7 @@ function NewOrderModal({ employee, onClose, onDone }) {
   const [vipId, setVipId] = useState(''); const [vipName, setVipName] = useState(''); const [orderType, setOrderType] = useState('現貨購買')
   const [items, setItems] = useState([{ name:'', price:'', qtyCab:0, qtyOut:0, qtySite:0, qtyPend:0, cab:'', _showDrop:false }])
   const [productList, setProductList] = useState([])
-  useEffect(() => { supabase.from('products').select('id, name, brand, price_a').order('brand', { ascending:true }).order('name', { ascending:true }).then(({ data }) => setProductList(data || [])) }, [])
+  useEffect(() => { supabase.from('products').select('id, name, brand, price_a, price_vip').eq('is_active', true).order('brand', { ascending:true }).order('name', { ascending:true }).then(({ data }) => setProductList(data || [])) }, [])
   const [payMethod, setPayMethod] = useState('現金'); const [paidAmt, setPaidAmt] = useState(''); const [note, setNote] = useState(''); const [srcTags, setSrcTags] = useState([])
   const sigRef = useRef(null); const [sigData, setSigData] = useState(null); const [busy, setBusy] = useState(false)
   const receiptRef = useRef(null); const [receiptData, setReceiptData] = useState(null); const [receiptPreview, setReceiptPreview] = useState(null)
@@ -472,11 +482,12 @@ function NewOrderModal({ employee, onClose, onDone }) {
     const orderNo = 'ORD-' + new Date().toISOString().replace(/[-T:.Z]/g,'').slice(0,15)
     const paid = +paidAmt || 0; const status = paid >= total && total > 0 ? '已沖平結清' : paid > 0 ? '部分沖銷' : '未付款'
     const notes = [note, srcTags.length ? '來源: '+srcTags.join(', ') : ''].filter(Boolean).join(' | ')
-    const { data:ord, error } = await supabase.from('vip_orders').insert({ order_no:orderNo, vip_id:vipId.trim(), vip_name:vipName||null, order_type:orderType, order_total:total, paid_amount:paid, balance:Math.max(0,total-paid), status, notes, staff_name:employee.name }).select().single()
+    const { data:ord, error } = await supabase.from('vip_orders').insert({ order_no:orderNo, vip_id:vipId.trim(), vip_name:vipName||null, order_type:orderType, order_total:total, paid_amount:paid, balance:Math.max(0,total-paid), status, notes, staff_id:employee.login_code||employee.id, staff_name:employee.name }).select().single()
     if (error) { setBusy(false); return alert('建立失敗: '+error.message) }
-    for (const i of validItems) { const tq = (+i.qtyCab||0)+(+i.qtyOut||0)+(+i.qtySite||0)+(+i.qtyPend||0); await supabase.from('vip_order_items').insert({ order_id:ord.id, order_no:orderNo, product_name:i.name, qty_ordered:tq, qty_delivered:tq-(+i.qtyPend||0), qty_pending:+i.qtyPend||0, unit_price:+i.price||0, cabinet_no:i.cab||null }) }
-    for (const i of validItems) { if ((+i.qtyCab||0) > 0 && i.cab) await supabase.from('vip_cabinets').insert({ vip_id:vipId.trim(), cabinet_no:i.cab, product_name:i.name, quantity:+i.qtyCab, unit_price:+i.price||0, stored_date:new Date().toISOString().slice(0,10) }) }
-    if (paid > 0) await supabase.from('vip_payments').insert({ order_id:ord.id, order_no:orderNo, vip_id:vipId.trim(), amount:paid, payment_method:payMethod, staff_name:employee.name, receipt_url:receiptData||null, signature_url:sigData||null })
+    for (const i of validItems) { const tq = (+i.qtyCab||0)+(+i.qtyOut||0)+(+i.qtySite||0)+(+i.qtyPend||0); const up = +i.price||0; await supabase.from('vip_order_items').insert({ order_id:ord.id, order_no:orderNo, product_name:i.name, qty_ordered:tq, qty_delivered:tq-(+i.qtyPend||0), qty_pending:+i.qtyPend||0, unit_price:up, subtotal:tq*up, destination:orderType, cabinet_no:i.cab||null, status:(+i.qtyPend||0)>0?'部分到貨':'已到齊' }) }
+    // Cabinet upsert: check existing then update or insert
+    for (const i of validItems) { if ((+i.qtyCab||0) > 0 && i.cab) { const vid = vipId.trim(); const { data:existing } = await supabase.from('vip_cabinets').select('id,quantity').eq('vip_id',vid).eq('cabinet_no',i.cab).eq('product_name',i.name).maybeSingle(); if (existing) { await supabase.from('vip_cabinets').update({ quantity:(existing.quantity||0)+(+i.qtyCab), updated_at:new Date().toISOString() }).eq('id',existing.id) } else { await supabase.from('vip_cabinets').insert({ vip_id:vid, cabinet_no:i.cab, product_name:i.name, quantity:+i.qtyCab, unit_price:+i.price||0, market_value:(+i.qtyCab)*(+i.price||0), stored_date:new Date().toISOString().slice(0,10) }) } } }
+    if (paid > 0) await supabase.from('vip_payments').insert({ order_id:ord.id, order_no:orderNo, vip_id:vipId.trim(), amount:paid, payment_method:payMethod, staff_id:employee.login_code||employee.id, staff_name:employee.name, receipt_url:receiptData||null })
     setBusy(false); alert('✅ 訂單已建立'); onDone()
   }
 
@@ -491,7 +502,7 @@ function NewOrderModal({ employee, onClose, onDone }) {
 
     {items.map((item,idx) => <div key={idx} style={{ background:'#0d0b09', borderRadius:14, padding:12, marginBottom:10, border:`1px solid ${C.border}` }}>
       <div style={{ display:'flex', gap:6, marginBottom:8, position:'relative' }}><Inp autoComplete="off" placeholder="搜尋雪茄品名或品牌 *" value={item.name} onChange={e => { upd(idx,'name',e.target.value); upd(idx,'_showDrop',true) }} onFocus={() => upd(idx,'_showDrop',true)} style={{ flex:2, marginBottom:0 }} /><Inp type="number" placeholder="單價 $" value={item.price} onChange={e => upd(idx,'price',e.target.value)} style={{ flex:1, marginBottom:0 }} />{items.length>1 && <button onClick={() => setItems(items.filter((_,i)=>i!==idx))} style={{ color:C.danger, background:'none', border:'none', cursor:'pointer', fontSize:16 }}>✕</button>}</div>
-      {item._showDrop && item.name.length >= 1 && (() => { const q = item.name.toLowerCase(); const matches = productList.filter(p => (p.brand||'').toLowerCase().includes(q) || (p.name||'').toLowerCase().includes(q)).slice(0,8); return matches.length > 0 ? <div style={{ background:'#1a1714', border:`1px solid ${C.gold}40`, borderRadius:10, maxHeight:160, overflowY:'auto', marginBottom:6 }}>{matches.map(p => <button key={p.id} onClick={() => { upd(idx,'name',p.name); upd(idx,'price',String(p.price_a||0)); upd(idx,'_showDrop',false) }} style={{ width:'100%', textAlign:'left', padding:'8px 12px', background:'transparent', border:'none', borderBottom:`1px solid ${C.border}`, color:C.text, cursor:'pointer', fontSize:12 }}><span style={{ color:C.gold }}>{p.brand}</span> {p.name} <span style={{ color:C.muted, marginLeft:4 }}>{fc(p.price_a)}</span></button>)}</div> : null })()}
+      {item._showDrop && item.name.length >= 1 && (() => { const q = item.name.toLowerCase(); const matches = productList.filter(p => (p.brand||'').toLowerCase().includes(q) || (p.name||'').toLowerCase().includes(q)).slice(0,8); return matches.length > 0 ? <div style={{ background:'#1a1714', border:`1px solid ${C.gold}40`, borderRadius:10, maxHeight:160, overflowY:'auto', marginBottom:6 }}>{matches.map(p => { const vipPrice = p.price_vip || p.price_a || 0; return <button key={p.id} onClick={() => { upd(idx,'name',p.name); upd(idx,'price',String(vipPrice)); upd(idx,'_showDrop',false) }} style={{ width:'100%', textAlign:'left', padding:'8px 12px', background:'transparent', border:'none', borderBottom:`1px solid ${C.border}`, color:C.text, cursor:'pointer', fontSize:12 }}><span style={{ color:C.gold }}>{p.brand}</span> {p.name} <span style={{ color:C.muted, marginLeft:4 }}>{fc(vipPrice)}</span></button> })}</div> : null })()}
       <div style={{ fontSize:10, color:C.muted, marginBottom:4 }}>購買支數 <b style={{ color:C.text }}>{(+item.qtyCab||0)+(+item.qtyOut||0)+(+item.qtySite||0)+(+item.qtyPend||0)}</b></div>
       <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:6, marginBottom:6 }}>{[['qtyCab','📦 入櫃'],['qtyOut','🛍️ 外帶'],['qtySite','🚬 現場'],['qtyPend','✈️ 未到貨']].map(([k,l]) => <div key={k}><div style={{ fontSize:9, color:C.muted, marginBottom:2 }}>{l}</div><input type="number" min={0} value={item[k]} onChange={e => upd(idx,k,+e.target.value||0)} style={{ width:'100%', fontSize:13, padding:'8px 4px', background:'#1a1714', border:`1px solid ${C.border}`, borderRadius:8, color:C.text, textAlign:'center' }} /></div>)}</div>
       {(+item.qtyCab||0) > 0 && <Inp placeholder="入櫃 → 櫃位號碼" value={item.cab} onChange={e => upd(idx,'cab',e.target.value)} style={{ borderColor:`${C.gold}50`, color:C.gold, marginBottom:4 }} />}
@@ -543,9 +554,9 @@ function AdminView({ employee, onViewVip }) {
   async function load() {
     setLoading(true)
     const [mR, cR, oR] = await Promise.all([
-      supabase.from('vip_members').select('id, name, phone, cabinet_opened, is_active').eq('is_active', true).order('name'),
+      supabase.from('vip_members').select('id, name, phone, cabinet_opened, cabinet_expires, is_active').eq('is_active', true).order('name'),
       supabase.from('vip_cabinets').select('vip_id, quantity, unit_price').gt('quantity', 0),
-      supabase.from('vip_orders').select('vip_id, order_total, balance, is_voided'),
+      supabase.from('vip_orders').select('vip_id, order_total, balance, is_voided').eq('is_voided', false),
     ])
     const ml = mR.data||[]; const cab = cR.data||[]; const ord = oR.data||[]
     setMembers(ml.map(m => {
