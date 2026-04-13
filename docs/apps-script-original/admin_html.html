@@ -1,6 +1,15 @@
 <div class="section-head">
-  <div><h2>系統資料維護後台</h2><p>Google 試算表正式資料庫管理／改密碼／ERP CSV 匯入</p></div>
+  <div><h2>系統資料維護後台</h2><p>老闆儀表板／會計管理／員工管理／POS 匯入</p></div>
 </div>
+
+<div id="bossDashboard" class="view-card admin-card full-span" style="margin-bottom:20px;background:linear-gradient(135deg,#1a1a1a,#111);border:1px solid var(--gold);">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+    <span style="color:var(--gold);font-size:20px;font-weight:bold;">📊 老闆儀表板</span>
+    <button type="button" class="action-btn" style="padding:8px 16px;" onclick="loadBossDashboard()">🔄 刷新</button>
+  </div>
+  <div id="bossDashContent" style="color:#888;font-size:14px;">載入中...</div>
+</div>
+
 <div class="admin-grid">
   <div class="view-card admin-card">
     <div class="panel-head"><div><h3>📊 正式資料庫資訊</h3><div class="subtle">前台與後台都以此為來源</div></div></div>
@@ -24,6 +33,25 @@
     <button type="button" class="primary-btn top-gap" onclick="adminChangePassword()">儲存新密碼</button>
   </div>
   <div class="view-card admin-card full-span">
+    <div class="panel-head"><div><h3>📥 POS 報表智慧匯入</h3><div class="subtle">將店內 POS 結帳報表自動轉為應收帳款與沖帳憑證</div></div></div>
+    <div class="tip-box" style="margin-bottom:16px;">
+      <div>📌 從 POS 系統匯出 CSV，系統會自動解析訂單、品項、付款方式，一鍵生成帳務紀錄。</div>
+      <div style="margin-top:6px;">支援格式：取單號碼 / 訂單編號 / 品名 / 售價 / 數量 / 付款方式 / 付款狀態 等欄位。</div>
+    </div>
+    <div class="field"><label>指定匯入的目標會員編號</label><input class="input" id="posTargetVip" type="text" placeholder="例如：88888" style="font-size:20px;"></div>
+    <div class="field" style="margin-top:12px;">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:15px;">
+        <input type="checkbox" id="posSkipInventory" checked style="width:22px;height:22px;accent-color:#d0a54f;">
+        <span>僅匯入帳務（不動庫存）<span style="color:#a39d91;font-size:13px;"> — 適合已盤點過櫃位的會員</span></span>
+      </label>
+    </div>
+    <input type="file" id="posCsvFileInput" accept=".csv,.xlsx,.xls" style="display:none;">
+    <div class="admin-actions" style="margin-top:16px;">
+      <button type="button" class="primary-btn" id="posUploadBtn" onclick="document.getElementById('posCsvFileInput').click()" style="background:linear-gradient(90deg, #2a7d5a, #1a4d38);">📥 選擇 POS CSV 檔案並匯入</button>
+    </div>
+    <div id="posStatus" style="margin-top:12px;"></div>
+  </div>
+  <div class="view-card admin-card full-span">
     <div class="panel-head"><div><h3>⬆ 歷史帳務與庫存補登 (CSV)</h3><div class="subtle">將舊訂單或盤點明細匯入</div></div></div>
     <div class="tip-box" style="margin-bottom:12px;">
       <div>支援 <strong>ERP 格式</strong> (含訂單編號) 或 <strong>庫存格式</strong> (無訂單編號)。</div>
@@ -31,8 +59,118 @@
     </div>
     <input type="file" id="csvFileInput" accept=".csv" style="display:none;">
     <div class="admin-actions">
-      <button type="button" class="primary-btn" id="csvUploadBtn" onclick="document.getElementById('csvFileInput').click()">選擇 CSV 檔案並匯入</button>
+      <button type="button" class="primary-btn" onclick="document.getElementById('csvFileInput').click()">選擇 CSV 檔案並匯入</button>
     </div>
     <div id="csvStatus" style="margin-top:12px;"></div>
   </div>
+  <div class="view-card admin-card full-span">
+    <div class="panel-head"><div><h3>📲 LINE 推播通知中心</h3><div class="subtle">自動推播低庫存警示、櫃位到期提醒、收款確認通知</div></div></div>
+    <div class="tip-box" style="margin-bottom:16px;">
+      <div>✅ LINE Messaging API 已連線（Channel ID: 1655787934）</div>
+      <div style="margin-top:6px;">📌 會員需綁定 LINE User ID 才能收到個人推播。請在「會員主檔」I 欄填入。</div>
+    </div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;">
+      <button type="button" class="primary-btn" style="flex:1;min-width:200px;" onclick="adminSetupDailyTrigger()">⏰ 啟用每日 9:00 自動檢查</button>
+      <button type="button" class="secondary-btn" style="flex:1;min-width:200px;border-color:var(--gold);color:var(--gold);" onclick="adminRunDailyCheck()">🔍 立即手動檢查一次</button>
+      <button type="button" class="secondary-btn" style="flex:1;min-width:200px;border-color:var(--success);color:var(--success);" onclick="adminTestLine()">📨 發送測試訊息</button>
+    </div>
+    <div style="border-top:1px solid #333;padding-top:16px;margin-top:8px;">
+      <label style="color:var(--gold);font-size:15px;font-weight:bold;display:block;margin-bottom:12px;">綁定會員 LINE User ID</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <input class="input" id="lineBindVipId" type="text" placeholder="會員編號" style="flex:1;min-width:100px;">
+        <input class="input" id="lineBindUserId" type="text" placeholder="LINE User ID" style="flex:2;min-width:200px;">
+        <button type="button" class="primary-btn" style="width:auto;padding:12px 20px;" onclick="adminBindLineId()">綁定</button>
+      </div>
+    </div>
+    <div style="border-top:1px solid #333;padding-top:16px;margin-top:16px;">
+      <label style="color:var(--gold);font-size:15px;font-weight:bold;display:block;margin-bottom:12px;">手動發送通知</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+        <input class="input" id="lineManualVipId" type="text" placeholder="會員編號（留空=群發全部好友）" style="flex:1;min-width:120px;">
+      </div>
+      <textarea class="input" id="lineManualMsg" rows="3" placeholder="輸入通知內容..." style="font-size:15px;"></textarea>
+      <button type="button" class="primary-btn top-gap" onclick="adminSendManualNotify()">📤 發送通知</button>
+    </div>
+    <div id="lineStatus" style="margin-top:12px;"></div>
+  </div>
+
+  <div class="view-card admin-card full-span">
+    <div class="panel-head"><div><h3>📈 全店月營收報表</h3><div class="subtle">老闆查看整體業績、員工績效、VIP 消費排行</div></div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <input class="input" id="reportMonth" type="text" placeholder="年/月（如 2026/04，留空=本月）" style="flex:1;">
+      <button type="button" class="primary-btn" style="width:auto;padding:12px 20px;" onclick="adminMonthlyReport()">📊 生成報表</button>
+    </div>
+    <div id="reportResult"></div>
+  </div>
+
+  <div class="view-card admin-card full-span">
+    <div class="panel-head"><div><h3>🔑 VIP 會員密碼管理</h3><div class="subtle">為 VIP 客戶設定登入密碼，保護財務隱私（未設密碼的客戶可直接登入）</div></div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <input class="input" id="vipPwdVipId" type="text" placeholder="會員編號" style="flex:1;">
+      <input class="input" id="vipPwdNew" type="text" placeholder="設定密碼（至少4字元）" style="flex:1;">
+      <button type="button" class="primary-btn" style="width:auto;padding:12px 20px;" onclick="adminSetVipPassword()">設定密碼</button>
+    </div>
+  </div>
+
+  <div class="view-card admin-card full-span">
+    <div class="panel-head"><div><h3>👥 員工帳號管理</h3><div class="subtle">從試算表動態管理員工，不需要改程式碼</div></div></div>
+    <div id="staffListContainer" style="margin-bottom:16px;"></div>
+    <div style="border-top:1px solid #333;padding-top:16px;">
+      <label style="color:var(--gold);font-size:14px;font-weight:bold;display:block;margin-bottom:10px;">新增員工</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <input class="input" id="newStaffCode" type="text" placeholder="代碼（如 81004）" style="flex:1;min-width:100px;">
+        <input class="input" id="newStaffName" type="text" placeholder="姓名" style="flex:1;min-width:100px;">
+        <select class="input" id="newStaffRole" style="flex:1;min-width:100px;"><option value="staff">員工</option><option value="master">管理員</option></select>
+        <button type="button" class="primary-btn" style="width:auto;padding:12px 20px;" onclick="adminAddStaff()">新增</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="view-card admin-card full-span">
+    <div class="panel-head"><div><h3>📦 到貨入庫確認</h3><div class="subtle">預購品到貨後，確認入庫並通知客戶</div></div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <input class="input" id="arrivalOrderId" type="text" placeholder="訂單編號" style="flex:1;">
+      <input class="input" id="arrivalItemName" type="text" placeholder="雪茄品名" style="flex:1;">
+      <input class="input" id="arrivalQty" type="number" placeholder="到貨數量" style="flex:1;max-width:100px;">
+      <input class="input" id="arrivalCabinet" type="text" placeholder="入櫃位" style="flex:1;max-width:80px;">
+      <button type="button" class="primary-btn" style="width:auto;padding:12px 20px;" onclick="adminConfirmArrival()">確認入庫</button>
+    </div>
+    <div id="arrivalStatus" style="margin-top:10px;"></div>
+  </div>
+
+  <div class="view-card admin-card full-span">
+    <div class="panel-head"><div><h3>📋 庫存盤點調整</h3><div class="subtle">盤點後修正庫存數量，系統自動記錄調整原因</div></div></div>
+    <div style="background:rgba(208,165,79,0.1);border:1px solid rgba(208,165,79,0.2);border-radius:12px;padding:16px;margin-bottom:16px;">
+      <div style="color:var(--gold);font-size:15px;font-weight:bold;margin-bottom:8px;">🔄 庫存智慧合併</div>
+      <div style="color:#aaa;font-size:13px;margin-bottom:12px;">自動偵測同會員同品名的重複品項 → 數量加總合併成一筆 → 刪除數量為 0 的空品項</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button type="button" class="secondary-btn" style="flex:1;border-color:var(--gold);color:var(--gold);" onclick="adminConsolidatePreview()">🔍 預覽合併結果</button>
+        <button type="button" class="primary-btn" style="flex:1;" onclick="adminConsolidateExecute()">🔄 執行合併</button>
+      </div>
+      <div id="consolidateResult" style="margin-top:10px;"></div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <input class="input" id="adjVipId" type="text" placeholder="會員編號" style="flex:1;">
+      <input class="input" id="adjCabinet" type="text" placeholder="櫃位" style="flex:1;max-width:80px;">
+      <input class="input" id="adjItemName" type="text" placeholder="雪茄品名" style="flex:1;">
+      <input class="input" id="adjNewQty" type="number" placeholder="正確數量" style="flex:1;max-width:100px;">
+      <input class="input" id="adjReason" type="text" placeholder="調整原因" style="flex:1;">
+      <button type="button" class="primary-btn" style="width:auto;padding:12px 20px;" onclick="adminAdjustInventory()">調整</button>
+    </div>
+    <div id="adjStatus" style="margin-top:10px;"></div>
+  </div>
+
+  <div class="view-card admin-card full-span">
+    <div class="panel-head"><div><h3>🔄 櫃位續約 / 💾 資料備份</h3></div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+      <input class="input" id="renewVipId" type="text" placeholder="會員編號" style="flex:1;">
+      <button type="button" class="primary-btn" style="width:auto;padding:12px 20px;" onclick="adminRenewCabinet()">🔄 續約（從今天起算一年）</button>
+    </div>
+    <div style="border-top:1px solid #333;padding-top:16px;display:flex;gap:12px;flex-wrap:wrap;">
+      <button type="button" class="secondary-btn" style="flex:1;border-color:var(--gold);color:var(--gold);" onclick="adminBackupNow()">💾 立即備份</button>
+      <button type="button" class="secondary-btn" style="flex:1;border-color:var(--success);color:var(--success);" onclick="adminSetupWeeklyBackup()">⏰ 啟用每週自動備份</button>
+    </div>
+    <div id="renewBackupStatus" style="margin-top:10px;"></div>
+  </div>
 </div>
+<div style="text-align:center;padding:20px 16px;line-height:1.8;margin-top:20px;border-top:1px solid #333;"><div style="color:var(--gold);font-size:11px;font-weight:bold;">W CIGAR BAR VIP 窖藏管理系統 ｜ Powered by CigarPrince&trade;</div><div style="color:#555;font-size:10px;">&copy; 2025-2026 蔡勝濬（雪茄王子）版權所有</div><div style="color:#444;font-size:9px;">本系統為專屬開發之智慧財產，任何形式之複製、仿製、逆向工程或未授權使用均屬違法</div></div>
+
