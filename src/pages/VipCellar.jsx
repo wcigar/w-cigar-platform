@@ -59,10 +59,18 @@ function Modal({onClose,title,children,wide}) { return <div style={{ position:'f
 function SigCanvas({sigRef,sigData,setSigData}) {
   function clear() { const c = sigRef.current; if(c) { const ctx=c.getContext('2d'); ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,c.width,c.height); setSigData(null) } }
   function initCanvas(c) { if(!c) return; const ctx=c.getContext('2d'); ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,c.width,c.height) }
-  useEffect(() => { if(sigRef.current) initCanvas(sigRef.current) }, [])
+  function getPos(e, c) { const r=c.getBoundingClientRect(); const t=e.touches?e.touches[0]:e; return { x:(t.clientX-r.left)*(c.width/r.width), y:(t.clientY-r.top)*(c.height/r.height) } }
+  function setupCanvas(el) {
+    if(!el) return; sigRef.current=el; initCanvas(el)
+    // iOS touch events with passive:false
+    let drawing=false
+    el.addEventListener('touchstart', e => { e.preventDefault(); drawing=true; const ctx=el.getContext('2d'); ctx.strokeStyle='#000'; ctx.lineWidth=2; ctx.beginPath(); const p=getPos(e,el); ctx.moveTo(p.x,p.y) }, {passive:false})
+    el.addEventListener('touchmove', e => { if(!drawing) return; e.preventDefault(); const ctx=el.getContext('2d'); const p=getPos(e,el); ctx.lineTo(p.x,p.y); ctx.stroke() }, {passive:false})
+    el.addEventListener('touchend', e => { e.preventDefault(); drawing=false; setSigData(el.toDataURL('image/jpeg',0.6)) }, {passive:false})
+  }
   return <><div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}><span style={{ fontSize:12, color:C.muted }}>客戶簽名確認</span><button onClick={clear} style={{ fontSize:10, color:C.muted, background:'none', border:`1px solid ${C.border}`, borderRadius:6, padding:'2px 10px', cursor:'pointer' }}>清除</button></div>
-    <canvas ref={el => { sigRef.current = el; if(el) initCanvas(el) }} width={400} height={120} style={{ width:'100%', height:120, background:'#fff', border:`1px solid ${C.border}`, borderRadius:12, marginBottom:12, touchAction:'none' }}
-      onPointerDown={e => { const c=sigRef.current; if(!c) return; const ctx=c.getContext('2d'); ctx.strokeStyle='#000'; ctx.lineWidth=2; ctx.beginPath(); const r=c.getBoundingClientRect(); ctx.moveTo((e.clientX-r.left)*(c.width/r.width),(e.clientY-r.top)*(c.height/r.height)); c.onpointermove=ev=>{ ctx.lineTo((ev.clientX-r.left)*(c.width/r.width),(ev.clientY-r.top)*(c.height/r.height)); ctx.stroke() }; c.onpointerup=()=>{ c.onpointermove=null; setSigData(c.toDataURL('image/jpeg',0.6)) } }} /></>
+    <canvas ref={setupCanvas} width={400} height={120} style={{ width:'100%', height:120, background:'#fff', border:`1px solid ${C.border}`, borderRadius:12, marginBottom:12, touchAction:'none' }}
+      onPointerDown={e => { if(e.pointerType==='touch') return; const c=sigRef.current; if(!c) return; const ctx=c.getContext('2d'); ctx.strokeStyle='#000'; ctx.lineWidth=2; ctx.beginPath(); const p=getPos(e,c); ctx.moveTo(p.x,p.y); c.onpointermove=ev=>{ const pp=getPos(ev,c); ctx.lineTo(pp.x,pp.y); ctx.stroke() }; c.onpointerup=()=>{ c.onpointermove=null; setSigData(c.toDataURL('image/jpeg',0.6)) } }} /></>
 }
 
 /* ═══ ROUTER ═══ */
@@ -472,7 +480,8 @@ function PaymentModal({ order, member, employee, onClose, onDone }) {
 /* ═══ NEW ORDER MODAL ═══ */
 function NewOrderModal({ employee, productCatalog, onClose, onDone }) {
   const [vipId, setVipId] = useState(''); const [vipName, setVipName] = useState(''); const [orderType, setOrderType] = useState('現貨購買')
-  const [items, setItems] = useState([{ name:'', price:'', qtyCab:0, qtyOut:0, qtySite:0, qtyPend:0, cab:'', _showDrop:false }])
+  const [items, setItems] = useState([{ name:'', price:'', qtyCab:0, qtyOut:0, qtySite:0, qtyPend:0, cab:'' }])
+  const [showDrop, setShowDrop] = useState(false); const [dropItems, setDropItems] = useState([]); const [dropIdx, setDropIdx] = useState(0)
   const productList = productCatalog || []
   const [payMethod, setPayMethod] = useState('現金'); const [paidAmt, setPaidAmt] = useState(''); const [note, setNote] = useState(''); const [srcTags, setSrcTags] = useState([])
   const sigRef = useRef(null); const [sigData, setSigData] = useState(null); const [busy, setBusy] = useState(false)
@@ -498,8 +507,6 @@ function NewOrderModal({ employee, productCatalog, onClose, onDone }) {
   const upd = (idx,k,v) => { const a=[...items]; a[idx][k]=v; setItems(a) }
 
   return <Modal onClose={onClose} title="＋ 新增訂單 / 開櫃" wide>
-    {/* Product datalist */}
-    <datalist id="vip-prod-list">{productList.map(p => <option key={p.id} value={p.name} />)}</datalist>
     <div style={{ display:'flex', gap:8, marginBottom:12 }}>
       <Inp value={vipId} onChange={async e => { setVipId(e.target.value); if(e.target.value.length>=2) { const { data } = await supabase.from('customers').select('id,name,phone').ilike('name','%'+e.target.value+'%').limit(5); if(data?.length===1) setVipName(data[0].name) } }} type="tel" placeholder="會員編號 *" style={{ flex:1, marginBottom:0 }} />
       <Inp value={vipName} onChange={e => setVipName(e.target.value)} placeholder="姓名（新客戶填）" style={{ flex:1, marginBottom:0 }} />
@@ -507,13 +514,21 @@ function NewOrderModal({ employee, productCatalog, onClose, onDone }) {
     <div style={{ display:'flex', gap:6, marginBottom:12 }}>{['現貨購買','預購訂貨','客戶寄存'].map(t => <button key={t} onClick={() => setOrderType(t)} style={{ flex:1, padding:8, borderRadius:10, fontSize:12, fontWeight:600, cursor:'pointer', background:orderType===t?C.gold:'transparent', color:orderType===t?'#000':C.text, border:`1px solid ${orderType===t?C.gold:C.border}` }}>{t}</button>)}</div>
 
     {items.map((item,idx) => <div key={idx} style={{ background:'#0d0b09', borderRadius:14, padding:12, marginBottom:10, border:`1px solid ${C.border}` }}>
-      <div style={{ display:'flex', gap:6, marginBottom:8 }}><Inp list="vip-prod-list" autoComplete="off" placeholder="搜尋雪茄品名或品牌 *" value={item.name} onChange={e => { const val=e.target.value; upd(idx,'name',val); const found=productList.find(p=>p.name===val); if(found) upd(idx,'price',String(found.price_vip||found.price_a||0)) }} style={{ flex:2, marginBottom:0 }} /><Inp type="number" placeholder="單價 $" value={item.price} onChange={e => upd(idx,'price',e.target.value)} style={{ flex:1, marginBottom:0 }} />{items.length>1 && <button onClick={() => setItems(items.filter((_,i)=>i!==idx))} style={{ color:C.danger, background:'none', border:'none', cursor:'pointer', fontSize:16 }}>✕</button>}</div>
+      <div style={{ position:'relative', display:'flex', gap:6, marginBottom:8 }}>
+        <div style={{ flex:2, position:'relative' }}>
+          <Inp autoComplete="off" placeholder="搜尋雪茄品名或品牌 *" value={item.name} onChange={e => { const kw=e.target.value; upd(idx,'name',kw); const lo=kw.toLowerCase(); const m=kw.length>=1?productList.filter(p=>(p.name||'').toLowerCase().includes(lo)||(p.brand||'').toLowerCase().includes(lo)).slice(0,20):[]; setDropItems(m); setDropIdx(idx); setShowDrop(m.length>0&&kw.length>0); const found=productList.find(p=>p.name===kw); if(found) upd(idx,'price',String(found.price_vip||found.price_a||0)) }} onFocus={e => { const kw=(item.name||'').toLowerCase(); if(kw.length>=1) { const m=productList.filter(p=>(p.name||'').toLowerCase().includes(kw)||(p.brand||'').toLowerCase().includes(kw)).slice(0,20); setDropItems(m); setDropIdx(idx); setShowDrop(m.length>0) } }} onBlur={() => setTimeout(()=>setShowDrop(false),200)} style={{ marginBottom:0 }} />
+          {showDrop && dropIdx===idx && dropItems.length>0 && <div style={{ position:'absolute', top:'100%', left:0, right:0, background:'#1a1a1a', border:`1px solid ${C.gold}`, borderRadius:12, maxHeight:220, overflowY:'auto', zIndex:9999, boxShadow:'0 8px 24px rgba(0,0,0,.6)' }}>
+            {dropItems.map(p => <div key={p.id} onMouseDown={e=>e.preventDefault()} onClick={() => { upd(idx,'name',p.name); upd(idx,'price',String(p.price_vip||p.price_a||0)); setShowDrop(false) }} style={{ padding:'12px 16px', fontSize:15, color:'#ddd', borderBottom:'1px solid #2a2a2a', display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer' }}><span>{p.name}</span><span style={{ color:C.gold, fontSize:13 }}>{fc(p.price_vip||p.price_a)}</span></div>)}
+          </div>}
+        </div>
+        <Inp type="number" placeholder="單價 $" value={item.price} onChange={e => upd(idx,'price',e.target.value)} style={{ flex:1, marginBottom:0 }} />{items.length>1 && <button onClick={() => setItems(items.filter((_,i)=>i!==idx))} style={{ color:C.danger, background:'none', border:'none', cursor:'pointer', fontSize:16 }}>✕</button>}
+      </div>
       <div style={{ fontSize:10, color:C.muted, marginBottom:4 }}>購買支數 <b style={{ color:C.text }}>{(+item.qtyCab||0)+(+item.qtyOut||0)+(+item.qtySite||0)+(+item.qtyPend||0)}</b></div>
       <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:6, marginBottom:6 }}>{[['qtyCab','📦 入櫃'],['qtyOut','🛍️ 外帶'],['qtySite','🚬 現場'],['qtyPend','✈️ 未到貨']].map(([k,l]) => <div key={k}><div style={{ fontSize:9, color:C.muted, marginBottom:2 }}>{l}</div><input type="number" min={0} value={item[k]} onChange={e => upd(idx,k,+e.target.value||0)} style={{ width:'100%', fontSize:13, padding:'8px 4px', background:'#1a1714', border:`1px solid ${C.border}`, borderRadius:8, color:C.text, textAlign:'center' }} /></div>)}</div>
       {(+item.qtyCab||0) > 0 && <Inp placeholder="入櫃 → 櫃位號碼" value={item.cab} onChange={e => upd(idx,'cab',e.target.value)} style={{ borderColor:`${C.gold}50`, color:C.gold, marginBottom:4 }} />}
       <div style={{ fontSize:10, color:C.muted, textAlign:'right' }}>合計 {(+item.qtyCab||0)+(+item.qtyOut||0)+(+item.qtySite||0)+(+item.qtyPend||0)} 支 | 小計 {fc((+item.price||0)*((+item.qtyCab||0)+(+item.qtyOut||0)+(+item.qtySite||0)+(+item.qtyPend||0)))}</div>
     </div>)}
-    <button onClick={() => setItems([...items, { name:'', price:'', qtyCab:0, qtyOut:0, qtySite:0, qtyPend:0, cab:'', _showDrop:false }])} style={{ fontSize:12, color:C.gold, background:'none', border:`1px dashed ${C.border}`, borderRadius:10, padding:10, width:'100%', cursor:'pointer', marginBottom:16 }}>+ 新增品項</button>
+    <button onClick={() => setItems([...items, { name:'', price:'', qtyCab:0, qtyOut:0, qtySite:0, qtyPend:0, cab:'' }])} style={{ fontSize:12, color:C.gold, background:'none', border:`1px dashed ${C.border}`, borderRadius:10, padding:10, width:'100%', cursor:'pointer', marginBottom:16 }}>+ 新增品項</button>
 
     <div style={{ fontSize:20, fontWeight:800, color:C.gold, textAlign:'right', marginBottom:16 }}>訂單總額：{fc(total)}</div>
     {total > 0 && total < 168000 && <div style={{ background:`${C.warning}10`, border:`1px solid ${C.warning}30`, borderRadius:10, padding:'8px 12px', marginBottom:12, fontSize:11, color:C.warning }}>⚠️ 此訂單金額未達開櫃門檻 ($168,000)</div>}
