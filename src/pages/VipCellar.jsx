@@ -80,6 +80,8 @@ export default function VipCellar() {
   const [employee, setEmployee] = useState(() => JSON.parse(sessionStorage.getItem('employee') || 'null'))
   const [member, setMember] = useState(() => JSON.parse(sessionStorage.getItem('vipMember') || 'null'))
   const [privacy, setPrivacy] = useState(false)
+  const [productCatalog, setProductCatalog] = useState([])
+  useEffect(() => { supabase.from('products').select('id,name,brand,price_a,price_vip').eq('is_active',true).order('brand').order('name').then(({data}) => setProductCatalog(data||[])) }, [])
 
   function loginAsVip(m) { setMember(m); setVipId(m.id); sessionStorage.setItem('vipMember', JSON.stringify(m)); setView('app') }
   function loginAsStaff(e) { setEmployee(e); sessionStorage.setItem('employee', JSON.stringify(e)); setView(e.is_admin ? 'admin' : 'staff') }
@@ -101,7 +103,7 @@ export default function VipCellar() {
 
     <main style={{ padding:0 }}>
       {view === 'login' && <LoginView onVipLogin={loginAsVip} onStaffLogin={loginAsStaff} />}
-      {view === 'staff' && <StaffView employee={employee} onViewVip={staffViewVip} />}
+      {view === 'staff' && <StaffView employee={employee} onViewVip={staffViewVip} productCatalog={productCatalog} />}
       {view === 'admin' && <AdminView employee={employee} onViewVip={staffViewVip} />}
       {view === 'app' && <AppView member={member} employee={employee} privacy={privacy} onBack={employee ? backToStaff : null} />}
     </main>
@@ -156,21 +158,18 @@ function LoginView({ onVipLogin, onStaffLogin }) {
 }
 
 /* ═══ STAFF ═══ */
-function StaffView({ employee, onViewVip }) {
+function StaffView({ employee, onViewVip, productCatalog }) {
   const [members, setMembers] = useState([]); const [search, setSearch] = useState(''); const [loading, setLoading] = useState(true)
   const [showNewOrder, setShowNewOrder] = useState(false)
-  const [productCatalog, setProductCatalog] = useState([])
 
   useEffect(() => { load() }, [])
   async function load() {
     setLoading(true)
-    const [mR, cR, oR, pR] = await Promise.all([
+    const [mR, cR, oR] = await Promise.all([
       supabase.from('vip_members').select('id, name, cabinet_opened, cabinet_expires, is_active').eq('is_active', true).order('name'),
       supabase.from('vip_cabinets').select('vip_id, quantity, unit_price').gt('quantity', 0),
       supabase.from('vip_orders').select('vip_id, balance, is_voided').eq('is_voided', false),
-      supabase.from('products').select('id, name, brand, price_a, price_vip').eq('is_active', true).order('brand').order('name'),
     ])
-    setProductCatalog(pR.data || [])
     const ml = mR.data || []; const cab = cR.data || []; const ord = oR.data || []
     setMembers(ml.map(m => {
       const myCab = cab.filter(c => c.vip_id === m.id)
