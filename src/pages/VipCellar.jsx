@@ -83,15 +83,34 @@ function Portal() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const s = JSON.parse(sessionStorage.getItem('vip_session') || 'null')
+    const s = JSON.parse(sessionStorage.getItem('vip_session') || sessionStorage.getItem('vipMember') || 'null')
     if (!s) return void (window.location.href = '/vip-cellar')
-    loadVip(s.id)
+    loadVip(s.id || s.vip_id, s)
   }, [])
 
-  async function loadVip(id) {
+  async function loadVip(memberId, session) {
     setLoading(true)
-    const { data } = await supabase.rpc('get_vip_data', { p_id: id })
-    if (data) setVip(data)
+    try {
+      const [cabRes, ordRes, withdRes] = await Promise.all([
+        supabase.from('vip_cabinets').select('*').eq('vip_id', memberId).gt('quantity', 0).order('cabinet_no'),
+        supabase.from('vip_orders').select('*').eq('vip_id', memberId).order('created_at', { ascending: false }),
+        supabase.from('vip_withdrawals').select('*').eq('vip_id', memberId).order('withdrawn_at', { ascending: false }),
+      ])
+      const cabinets = cabRes.data || []
+      const orders = ordRes.data || []
+      const withdrawals = withdRes.data || []
+      const stock_qty = cabinets.reduce((s, c) => s + (c.quantity || 0), 0)
+      const stock_val = cabinets.reduce((s, c) => s + (c.market_value || (c.quantity || 0) * (c.unit_price || 0)), 0)
+      const total_unpaid = orders.filter(o => !o.is_voided).reduce((s, o) => s + (o.balance || 0), 0)
+      const total_purchased = orders.filter(o => !o.is_voided).reduce((s, o) => s + (o.order_total || 0), 0)
+      setVip({
+        name: session?.name || '—', vip_id: session?.vip_id || memberId, tier: session?.tier || 'VIP',
+        total_spent: total_purchased, cellar_value: stock_val, unpaid: total_unpaid, cellar_count: stock_qty,
+        inventory: cabinets.map(c => ({ id: c.id, cabinet_no: c.cabinet_no, product_name: c.product_name || c.cigar_name || '—', brand: c.brand || '', qty: c.quantity, unit_price: c.unit_price || 0, stored_at: c.stored_at || c.created_at })),
+        orders: orders.map(o => ({ id: o.id, order_no: o.order_no, total: o.order_total || 0, paid: (o.order_total || 0) - (o.balance || 0), created_at: o.created_at })),
+        pickups: withdrawals.map(w => ({ id: w.id, product_name: w.cigar_name || w.product_name || '—', qty: w.quantity || 0, destination: w.purpose || w.destination || '—', staff_name: w.handled_by_name || w.staff_name || '—', signature_url: w.signature_url, created_at: w.withdrawn_at || w.created_at })),
+      })
+    } catch (e) { console.error('loadVip error:', e) }
     setLoading(false)
   }
 
@@ -192,8 +211,22 @@ function Staff() {
 
   async function loadVipData(vip) {
     setSelectedVip(vip)
-    const { data } = await supabase.rpc('get_vip_data', { p_id: vip.id })
-    setVipData(data)
+    try {
+      const [cabRes, ordRes, withdRes] = await Promise.all([
+        supabase.from('vip_cabinets').select('*').eq('vip_id', vip.id).gt('quantity', 0).order('cabinet_no'),
+        supabase.from('vip_orders').select('*').eq('vip_id', vip.id).order('created_at', { ascending: false }),
+        supabase.from('vip_withdrawals').select('*').eq('vip_id', vip.id).order('withdrawn_at', { ascending: false }),
+      ])
+      const cabinets = cabRes.data || [], orders = ordRes.data || [], withdrawals = withdRes.data || []
+      setVipData({
+        name: vip.name, vip_id: vip.vip_id, tier: vip.tier,
+        cellar_count: cabinets.reduce((s, c) => s + (c.quantity || 0), 0),
+        unpaid: orders.filter(o => !o.is_voided).reduce((s, o) => s + (o.balance || 0), 0),
+        inventory: cabinets.map(c => ({ id: c.id, cabinet_no: c.cabinet_no, product_name: c.product_name || c.cigar_name || '—', brand: c.brand || '', qty: c.quantity, unit_price: c.unit_price || 0, stored_at: c.stored_at || c.created_at })),
+        orders: orders.map(o => ({ id: o.id, order_no: o.order_no, total: o.order_total || 0, paid: (o.order_total || 0) - (o.balance || 0), created_at: o.created_at })),
+        pickups: withdrawals.map(w => ({ id: w.id, product_name: w.cigar_name || w.product_name || '—', qty: w.quantity || 0, destination: w.purpose || w.destination || '—', staff_name: w.handled_by_name || w.staff_name || '—', signature_url: w.signature_url, created_at: w.withdrawn_at || w.created_at })),
+      })
+    } catch (e) { console.error('loadVipData error:', e); setVipData(null) }
   }
 
   async function submitOrder() {
