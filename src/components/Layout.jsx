@@ -32,7 +32,7 @@ export default function Layout({ children }) {
   const nav = isBoss ? BOSS_NAV : STAFF_NAV
 
   // POS uses its own fullscreen layout — skip header, nav, and bottom padding
-  const isFullscreen = location.pathname === '/pos'
+  const isFullscreen = location.pathname === '/pos' || location.pathname.startsWith('/vip-cellar')
 
   if (isFullscreen) {
     return (

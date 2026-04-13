@@ -23,6 +23,7 @@ import Customers from './pages/boss/Customers'
 import DealerOrders from './pages/DealerOrders'
 import AmbassadorApp from './pages/ambassador/AmbassadorApp'
 import PosApp from './pages/pos/PosApp'
+import VipCellar from './pages/VipCellar'
 
 export default function App() {
   const { user, loading } = useAuth()
@@ -35,6 +36,13 @@ export default function App() {
     <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a0a' }}>
       <div className="loading-shimmer" style={{ width: 120, height: 120, borderRadius: '50%' }} />
     </div>
+  )
+
+  // VIP Cellar has its own auth
+  if (window.location.pathname.startsWith('/vip-cellar')) return (
+    <Routes>
+      <Route path="/vip-cellar/*" element={<VipCellar />} />
+    </Routes>
   )
 
   // POS App has its own auth (independent from employee system)

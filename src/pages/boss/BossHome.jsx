@@ -20,6 +20,7 @@ export default function BossHome() {
   const [monthRevenue, setMonthRevenue] = useState(0)
   const [pendingHandover, setPendingHandover] = useState(0)
   const [dealerPending, setDealerPending] = useState(0)
+  const [vipUnpaid, setVipUnpaid] = useState(0)
   const today = format(new Date(), 'yyyy-MM-dd')
   const month = format(new Date(), 'yyyy-MM')
 
@@ -55,6 +56,7 @@ export default function BossHome() {
     setMonthRevenue((revR.data || []).reduce((s, r) => s + (+r.total || 0), 0))
     setPendingHandover((hoR.data || []).length)
     try { const { data: dpData } = await supabase.rpc('get_dealer_pending_orders'); if (dpData?.count !== undefined) setDealerPending(dpData.count) } catch {}
+    try { const { data: vd } = await supabase.rpc('get_vip_dashboard'); if (vd?.total_unpaid !== undefined) setVipUnpaid(vd.total_unpaid) } catch {}
 
     // Build danger list
     const dangerList = []
@@ -132,6 +134,7 @@ export default function BossHome() {
         <SB label="待確認交班" value={pendingHandover} color={pendingHandover > 0 ? '#f59e0b' : 'var(--text-muted)'} />
         <SB label="低庫存" value={stats.lowStock} color={stats.lowStock > 0 ? 'var(--red)' : 'var(--green)'} tap={() => navigate('/operations')} />
         <SB label="經銷商待出貨" value={dealerPending} color={dealerPending > 0 ? 'var(--red)' : 'var(--text-muted)'} tap={() => navigate('/dealer-orders')} />
+        <SB label="💎 VIP窖藏欠款" value={vipUnpaid ? '$' + vipUnpaid.toLocaleString() : '$0'} color={vipUnpaid > 0 ? 'var(--red)' : 'var(--text-muted)'} tap={() => navigate('/vip-cellar/admin')} />
       </div>
 
       {/* 🔥 Today's Top 5 Dangers */}
