@@ -181,17 +181,20 @@ function Staff() {
   const [modal, setModal] = useState(null) // 'order' | 'pickup' | 'payment'
   // Order form
   const [orderType, setOrderType] = useState('現貨購買')
-  const [orderItems, setOrderItems] = useState([{ name: '', price: '', qty: 1, cabinet: '', destination: '入櫃' }])
-  const [orderPay, setOrderPay] = useState('cash')
+  const [orderItems, setOrderItems] = useState([{ name: '', price: '', qtyCabinet: 0, qtyTakeout: 0, qtyOnsite: 0, qtyPending: 0, cabinet: '' }])
+  const [orderPay, setOrderPay] = useState('現金')
   const [orderAmount, setOrderAmount] = useState('')
+  const [orderNote, setOrderNote] = useState('')
   // Pickup form
   const [pickupItem, setPickupItem] = useState(null)
   const [pickupQty, setPickupQty] = useState(1)
   const [pickupDest, setPickupDest] = useState('現場享用')
+  const [pickupNote, setPickupNote] = useState('')
   // Payment form
   const [payOrder, setPayOrder] = useState(null)
   const [payAmount, setPayAmount] = useState('')
-  const [payMethod, setPayMethod] = useState('cash')
+  const [payMethod, setPayMethod] = useState('現金')
+  const [payNote, setPayNote] = useState('')
   // Signature
   const sigRef = useRef(null)
   const [sigData, setSigData] = useState(null)
@@ -232,23 +235,58 @@ function Staff() {
   async function submitOrder() {
     const items = orderItems.filter(i => i.name.trim())
     if (!items.length) return alert('請填寫至少一個品項')
-    const { error } = await supabase.rpc('vip_create_order', { p_vip_id: selectedVip.id, p_type: orderType, p_items: items, p_payment_method: orderPay, p_paid_amount: +orderAmount || 0, p_staff_id: staff.employee_id, p_staff_name: staff.name })
-    if (error) return alert('建立失敗: ' + error.message)
-    alert('✅ 訂單已建立'); setModal(null); setOrderItems([{ name: '', price: '', qty: 1, cabinet: '', destination: '入櫃' }]); setOrderAmount(''); loadVipData(selectedVip)
+    const orderNo = 'ORD-' + new Date().toISOString().replace(/[-T:.Z]/g, '').slice(0, 15)
+    const isStore = orderType === '客戶寄存'
+    const orderTotal = isStore ? 0 : items.reduce((s, i) => s + (+i.price || 0) * ((+i.qtyCabinet || 0) + (+i.qtyTakeout || 0) + (+i.qtyOnsite || 0) + (+i.qtyPending || 0)), 0)
+    const paidAmt = +orderAmount || 0
+    const status = paidAmt >= orderTotal && orderTotal > 0 ? '已沖平結清' : paidAmt > 0 ? '部分沖銷' : '未付款'
+    // 1. Insert order
+    const { data: ordData, error: ordErr } = await supabase.from('vip_orders').insert({ order_no: orderNo, vip_id: selectedVip.id, vip_name: selectedVip.name, order_type: orderType, order_total: orderTotal, paid_amount: paidAmt, balance: Math.max(0, orderTotal - paidAmt), status, notes: orderNote || null, staff_name: staff.name }).select().single()
+    if (ordErr) return alert('建立失敗: ' + ordErr.message)
+    const orderId = ordData.id
+    // 2. Insert order items
+    for (const item of items) {
+      const totalQty = (+item.qtyCabinet || 0) + (+item.qtyTakeout || 0) + (+item.qtyOnsite || 0) + (+item.qtyPending || 0)
+      await supabase.from('vip_order_items').insert({ order_id: orderId, order_no: orderNo, product_name: item.name, qty_ordered: totalQty, qty_delivered: (+item.qtyCabinet || 0) + (+item.qtyTakeout || 0) + (+item.qtyOnsite || 0), qty_pending: +item.qtyPending || 0, unit_price: +item.price || 0, destination: item.cabinet ? '入櫃' : '外帶', cabinet_no: item.cabinet || null, status: (+item.qtyPending || 0) > 0 ? '部分到貨' : '已到齊' })
+    }
+    // 3. Insert cabinets for items with qtyCabinet > 0
+    for (const item of items) {
+      if ((+item.qtyCabinet || 0) > 0 && item.cabinet) {
+        await supabase.from('vip_cabinets').insert({ vip_id: selectedVip.id, cabinet_no: item.cabinet, product_name: item.name, quantity: +item.qtyCabinet, unit_price: +item.price || 0, stored_date: new Date().toISOString().slice(0, 10) })
+      }
+    }
+    // 4. Insert payment if paid
+    if (paidAmt > 0) {
+      await supabase.from('vip_payments').insert({ order_id: orderId, order_no: orderNo, vip_id: selectedVip.id, amount: paidAmt, payment_method: orderPay, staff_name: staff.name })
+    }
+    alert('✅ 訂單已建立'); setModal(null); setOrderItems([{ name: '', price: '', qtyCabinet: 0, qtyTakeout: 0, qtyOnsite: 0, qtyPending: 0, cabinet: '' }]); setOrderAmount(''); setOrderNote(''); loadVipData(selectedVip)
   }
 
   async function submitPickup() {
     if (!pickupItem) return alert('請選擇品項')
-    const { error } = await supabase.rpc('vip_record_pickup', { p_vip_id: selectedVip.id, p_inventory_id: pickupItem.id, p_qty: pickupQty, p_destination: pickupDest, p_staff_id: staff.employee_id, p_staff_name: staff.name, p_signature_url: sigData })
-    if (error) return alert('記錄失敗: ' + error.message)
-    alert('✅ 領取已記錄'); setModal(null); setPickupItem(null); setSigData(null); loadVipData(selectedVip)
+    if (pickupQty > pickupItem.qty) return alert(`最多只能領取 ${pickupItem.qty} 支`)
+    // 1. Update cabinet quantity
+    const { error: upErr } = await supabase.from('vip_cabinets').update({ quantity: pickupItem.qty - pickupQty }).eq('id', pickupItem.id)
+    if (upErr) return alert('更新失敗: ' + upErr.message)
+    // 2. Insert withdrawal
+    const { error: wErr } = await supabase.from('vip_withdrawals').insert({ vip_id: selectedVip.id, vip_name: selectedVip.name, cabinet_no: pickupItem.cabinet_no, product_name: pickupItem.product_name, cigar_name: pickupItem.product_name, qty_withdrawn: pickupQty, qty_remaining: pickupItem.qty - pickupQty, destination: pickupDest, purpose: pickupDest, staff_name: staff.name, handled_by_name: staff.name, notes: pickupNote || null, signature_url: sigData || null, withdrawn_at: new Date().toISOString() })
+    if (wErr) return alert('記錄失敗: ' + wErr.message)
+    alert('✅ 領取已記錄'); setModal(null); setPickupItem(null); setPickupQty(1); setPickupNote(''); setSigData(null); loadVipData(selectedVip)
   }
 
   async function submitPayment() {
-    if (!payOrder || !payAmount) return alert('請填寫金額')
-    const { error } = await supabase.rpc('vip_record_payment', { p_order_id: payOrder.id, p_amount: +payAmount, p_method: payMethod, p_staff_id: staff.employee_id, p_staff_name: staff.name })
-    if (error) return alert('收款失敗: ' + error.message)
-    alert('✅ 已收款'); setModal(null); setPayAmount(''); loadVipData(selectedVip)
+    if (!payOrder) return alert('請選擇訂單')
+    const amt = +payAmount || 0
+    if (amt <= 0) return alert('請填寫金額')
+    // 1. Insert payment
+    const { error: pErr } = await supabase.from('vip_payments').insert({ order_id: payOrder.id, order_no: payOrder.order_no, vip_id: selectedVip.id, amount: amt, payment_method: payMethod, staff_name: staff.name, notes: payNote || null })
+    if (pErr) return alert('收款失敗: ' + pErr.message)
+    // 2. Update order
+    const newPaid = payOrder.paid + amt
+    const newBalance = Math.max(0, payOrder.total - newPaid)
+    const newStatus = newPaid >= payOrder.total ? '已沖平結清' : '部分沖銷'
+    await supabase.from('vip_orders').update({ paid_amount: newPaid, balance: newBalance, status: newStatus, updated_at: new Date().toISOString() }).eq('id', payOrder.id)
+    alert('✅ 已收款'); setModal(null); setPayAmount(''); setPayNote(''); setPayOrder(null); loadVipData(selectedVip)
   }
 
   if (!staff) return null
@@ -289,39 +327,58 @@ function Staff() {
       <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
         {['現貨購買', '預購訂貨', '客戶寄存'].map(t => <button key={t} onClick={() => setOrderType(t)} style={{ flex: 1, padding: 8, borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: orderType === t ? C.gold : C.card, color: orderType === t ? '#000' : C.text, border: `1px solid ${C.border}` }}>{t}</button>)}
       </div>
-      {orderItems.map((item, idx) => <div key={idx} style={{ display: 'flex', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
-        <input placeholder="品名" value={item.name} onChange={e => { const a = [...orderItems]; a[idx].name = e.target.value; setOrderItems(a) }} style={{ flex: 2, ...is, marginBottom: 0 }} />
-        <input type="number" placeholder="單價" value={item.price} onChange={e => { const a = [...orderItems]; a[idx].price = e.target.value; setOrderItems(a) }} style={{ flex: 1, ...is, marginBottom: 0 }} />
-        <input type="number" placeholder="數量" value={item.qty} onChange={e => { const a = [...orderItems]; a[idx].qty = +e.target.value || 1; setOrderItems(a) }} style={{ width: 60, ...is, marginBottom: 0 }} />
-        <input placeholder="櫃位" value={item.cabinet} onChange={e => { const a = [...orderItems]; a[idx].cabinet = e.target.value; setOrderItems(a) }} style={{ width: 60, ...is, marginBottom: 0 }} />
-      </div>)}
-      <button onClick={() => setOrderItems([...orderItems, { name: '', price: '', qty: 1, cabinet: '', destination: '入櫃' }])} style={{ fontSize: 11, color: C.gold, background: 'none', border: `1px dashed ${C.border}`, borderRadius: 8, padding: '8px', width: '100%', cursor: 'pointer', marginBottom: 12 }}>+ 增加品項</button>
-      <select value={orderPay} onChange={e => setOrderPay(e.target.value)} style={is}><option value="cash">現金</option><option value="transfer">轉帳</option><option value="card">刷卡</option><option value="later">稍後付款</option></select>
-      <input type="number" placeholder="本次收款金額" value={orderAmount} onChange={e => setOrderAmount(e.target.value)} style={is} />
+      {orderItems.map((item, idx) => { const upd = (k, v) => { const a = [...orderItems]; a[idx][k] = v; setOrderItems(a) }; return <div key={idx} style={{ background: '#0d0b09', borderRadius: 10, padding: 10, marginBottom: 8, border: `1px solid ${C.border}` }}>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+          <input placeholder="品名 *" value={item.name} onChange={e => upd('name', e.target.value)} style={{ flex: 2, ...is, marginBottom: 0, background: '#2a2520', border: `1px solid ${C.gold}30` }} />
+          <input type="number" placeholder="單價" value={item.price} onChange={e => upd('price', e.target.value)} style={{ flex: 1, ...is, marginBottom: 0, background: '#2a2520', border: `1px solid ${C.gold}30` }} />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, marginBottom: 6 }}>
+          <div><div style={{ fontSize: 9, color: C.muted }}>入櫃</div><input type="number" min={0} value={item.qtyCabinet} onChange={e => upd('qtyCabinet', +e.target.value || 0)} style={{ width: '100%', fontSize: 12, padding: '6px 4px', background: '#2a2520', border: `1px solid ${C.border}`, borderRadius: 6, color: C.text, textAlign: 'center' }} /></div>
+          <div><div style={{ fontSize: 9, color: C.muted }}>外帶</div><input type="number" min={0} value={item.qtyTakeout} onChange={e => upd('qtyTakeout', +e.target.value || 0)} style={{ width: '100%', fontSize: 12, padding: '6px 4px', background: '#2a2520', border: `1px solid ${C.border}`, borderRadius: 6, color: C.text, textAlign: 'center' }} /></div>
+          <div><div style={{ fontSize: 9, color: C.muted }}>現場</div><input type="number" min={0} value={item.qtyOnsite} onChange={e => upd('qtyOnsite', +e.target.value || 0)} style={{ width: '100%', fontSize: 12, padding: '6px 4px', background: '#2a2520', border: `1px solid ${C.border}`, borderRadius: 6, color: C.text, textAlign: 'center' }} /></div>
+          <div><div style={{ fontSize: 9, color: C.muted }}>未到貨</div><input type="number" min={0} value={item.qtyPending} onChange={e => upd('qtyPending', +e.target.value || 0)} style={{ width: '100%', fontSize: 12, padding: '6px 4px', background: '#2a2520', border: `1px solid ${C.border}`, borderRadius: 6, color: C.text, textAlign: 'center' }} /></div>
+        </div>
+        {(+item.qtyCabinet || 0) > 0 && <input placeholder="櫃位號碼" value={item.cabinet} onChange={e => upd('cabinet', e.target.value)} style={{ width: '100%', fontSize: 12, padding: '6px 8px', background: '#2a2520', border: `1px solid ${C.gold}50`, borderRadius: 6, color: C.gold, marginBottom: 4 }} />}
+        {orderItems.length > 1 && <button onClick={() => setOrderItems(orderItems.filter((_, i) => i !== idx))} style={{ fontSize: 10, color: C.red, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0' }}>✕ 移除</button>}
+      </div> })}
+      <button onClick={() => setOrderItems([...orderItems, { name: '', price: '', qtyCabinet: 0, qtyTakeout: 0, qtyOnsite: 0, qtyPending: 0, cabinet: '' }])} style={{ fontSize: 11, color: C.gold, background: 'none', border: `1px dashed ${C.border}`, borderRadius: 8, padding: '8px', width: '100%', cursor: 'pointer', marginBottom: 12 }}>+ 增加品項</button>
+      <select value={orderPay} onChange={e => setOrderPay(e.target.value)} style={{ ...is, background: '#2a2520', border: `1px solid ${C.gold}30` }}><option>ACPAY刷卡機</option><option>臺灣企銀刷卡機</option><option>現金</option><option>銀行匯款</option><option>微信支付</option><option>支付寶</option></select>
+      <input type="number" placeholder="本次收款金額" value={orderAmount} onChange={e => setOrderAmount(e.target.value)} style={{ ...is, background: '#2a2520', border: `1px solid ${C.gold}30` }} />
+      <input placeholder="備註" value={orderNote} onChange={e => setOrderNote(e.target.value)} style={{ ...is, background: '#2a2520', border: `1px solid ${C.gold}30` }} />
+      <div style={{ fontSize: 12, color: C.muted, marginBottom: 8, textAlign: 'right' }}>訂單總額：<span style={{ color: C.gold, fontWeight: 700 }}>{fmt(orderType === '客戶寄存' ? 0 : orderItems.reduce((s, i) => s + (+i.price || 0) * ((+i.qtyCabinet || 0) + (+i.qtyTakeout || 0) + (+i.qtyOnsite || 0) + (+i.qtyPending || 0)), 0))}</span></div>
       <button onClick={submitOrder} style={{ width: '100%', padding: 14, fontSize: 16, fontWeight: 700, background: C.gold, color: '#000', border: 'none', borderRadius: 12, cursor: 'pointer' }}>確認建立</button>
     </Overlay>}
 
     {/* PICKUP MODAL */}
     {modal === 'pickup' && <Overlay onClose={() => setModal(null)} title="記錄領取">
       <div style={{ fontSize: 12, color: C.muted, marginBottom: 8 }}>選擇庫存品項</div>
-      {(vipData?.inventory || []).filter(i => i.qty > 0).map(i => <button key={i.id} onClick={() => setPickupItem(i)} style={{ width: '100%', textAlign: 'left', padding: 10, marginBottom: 4, background: pickupItem?.id === i.id ? 'rgba(208,165,79,.1)' : C.card, border: `1px solid ${pickupItem?.id === i.id ? C.gold : C.border}`, borderRadius: 8, color: C.text, cursor: 'pointer' }}>{i.product_name} ({i.qty}支) — 櫃位 {i.cabinet_no || '—'}</button>)}
-      <input type="number" min={1} value={pickupQty} onChange={e => setPickupQty(Math.max(1, +e.target.value || 1))} placeholder="數量" style={{ ...is, marginTop: 8 }} />
-      <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-        {['現場享用', '外帶', '轉贈'].map(d => <button key={d} onClick={() => setPickupDest(d)} style={{ flex: 1, padding: 8, borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: pickupDest === d ? C.gold : C.card, color: pickupDest === d ? '#000' : C.text, border: `1px solid ${C.border}` }}>{d}</button>)}
+      {(vipData?.inventory || []).filter(i => i.qty > 0).map(i => <button key={i.id} onClick={() => { setPickupItem(i); setPickupQty(1) }} style={{ width: '100%', textAlign: 'left', padding: 10, marginBottom: 4, background: pickupItem?.id === i.id ? 'rgba(208,165,79,.1)' : C.card, border: `1px solid ${pickupItem?.id === i.id ? C.gold : C.border}`, borderRadius: 8, color: C.text, cursor: 'pointer' }}>{i.product_name} ({i.qty}支) — 櫃位 {i.cabinet_no || '—'}</button>)}
+      <input type="number" min={1} max={pickupItem?.qty || 999} value={pickupQty} onChange={e => setPickupQty(Math.max(1, Math.min(pickupItem?.qty || 999, +e.target.value || 1)))} placeholder="數量" style={{ ...is, marginTop: 8, background: '#2a2520', border: `1px solid ${C.gold}30` }} />
+      <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+        {['現場享用', '外帶離店', '轉贈他人'].map(d => <button key={d} onClick={() => setPickupDest(d)} style={{ flex: 1, padding: 8, borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: pickupDest === d ? C.gold : C.card, color: pickupDest === d ? '#000' : C.text, border: `1px solid ${C.border}` }}>{d}</button>)}
       </div>
+      <input placeholder="備註" value={pickupNote} onChange={e => setPickupNote(e.target.value)} style={{ ...is, background: '#2a2520', border: `1px solid ${C.gold}30` }} />
       {/* Signature canvas */}
-      <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>客戶簽名</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}><span style={{ fontSize: 11, color: C.muted }}>客戶簽名</span><button onClick={() => { const c = sigRef.current; if (c) { c.getContext('2d').clearRect(0, 0, c.width, c.height); setSigData(null) } }} style={{ fontSize: 10, color: C.muted, background: 'none', border: `1px solid ${C.border}`, borderRadius: 4, padding: '2px 8px', cursor: 'pointer' }}>清除</button></div>
       <canvas ref={sigRef} width={300} height={100} style={{ width: '100%', height: 100, background: '#1a1714', border: `1px solid ${C.border}`, borderRadius: 8, marginBottom: 8, touchAction: 'none' }}
         onPointerDown={e => { const c = sigRef.current; if (!c) return; const ctx = c.getContext('2d'); ctx.strokeStyle = C.gold; ctx.lineWidth = 2; ctx.beginPath(); const r = c.getBoundingClientRect(); ctx.moveTo(e.clientX - r.left, e.clientY - r.top); c.onpointermove = ev => { ctx.lineTo(ev.clientX - r.left, ev.clientY - r.top); ctx.stroke() }; c.onpointerup = () => { c.onpointermove = null; setSigData(c.toDataURL()) } }} />
       <button onClick={submitPickup} style={{ width: '100%', padding: 14, fontSize: 16, fontWeight: 700, background: C.gold, color: '#000', border: 'none', borderRadius: 12, cursor: 'pointer' }}>確認領取</button>
     </Overlay>}
 
     {/* PAYMENT MODAL */}
-    {modal === 'payment' && <Overlay onClose={() => setModal(null)} title="收款">
-      <div style={{ fontSize: 12, color: C.muted, marginBottom: 8 }}>選擇訂單</div>
-      {(vipData?.orders || []).filter(o => o.paid < o.total).map(o => <button key={o.id} onClick={() => setPayOrder(o)} style={{ width: '100%', textAlign: 'left', padding: 10, marginBottom: 4, background: payOrder?.id === o.id ? 'rgba(208,165,79,.1)' : C.card, border: `1px solid ${payOrder?.id === o.id ? C.gold : C.border}`, borderRadius: 8, color: C.text, cursor: 'pointer' }}>{o.order_no} — 欠 {fmt(o.total - o.paid)}</button>)}
-      <select value={payMethod} onChange={e => setPayMethod(e.target.value)} style={{ ...is, marginTop: 8 }}><option value="cash">現金</option><option value="transfer">轉帳</option><option value="card">刷卡</option></select>
-      <input type="number" placeholder="收款金額" value={payAmount} onChange={e => setPayAmount(e.target.value)} style={is} />
+    {modal === 'payment' && <Overlay onClose={() => setModal(null)} title="💰 收款">
+      <div style={{ fontSize: 12, color: C.muted, marginBottom: 8 }}>選擇未付清訂單</div>
+      {(vipData?.orders || []).filter(o => o.paid < o.total).map(o => <button key={o.id} onClick={() => { setPayOrder(o); setPayAmount(String(o.total - o.paid)) }} style={{ width: '100%', textAlign: 'left', padding: 10, marginBottom: 4, background: payOrder?.id === o.id ? 'rgba(208,165,79,.1)' : C.card, border: `1px solid ${payOrder?.id === o.id ? C.gold : C.border}`, borderRadius: 8, color: C.text, cursor: 'pointer' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: C.gold }}>{o.order_no}</span><span style={{ color: C.red, fontWeight: 600 }}>欠 {fmt(o.total - o.paid)}</span></div>
+        <div style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>總額 {fmt(o.total)} · 已付 {fmt(o.paid)}</div>
+      </button>)}
+      {payOrder && <div style={{ background: '#0d0b09', borderRadius: 8, padding: 10, marginBottom: 8, border: `1px solid ${C.gold}30` }}>
+        <div style={{ fontSize: 11, color: C.muted }}>訂單 {payOrder.order_no}</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}><span>總額 {fmt(payOrder.total)}</span><span>已付 {fmt(payOrder.paid)}</span><span style={{ color: C.red, fontWeight: 700 }}>待付 {fmt(payOrder.total - payOrder.paid)}</span></div>
+      </div>}
+      <select value={payMethod} onChange={e => setPayMethod(e.target.value)} style={{ ...is, marginTop: 4, background: '#2a2520', border: `1px solid ${C.gold}30` }}><option>ACPAY刷卡機</option><option>臺灣企銀刷卡機</option><option>現金</option><option>銀行匯款</option><option>微信支付</option><option>支付寶</option></select>
+      <input type="number" placeholder="收款金額" value={payAmount} onChange={e => setPayAmount(e.target.value)} style={{ ...is, background: '#2a2520', border: `1px solid ${C.gold}30` }} />
+      <input placeholder="備註" value={payNote} onChange={e => setPayNote(e.target.value)} style={{ ...is, background: '#2a2520', border: `1px solid ${C.gold}30` }} />
       <button onClick={submitPayment} style={{ width: '100%', padding: 14, fontSize: 16, fontWeight: 700, background: C.green, color: '#fff', border: 'none', borderRadius: 12, cursor: 'pointer' }}>確認收款</button>
     </Overlay>}
   </div>
