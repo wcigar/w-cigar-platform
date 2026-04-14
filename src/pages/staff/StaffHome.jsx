@@ -168,6 +168,52 @@ export default function StaffHome() {
         </div>
       )}
 
+      {/* 🎯 Reward target card */}
+      {(() => {
+        const tiers = [{min:0,max:300000,pct:0,label:'未達門檻'},{min:300000,max:500000,pct:3,label:'3%分紅'},{min:500000,max:700000,pct:5,label:'5%分紅'},{min:700000,max:1000000,pct:7,label:'7%分紅'},{min:1000000,max:Infinity,pct:10,label:'10%分紅'}]
+        const cur = tiers.find(t => monthRevenue >= t.min && monthRevenue < t.max) || tiers[0]
+        const next = tiers.find(t => t.min > monthRevenue)
+        const curIdx = tiers.indexOf(cur)
+        const gap = next ? next.min - monthRevenue : 0
+        const pctInTier = cur.max === Infinity ? 100 : Math.min(100, ((monthRevenue - cur.min) / (cur.max - cur.min)) * 100)
+        return <div className="card" style={{ marginBottom: 16, borderColor: cur.pct > 0 ? 'rgba(77,168,108,.3)' : 'var(--border-gold)', background: cur.pct > 0 ? 'rgba(77,168,108,.03)' : 'rgba(201,168,76,.03)' }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+            <span style={{ fontSize:15, fontWeight:700 }}>🎯 本月獎勵目標</span>
+            <span style={{ fontSize:10, color:'var(--text-muted)' }}>{format(new Date(), 'M月')}</span>
+          </div>
+          {/* Big revenue + current tier */}
+          <div style={{ textAlign:'center', marginBottom:12 }}>
+            <div style={{ fontSize:11, color:'var(--text-dim)' }}>本月店內營業額</div>
+            <div style={{ fontSize:32, fontWeight:800, color:'var(--gold)', fontFamily:'var(--font-mono)', marginTop:2 }}>${monthRevenue.toLocaleString()}</div>
+            <div style={{ fontSize:14, fontWeight:700, color:cur.pct>0?'var(--green)':'var(--text-muted)', marginTop:4 }}>{cur.pct>0?`🎉 目前 ${cur.pct}% 分紅！`:'尚未達分紅門檻'}</div>
+          </div>
+          {/* 5-segment progress */}
+          <div style={{ display:'flex', gap:3, marginBottom:6 }}>
+            {tiers.map((t,i) => <div key={i} style={{ flex:1, height:8, borderRadius:4, background:i<curIdx?'var(--green)':i===curIdx?`linear-gradient(90deg,${cur.pct>0?'var(--green)':'var(--gold)'} ${pctInTier}%, var(--black) ${pctInTier}%)`:'var(--black)', border:'1px solid var(--border)' }} />)}
+          </div>
+          <div style={{ display:'flex', justifyContent:'space-between', fontSize:9, color:'var(--text-muted)', marginBottom:10 }}>
+            {tiers.map((t,i) => <span key={i} style={{ color:i<=curIdx?'var(--gold)':'var(--text-muted)', fontWeight:i===curIdx?700:400 }}>{t.pct}%</span>)}
+          </div>
+          {/* Milestone text */}
+          {next && gap > 0 && <div style={{ background:'var(--black)', borderRadius:8, padding:'8px 12px', fontSize:13, textAlign:'center', marginBottom:8 }}>
+            {cur.pct > 0
+              ? <span>📈 再 <b style={{ color:'var(--gold)' }}>${gap.toLocaleString()}</b> 升級到 <b style={{ color:'var(--green)' }}>{next.pct}%</b></span>
+              : <span>💪 再 <b style={{ color:'var(--gold)' }}>${gap.toLocaleString()}</b> 即達 <b style={{ color:'var(--green)' }}>{next.pct}%</b> 分紅門檻</span>}
+          </div>}
+          {/* Bonuses */}
+          <div style={{ display:'flex', gap:8, fontSize:11 }}>
+            <div style={{ flex:1, background:'var(--black)', borderRadius:8, padding:'8px 10px', textAlign:'center' }}>
+              <div style={{ color:'var(--text-muted)', fontSize:9 }}>全勤獎金</div>
+              <div style={{ color:'var(--gold)', fontWeight:700, fontSize:16, fontFamily:'var(--font-mono)' }}>$2,000</div>
+            </div>
+            <div style={{ flex:1, background:'var(--black)', borderRadius:8, padding:'8px 10px', textAlign:'center' }}>
+              <div style={{ color:'var(--text-muted)', fontSize:9 }}>分紅級距</div>
+              <div style={{ color:cur.pct>0?'var(--green)':'var(--text-muted)', fontWeight:700, fontSize:16 }}>{cur.pct}%</div>
+            </div>
+          </div>
+        </div>
+      })()}
+
       <div className="grid-2" style={{ marginBottom: 16 }}>
         <div className="card" style={{ padding: 14, textAlign: 'center' }}>
           <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>SOP 進度</div>
@@ -243,31 +289,6 @@ export default function StaffHome() {
         </div>
       )}
 
-      {/* Commission card */}
-      <div className="card" style={{ marginBottom: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}><span style={{ fontSize: 16 }}>💰</span><span style={{ fontSize: 14, fontWeight: 600 }}>POS 收銀分紅</span></div>
-        {(() => {
-          const tiers = [{min:0,max:300000,pct:0},{min:300000,max:500000,pct:3},{min:500000,max:700000,pct:5},{min:700000,max:1000000,pct:7},{min:1000000,max:Infinity,pct:10}]
-          const current = tiers.find(t => monthRevenue >= t.min && monthRevenue < t.max) || tiers[0]
-          const next = tiers.find(t => t.min > monthRevenue)
-          const fmtK = n => n >= 10000 ? Math.round(n/10000)+'萬' : '$'+n.toLocaleString()
-          return <>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-dim)', marginBottom: 6 }}>
-              <span>本月店內營收</span>
-              <span style={{ color: 'var(--gold)', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>${monthRevenue.toLocaleString()}</span>
-            </div>
-            <div style={{ height: 6, background: 'var(--black)', borderRadius: 3, overflow: 'hidden', marginBottom: 8 }}>
-              <div style={{ height: '100%', borderRadius: 3, width: Math.min(100, monthRevenue / 1000000 * 100) + '%', background: current.pct > 0 ? 'var(--green)' : 'var(--gold-dim)', transition: 'width .5s' }} />
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
-              {tiers.map(t => <span key={t.min} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: current.min === t.min ? (t.pct > 0 ? 'rgba(77,168,108,.15)' : 'rgba(201,168,76,.1)') : 'transparent', color: current.min === t.min ? (t.pct > 0 ? 'var(--green)' : 'var(--gold)') : 'var(--text-muted)', border: current.min === t.min ? '1px solid' : '1px solid transparent', fontWeight: current.min === t.min ? 700 : 400 }}>{fmtK(t.min)}~{t.max === Infinity ? '以上' : fmtK(t.max)} → {t.pct}%</span>)}
-            </div>
-            {current.pct > 0 ? <div style={{ fontSize: 12, color: 'var(--green)' }}>🎉 已達 {current.pct}% 分紅門檻！{next ? ` 再 $${(next.min - monthRevenue).toLocaleString()} 升級到 ${next.pct}%` : ''}</div>
-            : next ? <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>再 ${(next.min - monthRevenue).toLocaleString()} 即達 {next.pct}% 分紅門檻</div>
-            : null}
-          </>
-        })()}
-      </div>
     
       {showPunchCam && (
         <div style={{ position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.9)', zIndex:9999, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center' }}>
