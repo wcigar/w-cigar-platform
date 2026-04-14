@@ -7,8 +7,8 @@ const PAY_OPTS = ['ACPAY刷卡機','臺灣企銀刷卡機(美國運通/銀聯)',
 const SRC_TAGS = ['老闆客戶','老闆娘客戶','店內新客戶','友人介紹','LINE訂購']
 const DEST_OPTS = [{ k:'現場享用', icon:'🚬', c:C.success }, { k:'外帶離店', icon:'🛍️', c:C.gold }, { k:'轉贈招待', icon:'🎁', c:C.danger }]
 const fc = n => new Intl.NumberFormat('zh-TW', { style:'currency', currency:'TWD', minimumFractionDigits:0 }).format(n || 0)
-const fd = d => { if(!d) return '—'; const x=new Date(d); return isNaN(x.getTime()) ? '—' : x.toLocaleDateString('zh-TW', { timeZone:'Asia/Taipei' }) }
-const fdt = d => { if(!d) return '—'; const x=new Date(d); return isNaN(x.getTime()) ? '—' : x.toLocaleString('zh-TW', { timeZone:'Asia/Taipei', year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' }) }
+const fd = d => { if(!d) return '—'; try { const x=new Date(d); if(isNaN(x.getTime())) return String(d); return x.toLocaleDateString('zh-TW', { timeZone:'Asia/Taipei' }) } catch { return String(d) } }
+const fdt = d => { if(!d) return '—'; try { const x=new Date(d); if(isNaN(x.getTime())) return String(d); return x.toLocaleString('zh-TW', { timeZone:'Asia/Taipei', year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', hour12:false }).replace(',','') } catch { return String(d) } }
 
 function getAging(ds) { if (!ds) return null; const m = Math.floor((Date.now() - new Date(ds).getTime()) / (30.44*86400000)); return m < 3 ? { l:'🟡 醇化中', c:C.warning } : m < 12 ? { l:'🟢 適飲期', c:C.success } : { l:'👑 完美熟成', c:C.purple } }
 function extractBrand(n) { const brands = ['COHIBA','MONTECRISTO','ROMEO Y JULIETA','PARTAGAS','H. UPMANN','HOYO DE MONTERREY','BOLIVAR','TRINIDAD','PUNCH','QUAI D\'ORSAY','DIPLOMATICOS','SAINT LUIS REY','RAMON ALLONES','CAPADURA','VEGUEROS','SAN CRISTOBAL']; const up = (n||'').toUpperCase(); return brands.find(b => up.startsWith(b)) || (n||'').split(' ')[0] || '其他' }
@@ -53,24 +53,26 @@ async function loadVipFull(mid) {
 
 /* ═══ SHARED UI ═══ */
 const GoldBtn = ({children,...p}) => <button {...p} style={{ padding:'10px 20px', fontSize:14, fontWeight:700, borderRadius:12, border:'none', cursor:'pointer', background:C.gold, color:'#000', display:'flex', alignItems:'center', justifyContent:'center', gap:6, ...p.style }}>{children}</button>
-const Inp = p => <input {...p} style={{ width:'100%', fontSize:14, padding:'12px 14px', background:'#1a1714', border:`1px solid ${C.border}`, borderRadius:12, color:C.text, boxSizing:'border-box', marginBottom:8, ...p.style }} />
+const Inp = p => <input {...p} style={{ width:'100%', fontSize:15, padding:'12px 14px', background:'#1a1714', border:`1px solid ${C.border}`, borderRadius:12, color:C.text, boxSizing:'border-box', marginBottom:8, ...p.style }} />
 const MetricBox = ({label,value,color,blur}) => <div style={{ background:C.card, borderRadius:16, padding:14, border:`1px solid ${C.border}` }}><div style={{ fontSize:10, color:C.muted, marginBottom:4 }}>{label}</div><div style={{ fontSize:20, fontWeight:700, color:color||C.text, fontFamily:'var(--font-mono)', filter:blur?'blur(6px)':'none' }}>{value}</div></div>
-function Modal({onClose,title,children,wide}) { return <div style={{ position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,.92)', zIndex:400, overflowY:'auto', WebkitOverflowScrolling:'touch' }} onClick={onClose}><div style={{ maxWidth:wide?700:520, margin:'20px auto', background:'#1a1714', border:`1px solid ${C.gold}40`, borderRadius:24, padding:24, boxShadow:'0 18px 40px rgba(0,0,0,.45)', maxHeight:'90vh', overflowY:'auto' }} onClick={e=>e.stopPropagation()}><div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}><span style={{ fontSize:18, fontWeight:700, color:C.gold }}>{title}</span><button onClick={onClose} style={{ background:'none', border:'none', color:C.muted, cursor:'pointer', fontSize:22 }}>✕</button></div>{children}</div></div> }
+function Modal({onClose,title,children,wide}) { return <div style={{ position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,.92)', zIndex:400, overflowY:'auto', WebkitOverflowScrolling:'touch' }} onClick={onClose}><div style={{ maxWidth:wide?700:520, margin:'20px auto', background:'#1a1714', border:`1px solid ${C.gold}40`, borderRadius:24, padding:24, boxShadow:'0 18px 40px rgba(0,0,0,.45)' }} onClick={e=>e.stopPropagation()}><div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}><span style={{ fontSize:18, fontWeight:700, color:C.gold }}>{title}</span><button onClick={onClose} style={{ background:'none', border:'none', color:C.muted, cursor:'pointer', fontSize:22 }}>✕</button></div>{children}</div></div> }
 function SigCanvas({sigRef,sigData,setSigData}) {
-  function clear() { const c = sigRef.current; if(c) { const ctx=c.getContext('2d'); ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,c.width,c.height); setSigData(null) } }
-  function initCanvas(c) { if(!c) return; c.width=c.offsetWidth||400; c.height=200; const ctx=c.getContext('2d'); ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,c.width,c.height); ctx.strokeStyle='#222222'; ctx.lineWidth=2; ctx.lineCap='round' }
-  function getPos(e, c) { const r=c.getBoundingClientRect(); const t=e.touches?e.touches[0]:e; return { x:(t.clientX-r.left)*(c.width/r.width), y:(t.clientY-r.top)*(c.height/r.height) } }
-  function setupCanvas(el) {
-    if(!el) return; sigRef.current=el; initCanvas(el)
-    // iOS touch events with passive:false
+  const bindRef = useRef(false)
+  function clear() { const c=sigRef.current; if(!c) return; const ctx=c.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,c.width,c.height); ctx.strokeStyle='#111'; ctx.lineWidth=3; ctx.lineCap='round'; ctx.lineJoin='round'; setSigData(null) }
+  function mount(el) {
+    if(!el || bindRef.current) return; sigRef.current=el; bindRef.current=true
+    el.width=el.offsetWidth||500; el.height=160
+    const ctx=el.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,el.width,el.height); ctx.strokeStyle='#111'; ctx.lineWidth=3; ctx.lineCap='round'; ctx.lineJoin='round'
     let drawing=false
-    el.addEventListener('touchstart', e => { e.preventDefault(); drawing=true; const ctx=el.getContext('2d'); ctx.strokeStyle='#000'; ctx.lineWidth=2; ctx.beginPath(); const p=getPos(e,el); ctx.moveTo(p.x,p.y) }, {passive:false})
-    el.addEventListener('touchmove', e => { if(!drawing) return; e.preventDefault(); const ctx=el.getContext('2d'); const p=getPos(e,el); ctx.lineTo(p.x,p.y); ctx.stroke() }, {passive:false})
-    el.addEventListener('touchend', e => { e.preventDefault(); drawing=false; setSigData(el.toDataURL('image/jpeg',0.6)) }, {passive:false})
+    const gp=(e)=>{ const r=el.getBoundingClientRect(); const s=e.touches?e.touches[0]:e; return { x:(s.clientX-r.left)*(el.width/r.width), y:(s.clientY-r.top)*(el.height/r.height) } }
+    const start=e=>{ e.preventDefault(); drawing=true; ctx.beginPath(); const p=gp(e); ctx.moveTo(p.x,p.y) }
+    const move=e=>{ e.preventDefault(); if(!drawing) return; const p=gp(e); ctx.lineTo(p.x,p.y); ctx.stroke() }
+    const end=e=>{ e.preventDefault(); drawing=false; setSigData(el.toDataURL('image/jpeg',0.6)) }
+    el.addEventListener('mousedown',start); el.addEventListener('mousemove',move); el.addEventListener('mouseup',end)
+    el.addEventListener('touchstart',start,{passive:false}); el.addEventListener('touchmove',move,{passive:false}); el.addEventListener('touchend',end,{passive:false})
   }
   return <><div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}><span style={{ fontSize:12, color:C.muted }}>客戶簽名確認</span><button onClick={clear} style={{ fontSize:10, color:C.muted, background:'none', border:`1px solid ${C.border}`, borderRadius:6, padding:'2px 10px', cursor:'pointer' }}>清除</button></div>
-    <canvas ref={setupCanvas} width={400} height={200} style={{ width:'100%', height:200, background:'#fff', border:`1px solid ${C.border}`, borderRadius:12, marginBottom:12, touchAction:'none' }}
-      onPointerDown={e => { if(e.pointerType==='touch') return; const c=sigRef.current; if(!c) return; const ctx=c.getContext('2d'); ctx.strokeStyle='#000'; ctx.lineWidth=2; ctx.beginPath(); const p=getPos(e,c); ctx.moveTo(p.x,p.y); c.onpointermove=ev=>{ const pp=getPos(ev,c); ctx.lineTo(pp.x,pp.y); ctx.stroke() }; c.onpointerup=()=>{ c.onpointermove=null; setSigData(c.toDataURL('image/jpeg',0.6)) } }} /></>
+    <canvas ref={mount} style={{ width:'100%', height:160, display:'block', cursor:'crosshair', background:'#fff', border:`1px solid ${C.border}`, borderRadius:12, marginBottom:12, touchAction:'none' }} /></>
 }
 
 /* ═══ ROUTER ═══ */
@@ -152,7 +154,7 @@ function LoginView({ onVipLogin, onStaffLogin }) {
       <div style={{ fontSize:48, marginBottom:8 }}>⚜️</div>
       <div style={{ fontSize:22, fontWeight:800, color:C.gold, marginBottom:4 }}>VIP 尊榮登入</div>
       <div style={{ fontSize:12, color:C.muted, marginBottom:24 }}>請輸入專屬編號，探索您的珍藏世界</div>
-      <Inp value={vid} onChange={e => setVid(e.target.value)} type="tel" placeholder="VIP 編號" onKeyDown={e => e.key === 'Enter' && doVip()} style={{ textAlign:'center', fontSize:20, letterSpacing:4, padding:'16px' }} />
+      <Inp value={vid} onChange={e => setVid(e.target.value)} type="tel" placeholder="VIP 編號" onKeyDown={e => e.key === 'Enter' && doVip()} style={{ textAlign:'center', fontSize:24, letterSpacing:4, padding:'14px' }} />
       {needPwd && <Inp type="password" value={pwd} onChange={e => setPwd(e.target.value)} placeholder="請輸入密碼" onKeyDown={e => e.key === 'Enter' && doVip()} style={{ textAlign:'center' }} />}
       <GoldBtn onClick={doVip} disabled={busy} style={{ width:'100%', marginBottom:16, opacity:busy?.5:1 }}>{busy ? '驗證中...' : '探索我的窖藏'}</GoldBtn>
       {err && <div style={{ color:C.danger, fontSize:13, marginBottom:12 }}>{err}</div>}
@@ -216,7 +218,7 @@ function StaffView({ employee, onViewVip, productCatalog }) {
       <span style={{ color:C.muted, fontSize:22 }}>›</span>
     </div>)}
 
-    {showNewOrder && <NewOrderModal employee={employee} productCatalog={productCatalog} onClose={() => setShowNewOrder(false)} onDone={() => { setShowNewOrder(false); load() }} />}
+    {showNewOrder && <NewOrderModal employee={employee} productCatalog={productCatalog} staffMembers={members} onClose={() => setShowNewOrder(false)} onDone={() => { setShowNewOrder(false); load() }} />}
   </div>
 }
 
@@ -478,11 +480,13 @@ function PaymentModal({ order, member, employee, onClose, onDone }) {
 }
 
 /* ═══ NEW ORDER MODAL ═══ */
-function NewOrderModal({ employee, productCatalog, onClose, onDone }) {
+function NewOrderModal({ employee, productCatalog, staffMembers, onClose, onDone }) {
   const [vipId, setVipId] = useState(''); const [vipName, setVipName] = useState(''); const [orderType, setOrderType] = useState('現貨購買')
   const [items, setItems] = useState([{ name:'', price:'', qtyCab:0, qtyOut:0, qtySite:0, qtyPend:0, cab:'' }])
-  const [showDrop, setShowDrop] = useState(false); const [dropItems, setDropItems] = useState([]); const [dropIdx, setDropIdx] = useState(0)
+  const [prodDrop, setProdDrop] = useState({}) // { [rowIdx]: true }
+  const [memberDrop, setMemberDrop] = useState(false)
   const productList = productCatalog || []
+  const memberList = staffMembers || []
   const [payMethod, setPayMethod] = useState('現金'); const [paidAmt, setPaidAmt] = useState(''); const [note, setNote] = useState(''); const [srcTags, setSrcTags] = useState([])
   const sigRef = useRef(null); const [sigData, setSigData] = useState(null); const [busy, setBusy] = useState(false)
   const receiptRef = useRef(null); const [receiptData, setReceiptData] = useState(null); const [receiptPreview, setReceiptPreview] = useState(null)
@@ -507,21 +511,22 @@ function NewOrderModal({ employee, productCatalog, onClose, onDone }) {
   const upd = (idx,k,v) => { const a=[...items]; a[idx][k]=v; setItems(a) }
 
   return <Modal onClose={onClose} title="＋ 新增訂單 / 開櫃" wide>
-    <div style={{ display:'flex', gap:8, marginBottom:12 }}>
-      <Inp value={vipId} onChange={async e => { setVipId(e.target.value); if(e.target.value.length>=2) { const { data } = await supabase.from('customers').select('id,name,phone').ilike('name','%'+e.target.value+'%').limit(5); if(data?.length===1) setVipName(data[0].name) } }} type="tel" placeholder="會員編號 *" style={{ flex:1, marginBottom:0 }} />
+    <div style={{ display:'flex', gap:8, marginBottom:12, position:'relative' }}>
+      <div style={{ flex:1, position:'relative' }}>
+        <Inp value={vipId} autoComplete="off" onChange={e => { setVipId(e.target.value); setMemberDrop(e.target.value.length>=1) }} onFocus={() => setMemberDrop(vipId.length>=1)} onBlur={() => setTimeout(()=>setMemberDrop(false),200)} placeholder="會員編號 *" style={{ marginBottom:0 }} />
+        {memberDrop && (() => { const kw=vipId.toLowerCase(); const m=memberList.filter(v=>(v.vip_code||v.id||'').toLowerCase().includes(kw)||(v.name||'').toLowerCase().includes(kw)).slice(0,15); return m.length>0?<div style={{ position:'absolute', top:'100%', left:0, right:0, background:'#1a1a1a', border:`1px solid ${C.gold}`, borderRadius:10, maxHeight:200, overflowY:'auto', zIndex:9999, boxShadow:'0 8px 24px rgba(0,0,0,.6)' }}>{m.map(v=><div key={v.id} onMouseDown={e=>e.preventDefault()} onClick={()=>{ setVipId(v.vip_code||v.id); setVipName(v.name); setMemberDrop(false) }} style={{ padding:'10px 14px', fontSize:14, color:'#ddd', borderBottom:'1px solid #2a2a2a', cursor:'pointer', display:'flex', justifyContent:'space-between' }}><span>{v.name}</span><span style={{ color:C.muted, fontSize:12 }}>{v.vip_code||v.id}</span></div>)}</div>:null })()}
+      </div>
       <Inp value={vipName} onChange={e => setVipName(e.target.value)} placeholder="姓名（新客戶填）" style={{ flex:1, marginBottom:0 }} />
     </div>
     <div style={{ display:'flex', gap:6, marginBottom:12 }}>{['現貨購買','預購訂貨','客戶寄存'].map(t => <button key={t} onClick={() => setOrderType(t)} style={{ flex:1, padding:8, borderRadius:10, fontSize:12, fontWeight:600, cursor:'pointer', background:orderType===t?C.gold:'transparent', color:orderType===t?'#000':C.text, border:`1px solid ${orderType===t?C.gold:C.border}` }}>{t}</button>)}</div>
 
     {items.map((item,idx) => <div key={idx} style={{ background:'#0d0b09', borderRadius:14, padding:12, marginBottom:10, border:`1px solid ${C.border}` }}>
-      <div style={{ position:'relative', display:'flex', gap:6, marginBottom:8 }}>
+      <div style={{ display:'flex', gap:6, marginBottom:8 }}>
         <div style={{ flex:2, position:'relative' }}>
-          <Inp autoComplete="off" placeholder="搜尋雪茄品名或品牌 *" value={item.name} onChange={e => { const kw=e.target.value; upd(idx,'name',kw); const lo=kw.toLowerCase(); const m=kw.length>=1?productList.filter(p=>(p.name||'').toLowerCase().includes(lo)||(p.brand||'').toLowerCase().includes(lo)).slice(0,20):[]; setDropItems(m); setDropIdx(idx); setShowDrop(m.length>0&&kw.length>0); const found=productList.find(p=>p.name===kw); if(found) upd(idx,'price',String(found.price_vip||found.price_a||0)) }} onFocus={e => { const kw=(item.name||'').toLowerCase(); if(kw.length>=1) { const m=productList.filter(p=>(p.name||'').toLowerCase().includes(kw)||(p.brand||'').toLowerCase().includes(kw)).slice(0,20); setDropItems(m); setDropIdx(idx); setShowDrop(m.length>0) } }} onBlur={() => setTimeout(()=>setShowDrop(false),200)} style={{ marginBottom:0 }} />
-          {showDrop && dropIdx===idx && dropItems.length>0 && <div style={{ position:'absolute', top:'100%', left:0, right:0, background:'#1a1a1a', border:`1px solid ${C.gold}`, borderRadius:12, maxHeight:220, overflowY:'auto', zIndex:9999, boxShadow:'0 8px 24px rgba(0,0,0,.6)' }}>
-            {dropItems.map(p => <div key={p.id} onMouseDown={e=>e.preventDefault()} onClick={() => { upd(idx,'name',p.name); upd(idx,'price',String(p.price_vip||p.price_a||0)); setShowDrop(false) }} style={{ padding:'12px 16px', fontSize:15, color:'#ddd', borderBottom:'1px solid #2a2a2a', display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer' }}><span>{p.name}</span><span style={{ color:C.gold, fontSize:13 }}>{fc(p.price_vip||p.price_a)}</span></div>)}
-          </div>}
+          <Inp autoComplete="off" placeholder="搜尋雪茄品名或品牌 *" value={item.name} onChange={e => { const v=e.target.value; upd(idx,'name',v); setProdDrop(d=>({...d,[idx]:v.length>0})); const found=productList.find(p=>p.name===v); if(found) upd(idx,'price',String(found.price_vip||found.price_a||0)) }} onFocus={() => setProdDrop(d=>({...d,[idx]:true}))} onBlur={() => setTimeout(()=>setProdDrop(d=>({...d,[idx]:false})),200)} style={{ marginBottom:0, fontSize:15 }} />
+          {prodDrop[idx] && (()=>{ const kw=(item.name||'').toLowerCase(); const fl=productList.filter(p=>!kw||(p.name||'').toLowerCase().includes(kw)||(p.brand||'').toLowerCase().includes(kw)).slice(0,25); return fl.length>0?<div style={{ position:'absolute', top:'100%', left:0, right:0, background:'#1a1a1a', border:'1px solid #444', borderRadius:10, maxHeight:240, overflowY:'auto', zIndex:9999, boxShadow:'0 8px 32px rgba(0,0,0,.8)' }}>{fl.map(p=><div key={p.id} onMouseDown={e=>e.preventDefault()} onClick={()=>{ upd(idx,'name',p.name); upd(idx,'price',String(p.price_vip||p.price_a||0)); setProdDrop(d=>({...d,[idx]:false})) }} style={{ padding:'10px 14px', cursor:'pointer', fontSize:14, color:'#ddd', borderBottom:'1px solid #2a2a2a', display:'flex', justifyContent:'space-between', alignItems:'center' }}><span>{p.brand} · {p.name}</span><span style={{ color:C.gold, fontSize:13, marginLeft:8, flexShrink:0 }}>{fc(p.price_vip||p.price_a)}</span></div>)}</div>:null })()}
         </div>
-        <Inp type="number" placeholder="單價 $" value={item.price} onChange={e => upd(idx,'price',e.target.value)} style={{ flex:1, marginBottom:0 }} />{items.length>1 && <button onClick={() => setItems(items.filter((_,i)=>i!==idx))} style={{ color:C.danger, background:'none', border:'none', cursor:'pointer', fontSize:16 }}>✕</button>}
+        <Inp type="number" placeholder="單價 $" value={item.price} onChange={e => upd(idx,'price',e.target.value)} style={{ flex:1, marginBottom:0, fontSize:15 }} />{items.length>1 && <button onClick={() => setItems(items.filter((_,i)=>i!==idx))} style={{ color:C.danger, background:'none', border:'none', cursor:'pointer', fontSize:16 }}>✕</button>}
       </div>
       <div style={{ fontSize:10, color:C.muted, marginBottom:4 }}>購買支數 <b style={{ color:C.text }}>{(+item.qtyCab||0)+(+item.qtyOut||0)+(+item.qtySite||0)+(+item.qtyPend||0)}</b></div>
       <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:6, marginBottom:6 }}>{[['qtyCab','📦 入櫃'],['qtyOut','🛍️ 外帶'],['qtySite','🚬 現場'],['qtyPend','✈️ 未到貨']].map(([k,l]) => <div key={k}><div style={{ fontSize:9, color:C.muted, marginBottom:2 }}>{l}</div><input type="number" min={0} value={item[k]} onChange={e => upd(idx,k,+e.target.value||0)} style={{ width:'100%', fontSize:13, padding:'8px 4px', background:'#1a1714', border:`1px solid ${C.border}`, borderRadius:8, color:C.text, textAlign:'center' }} /></div>)}</div>
