@@ -2,10 +2,22 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { Package, Search, AlertTriangle, X, Camera } from 'lucide-react'
 
+const REASON_CODES = {
+  normal: { label: '正常消耗', color: '#4da86c' },
+  damage: { label: '損耗報廢', color: '#e74c3c' },
+  restock: { label: '進貨入庫', color: '#4d8ac4' },
+  error: { label: '盤點誤差', color: '#f59e0b' },
+  gift: { label: '贈送客戶', color: '#c9a84c' },
+  other: { label: '其他', color: '#8a7e6e' },
+}
+
 export default function BossInventory() {
+  const [tab, setTab] = useState('stock') // 'stock' | 'records'
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [records, setRecords] = useState([])
+  const [recordsLoading, setRecordsLoading] = useState(false)
   const [selected, setSelected] = useState(null)
   const [adjQty, setAdjQty] = useState('')
   const [adjReason, setAdjReason] = useState('')
@@ -23,6 +35,14 @@ export default function BossInventory() {
     const { data } = await supabase.from('inventory_master').select('*, image_url').eq('enabled', true).order('category').order('name')
     if (data) setItems(data)
     setLoading(false)
+  }
+
+  useEffect(() => { if (tab === 'records') loadRecords() }, [tab])
+  async function loadRecords() {
+    setRecordsLoading(true)
+    const { data } = await supabase.from('inventory_records').select('*').order('created_at', { ascending: false }).limit(100)
+    setRecords(data || [])
+    setRecordsLoading(false)
   }
 
   async function handleAdjust() {
@@ -121,6 +141,37 @@ export default function BossInventory() {
         </div>
         <div style={{ fontSize: 12, color: '#8a8278' }}>共 {items.length} 項商品</div>
       </div>
+
+      {/* Tab switcher */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+        <button onClick={() => setTab('stock')} style={{ flex: 1, padding: '8px 0', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', background: tab === 'stock' ? 'rgba(201,168,76,.15)' : 'transparent', color: tab === 'stock' ? '#c9a84c' : '#8a7e6e', border: tab === 'stock' ? '1px solid rgba(201,168,76,.3)' : '1px solid #2a2520' }}>庫存總覽</button>
+        <button onClick={() => setTab('records')} style={{ flex: 1, padding: '8px 0', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', background: tab === 'records' ? 'rgba(201,168,76,.15)' : 'transparent', color: tab === 'records' ? '#c9a84c' : '#8a7e6e', border: tab === 'records' ? '1px solid rgba(201,168,76,.3)' : '1px solid #2a2520' }}>盤點紀錄</button>
+      </div>
+
+      {tab === 'records' ? (
+        <div>
+          {recordsLoading ? <div style={{ textAlign: 'center', padding: 30, color: '#8a8278' }}>載入中…</div> :
+          !records.length ? <div style={{ textAlign: 'center', padding: 30, color: '#8a8278' }}>尚無盤點紀錄</div> :
+          records.map(r => {
+            const rc = REASON_CODES[r.reason_code]
+            return <div key={r.id} style={{ ...s.row, flexDirection: 'column', alignItems: 'stretch', gap: 4 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>{r.item_name}</div>
+                <div style={{ fontSize: 11, color: '#8a8278' }}>{r.staff_code}</div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
+                <span style={{ color: '#8a8278' }}>{r.before_stock} → {r.after_stock} <span style={{ fontWeight: 700, color: r.diff > 0 ? '#4da86c' : r.diff < 0 ? '#e74c3c' : '#8a8278' }}>{r.diff > 0 ? '+' : ''}{r.diff}</span></span>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  {rc && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 8, background: rc.color + '20', color: rc.color, fontWeight: 600 }}>{rc.label}</span>}
+                  <span style={{ fontSize: 10, color: '#8a8278' }}>{r.created_at ? new Date(r.created_at).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                </div>
+              </div>
+              {r.note && <div style={{ fontSize: 11, color: '#8a8278' }}>{r.note}</div>}
+            </div>
+          })}
+        </div>
+      ) : <>
+
       <div style={s.searchBox}>
         <Search size={16} color="#8a8278" />
         <input style={s.input} placeholder="搜尋商品名稱 / 分類..." value={search} onChange={e => setSearch(e.target.value)} />
@@ -203,6 +254,7 @@ export default function BossInventory() {
           </div>
         </div>
       )}
+      </>}
     </div>
   )
 }

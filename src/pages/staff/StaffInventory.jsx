@@ -14,6 +14,7 @@ const REASON_CODES = [
 
 export default function StaffInventory() {
   const { user } = useAuth()
+  const [tab, setTab] = useState('count') // 'count' | 'records'
   const [items, setItems] = useState([])
   const [filter, setFilter] = useState('all')
   const [keyword, setKeyword] = useState('')
@@ -23,8 +24,18 @@ export default function StaffInventory() {
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [records, setRecords] = useState([])
+  const [recordsLoading, setRecordsLoading] = useState(false)
 
   useEffect(() => { load() }, [])
+  useEffect(() => { if (tab === 'records') loadRecords() }, [tab])
+
+  async function loadRecords() {
+    setRecordsLoading(true)
+    const { data } = await supabase.from('inventory_records').select('*').eq('staff_code', user.employee_id).order('created_at', { ascending: false }).limit(50)
+    setRecords(data || [])
+    setRecordsLoading(false)
+  }
 
   async function load() {
     setLoading(true)
@@ -96,10 +107,44 @@ export default function StaffInventory() {
 
   return (
     <div className="page-container fade-in">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
         <Package size={20} color="var(--gold)" />
         <span className="section-title" style={{ marginBottom: 0 }}>庫存盤點</span>
       </div>
+
+      {/* Tab switcher */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+        <button onClick={() => setTab('count')} style={{ flex: 1, padding: '8px 0', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', background: tab === 'count' ? 'var(--gold-glow)' : 'transparent', color: tab === 'count' ? 'var(--gold)' : 'var(--text-dim)', border: tab === 'count' ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>盤點作業</button>
+        <button onClick={() => setTab('records')} style={{ flex: 1, padding: '8px 0', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', background: tab === 'records' ? 'var(--gold-glow)' : 'transparent', color: tab === 'records' ? 'var(--gold)' : 'var(--text-dim)', border: tab === 'records' ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>我的紀錄</button>
+      </div>
+
+      {tab === 'records' ? (
+        <div>
+          {recordsLoading ? <div style={{ textAlign: 'center', padding: 30, color: 'var(--text-dim)' }}>載入中…</div> :
+          !records.length ? <div style={{ textAlign: 'center', padding: 30, color: 'var(--text-dim)' }}>尚無盤點紀錄</div> :
+          records.map(r => {
+            const rc = REASON_CODES.find(c => c.id === r.reason_code)
+            return <div key={r.id} className="card" style={{ padding: 12, marginBottom: 6 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>{r.item_name}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>
+                    {r.before_stock} → {r.after_stock}
+                    <span style={{ marginLeft: 8, fontWeight: 700, color: r.diff > 0 ? 'var(--green)' : r.diff < 0 ? 'var(--red)' : 'var(--text-muted)' }}>
+                      {r.diff > 0 ? '+' : ''}{r.diff}
+                    </span>
+                  </div>
+                  {r.note && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{r.note}</div>}
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  {rc && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 8, background: rc.color + '20', color: rc.color, fontWeight: 600 }}>{rc.label}</span>}
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>{r.created_at ? new Date(r.created_at).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}</div>
+                </div>
+              </div>
+            </div>
+          })}
+        </div>
+      ) : <>
 
       {error && <div className="card" style={{ padding: 14, marginBottom: 12, borderColor: 'rgba(196,77,77,.3)', color: 'var(--red)' }}>錯誤：{error}</div>}
 
@@ -180,6 +225,7 @@ export default function StaffInventory() {
 
       {items.length === 0 && !error && <div className="card" style={{ textAlign: 'center', padding: 30, color: 'var(--text-dim)', marginTop: 12 }}>你沒有負責的盤點品項</div>}
       {filtered.length === 0 && items.length > 0 && <div className="card" style={{ textAlign: 'center', padding: 30, color: 'var(--text-dim)', marginTop: 12 }}>沒有符合條件的品項</div>}
+      </>}
     </div>
   )
 }
