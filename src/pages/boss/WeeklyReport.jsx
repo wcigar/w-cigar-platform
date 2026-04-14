@@ -9,7 +9,7 @@ const STAFF = ['RICKY', 'DANIEL', 'JESSICA']
 const DAY_NAMES = ['日', '一', '二', '三', '四', '五', '六']
 
 export default function WeeklyReport() {
-  const [weekOffset, setWeekOffset] = useState(0)
+  const [weekOffset, setWeekOffset] = useState(-1)
   const [schedules, setSchedules] = useState([])
   const [punches, setPunches] = useState([])
   const [tasks, setTasks] = useState([])
@@ -92,7 +92,8 @@ export default function WeeklyReport() {
           <button onClick={() => setWeekOffset(w => w - 1)} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--black-card)', color: 'var(--text)', cursor: 'pointer', fontSize: 13 }}>‹ 上週</button>
           <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--gold)' }}>{format(weekStart, 'M/d', { locale: zhTW })} — {format(weekEnd, 'M/d', { locale: zhTW })}</span>
           <button onClick={() => setWeekOffset(w => w + 1)} disabled={weekOffset >= 0} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--black-card)', color: weekOffset >= 0 ? 'var(--text-muted)' : 'var(--text)', cursor: weekOffset >= 0 ? 'default' : 'pointer', fontSize: 13 }}>下週 ›</button>
-          {weekOffset !== 0 && <button onClick={() => setWeekOffset(0)} style={{ fontSize: 11, color: 'var(--gold)', background: 'none', border: '1px solid var(--border-gold)', borderRadius: 6, padding: '3px 10px', cursor: 'pointer' }}>本週</button>}
+          <button onClick={() => setWeekOffset(-1)} style={{ fontSize: 11, color: weekOffset === -1 ? '#000' : 'var(--gold)', background: weekOffset === -1 ? 'var(--gold)' : 'none', border: '1px solid var(--border-gold)', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontWeight: weekOffset === -1 ? 700 : 400 }}>上週（開會用）</button>
+          <button onClick={() => setWeekOffset(0)} style={{ fontSize: 11, color: weekOffset === 0 ? '#000' : 'var(--gold)', background: weekOffset === 0 ? 'var(--gold)' : 'none', border: '1px solid var(--border-gold)', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontWeight: weekOffset === 0 ? 700 : 400 }}>本週</button>
         </div>
         <button onClick={() => window.print()} style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: 'var(--gold)', color: '#000', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>🖨️ 列印</button>
       </div>
