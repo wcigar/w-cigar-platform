@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
-import { format, startOfWeek, addWeeks } from 'date-fns'
+import { format, startOfWeek, addWeeks, endOfWeek } from 'date-fns'
 import { zhTW } from 'date-fns/locale'
 
 export default function StaffMeeting() {
@@ -16,6 +16,11 @@ export default function StaffMeeting() {
   const [bossComment, setBossComment] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  // Action items
+  const [actionItems, setActionItems] = useState([])
+  const [claimTitle, setClaimTitle] = useState('')
+  const [assignTask, setAssignTask] = useState({ title: '', assigned_to: '' })
+  const STAFF = ['RICKY', 'DANIEL', 'JESSICA']
 
   const weekStart = startOfWeek(addWeeks(new Date(), weekOffset), { weekStartsOn: 1 })
   const weekKey = format(weekStart, 'yyyy-MM-dd')
@@ -40,7 +45,32 @@ export default function StaffMeeting() {
       setReview(''); setIssues(''); setSuggestions(''); setNextGoals('')
       setSubmitted(false); setSubmittedAt(null); setBossComment('')
     }
+    // Load action items for this week
+    const { data: aiData } = await supabase.from('meeting_action_items').select('*').eq('week', weekKey).order('created_at')
+    setActionItems(aiData || [])
     setLoading(false)
+  }
+
+  async function claimTask() {
+    if (!claimTitle.trim()) return
+    await supabase.from('meeting_action_items').insert({
+      week: weekKey, title: claimTitle.trim(), assigned_to: user.employee_id,
+      assigned_to_name: user.name, assigned_by: user.employee_id,
+      assigned_by_name: user.name, priority: 'normal', status: 'pending'
+    })
+    setClaimTitle('')
+    loadNote()
+  }
+
+  async function assignToColleague() {
+    if (!assignTask.title.trim() || !assignTask.assigned_to) return alert('請填寫任務並選擇同事')
+    await supabase.from('meeting_action_items').insert({
+      week: weekKey, title: assignTask.title.trim(), assigned_to: assignTask.assigned_to,
+      assigned_to_name: assignTask.assigned_to, assigned_by: user.employee_id,
+      assigned_by_name: user.name, priority: 'normal', status: 'pending'
+    })
+    setAssignTask({ title: '', assigned_to: '' })
+    loadNote()
   }
 
   async function saveDraft() {
@@ -113,7 +143,7 @@ export default function StaffMeeting() {
           ))}
 
           {!submitted && (
-            <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+            <div style={{ display: 'flex', gap: 10, marginTop: 8, marginBottom: 20 }}>
               <button onClick={saveDraft} disabled={saving} className="btn-outline" style={{ flex: 1, padding: 14, fontSize: 14 }}>
                 {saving ? '儲存中…' : '暫存草稿'}
               </button>
@@ -122,6 +152,60 @@ export default function StaffMeeting() {
               </button>
             </div>
           )}
+
+          {/* Action items section */}
+          <div className="card" style={{ marginTop: 16 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span>📋</span><span>會議任務</span>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto' }}>{actionItems.length} 項</span>
+            </div>
+
+            {/* Task list */}
+            {actionItems.length > 0 ? actionItems.map(item => {
+              const done = item.status === 'completed'
+              const isMe = item.assigned_to === user.employee_id
+              const priorityColor = item.priority === 'high' ? 'var(--red)' : item.priority === 'urgent' ? '#f59e0b' : 'var(--text-muted)'
+              return (
+                <div key={item.id} style={{ padding: '8px 0', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, color: done ? 'var(--text-muted)' : 'var(--text)', textDecoration: done ? 'line-through' : 'none', fontWeight: isMe ? 600 : 400 }}>{item.title}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
+                      <span style={{ color: isMe ? 'var(--green)' : 'var(--gold)' }}>{item.assigned_to_name}{isMe ? ' (我)' : ''}</span>
+                      {item.due_date && <span style={{ marginLeft: 8 }}>截止 {item.due_date}</span>}
+                      {item.priority !== 'normal' && <span style={{ marginLeft: 8, color: priorityColor, fontWeight: 600 }}>{item.priority === 'high' ? '高' : '緊急'}</span>}
+                      {item.assigned_by_name && item.assigned_by !== item.assigned_to && <span style={{ marginLeft: 8 }}>by {item.assigned_by_name}</span>}
+                      {item.progress_note && <span style={{ marginLeft: 8, color: 'var(--text-dim)' }}>💬 {item.progress_note}</span>}
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, fontWeight: 600, flexShrink: 0, background: done ? 'rgba(77,168,108,.1)' : item.status === 'in_progress' ? 'rgba(77,140,196,.15)' : 'rgba(201,168,76,.1)', color: done ? 'var(--green)' : item.status === 'in_progress' ? 'var(--blue)' : 'var(--gold)' }}>
+                    {done ? '完成' : item.status === 'in_progress' ? '進行中' : '待執行'}
+                  </span>
+                </div>
+              )
+            }) : <div style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', padding: 12 }}>尚無任務</div>}
+
+            {/* Claim task */}
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--gold)', marginBottom: 6 }}>🙋 我認領任務</div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <input value={claimTitle} onChange={e => setClaimTitle(e.target.value)} placeholder="我要做的事…" style={{ flex: 1, fontSize: 12, padding: '7px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text)' }} />
+                <button onClick={claimTask} style={{ fontSize: 12, padding: '7px 14px', borderRadius: 8, border: '1px solid var(--border-gold)', background: 'rgba(201,168,76,.1)', color: 'var(--gold)', cursor: 'pointer', fontWeight: 700, whiteSpace: 'nowrap' }}>＋ 認領</button>
+              </div>
+            </div>
+
+            {/* Assign to colleague */}
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--gold)', marginBottom: 6 }}>📤 分派給同事</div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <input value={assignTask.title} onChange={e => setAssignTask(p => ({ ...p, title: e.target.value }))} placeholder="任務描述…" style={{ flex: 1, fontSize: 12, padding: '7px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text)' }} />
+                <select value={assignTask.assigned_to} onChange={e => setAssignTask(p => ({ ...p, assigned_to: e.target.value }))} style={{ width: 90, fontSize: 12, padding: '7px 8px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text)' }}>
+                  <option value="">同事</option>
+                  {STAFF.filter(s => s !== user.employee_id).map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <button onClick={assignToColleague} style={{ fontSize: 12, padding: '7px 14px', borderRadius: 8, border: '1px solid var(--border-gold)', background: 'rgba(201,168,76,.1)', color: 'var(--gold)', cursor: 'pointer', fontWeight: 700, whiteSpace: 'nowrap' }}>＋ 分派</button>
+              </div>
+            </div>
+          </div>
         </>
       )}
     </div>
