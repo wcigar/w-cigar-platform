@@ -57,8 +57,8 @@ export default function StaffHome() {
     const { data: revData } = await supabase.from('daily_revenue').select('total').gte('date', month + '-01').lte('date', format(endOfMonth(new Date(month + '-01')), 'yyyy-MM-dd'))
     setMonthRevenue((revData || []).reduce((s, r) => s + (+r.total || 0), 0))
     // Cabinet rewards for this employee this month
-    const { data: crData } = await supabase.from('cabinet_rewards').select('*').eq('month', month).cs('staff_names', JSON.stringify([user.name]))
-    setCabinetRewards(crData || [])
+    const { data: crData } = await supabase.from('cabinet_rewards').select('*').eq('month', month).order('created_at', { ascending: false })
+    setCabinetRewards((crData || []).filter(r => (r.staff_ids || []).includes(user.employee_id)))
     setLoading(false)
   }
 
