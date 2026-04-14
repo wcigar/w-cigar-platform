@@ -58,7 +58,7 @@ const MetricBox = ({label,value,color,blur}) => <div style={{ background:C.card,
 function Modal({onClose,title,children,wide}) { return <div style={{ position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,.92)', zIndex:400, overflowY:'auto', WebkitOverflowScrolling:'touch' }} onClick={onClose}><div style={{ maxWidth:wide?700:520, margin:'20px auto', background:'#1a1714', border:`1px solid ${C.gold}40`, borderRadius:24, padding:24, boxShadow:'0 18px 40px rgba(0,0,0,.45)', maxHeight:'90vh', overflowY:'auto' }} onClick={e=>e.stopPropagation()}><div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}><span style={{ fontSize:18, fontWeight:700, color:C.gold }}>{title}</span><button onClick={onClose} style={{ background:'none', border:'none', color:C.muted, cursor:'pointer', fontSize:22 }}>✕</button></div>{children}</div></div> }
 function SigCanvas({sigRef,sigData,setSigData}) {
   function clear() { const c = sigRef.current; if(c) { const ctx=c.getContext('2d'); ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,c.width,c.height); setSigData(null) } }
-  function initCanvas(c) { if(!c) return; const ctx=c.getContext('2d'); ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,c.width,c.height) }
+  function initCanvas(c) { if(!c) return; c.width=c.offsetWidth||400; c.height=200; const ctx=c.getContext('2d'); ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,c.width,c.height); ctx.strokeStyle='#222222'; ctx.lineWidth=2; ctx.lineCap='round' }
   function getPos(e, c) { const r=c.getBoundingClientRect(); const t=e.touches?e.touches[0]:e; return { x:(t.clientX-r.left)*(c.width/r.width), y:(t.clientY-r.top)*(c.height/r.height) } }
   function setupCanvas(el) {
     if(!el) return; sigRef.current=el; initCanvas(el)
@@ -69,7 +69,7 @@ function SigCanvas({sigRef,sigData,setSigData}) {
     el.addEventListener('touchend', e => { e.preventDefault(); drawing=false; setSigData(el.toDataURL('image/jpeg',0.6)) }, {passive:false})
   }
   return <><div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}><span style={{ fontSize:12, color:C.muted }}>客戶簽名確認</span><button onClick={clear} style={{ fontSize:10, color:C.muted, background:'none', border:`1px solid ${C.border}`, borderRadius:6, padding:'2px 10px', cursor:'pointer' }}>清除</button></div>
-    <canvas ref={setupCanvas} width={400} height={120} style={{ width:'100%', height:120, background:'#fff', border:`1px solid ${C.border}`, borderRadius:12, marginBottom:12, touchAction:'none' }}
+    <canvas ref={setupCanvas} width={400} height={200} style={{ width:'100%', height:200, background:'#fff', border:`1px solid ${C.border}`, borderRadius:12, marginBottom:12, touchAction:'none' }}
       onPointerDown={e => { if(e.pointerType==='touch') return; const c=sigRef.current; if(!c) return; const ctx=c.getContext('2d'); ctx.strokeStyle='#000'; ctx.lineWidth=2; ctx.beginPath(); const p=getPos(e,c); ctx.moveTo(p.x,p.y); c.onpointermove=ev=>{ const pp=getPos(ev,c); ctx.lineTo(pp.x,pp.y); ctx.stroke() }; c.onpointerup=()=>{ c.onpointermove=null; setSigData(c.toDataURL('image/jpeg',0.6)) } }} /></>
 }
 
@@ -319,7 +319,7 @@ function AppView({ member, employee, privacy, onBack }) {
         </div>
         <div style={{ borderTop:`1px solid ${C.border}`, marginTop:10, paddingTop:8 }}>
           <div style={{ fontSize:10, color:C.muted, marginBottom:4 }}>客戶親筆畫押</div>
-          {p.sig ? <img src={p.sig} alt="簽名" style={{ maxWidth:200, width:'100%', borderRadius:8, border:`1px solid ${C.border}`, background:'#fff', padding:4 }} /> : <span style={{ fontSize:10, color:C.muted }}>(無簽名紀錄)</span>}
+          {p.sig ? <img src={p.sig} alt="簽名" style={{ maxHeight:80, maxWidth:200, background:'#ffffff', padding:4, borderRadius:8, border:'1px solid #444', display:'block' }} /> : <span style={{ fontSize:10, color:C.muted }}>(無簽名紀錄)</span>}
         </div>
         {p.notes && <div style={{ fontSize:10, color:C.muted, marginTop:6 }}>備註：{p.notes}</div>}
       </div> })}
