@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { SHIFTS, LEAVE_TYPES } from '../../lib/constants'
 import { isHoliday, getHolidayName, calcMonthRestDays, TW_HOLIDAYS_2026 } from '../../lib/holidays'
 import { toTaipei } from '../../lib/timezone'
+import WeeklyReport from './WeeklyReport'
 import { ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react'
 import { format, startOfMonth, endOfMonth, addMonths, subMonths, eachDayOfInterval } from 'date-fns'
 import SmartScheduleBtn from '../../components/SmartSchedule'
@@ -57,7 +58,7 @@ export default function HRSchedule() {
   useEffect(() => { if (tab === 'audit') loadLogs() }, [tab])
 
   const shiftColors = { '早班': '#3dd68c', '晚班': '#4d8ac4', '休假': '#ff9a9a', '臨時請假': '#ff9a9a', '病假': '#ffb347', '事假': '#ffd700', '特休': '#64c8ff' }
-  const tabs = [{ id: 'schedule', l: '排班表' }, { id: 'holidays', l: `國定假日 (${monthHolidays.length})` }, { id: 'punch', l: '打卡紀錄' }, { id: 'leave', l: '假單審核' }, { id: 'audit', l: '稽核日誌' }]
+  const tabs = [{ id: 'schedule', l: '排班表' }, { id: 'holidays', l: `國定假日 (${monthHolidays.length})` }, { id: 'punch', l: '打卡紀錄' }, { id: 'leave', l: '假單審核' }, { id: 'weekly', l: '📊 週會報表' }, { id: 'audit', l: '稽核日誌' }]
 
   // Holiday cost analysis
   const holWorkCount = scheds.filter(s => (s.shift === '早班' || s.shift === '晚班') && isHoliday(s.date)).length
@@ -240,6 +241,8 @@ export default function HRSchedule() {
       )}
 
       {tab === 'leave' && <LeaveApproval />}
+
+      {tab === 'weekly' && <WeeklyReport />}
 
       {tab === 'audit' && (
         <div>
