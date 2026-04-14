@@ -11,6 +11,7 @@ import StaffKPI from './pages/staff/StaffKPI'
 import StaffRevenue from './pages/staff/StaffRevenue'
 import StaffInventory from './pages/staff/StaffInventory'
 import StaffExpense from './pages/staff/StaffExpense'
+import StaffMeeting from './pages/staff/StaffMeeting'
 import StaffPOS from './pages/staff/StaffPOS'
 import BossHome from './pages/boss/BossHome'
 import BossOperations from './pages/boss/Operations'
@@ -90,6 +91,7 @@ export default function App() {
           <Route path="/revenue" element={<StaffRevenue />} />
           <Route path="/kpi" element={<StaffKPI />} />
           <Route path="/expense" element={<StaffExpense />} />
+          <Route path="/meeting" element={<StaffMeeting />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       )}

@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { SHIFTS } from '../../lib/constants'
-import { Clock, CheckCircle2, Circle, AlertCircle, MapPin, AlertTriangle, Trophy } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Clock, CheckCircle2, Circle, AlertCircle, MapPin, AlertTriangle, Trophy, FileText } from 'lucide-react'
 import { format, endOfMonth } from 'date-fns'
 import { zhTW } from 'date-fns/locale'
 import AbnormalReport from '../../components/AbnormalReport'
@@ -10,6 +11,7 @@ import { markNoticesRead } from '../../lib/noticeUtils'
 import { toTaipei } from '../../lib/timezone'
 
 export default function StaffHome() {
+  const navigate = useNavigate()
   const { user } = useAuth()
   const [shift, setShift] = useState(null)
   const [tasks, setTasks] = useState([])
@@ -306,6 +308,10 @@ export default function StaffHome() {
           </div>
         ))}
       </div>
+
+      <button onClick={() => navigate('/meeting')} style={{ width: '100%', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, background: 'rgba(201,168,76,.08)', border: '1px solid var(--border-gold)', borderRadius: 'var(--radius-sm)', color: 'var(--gold)', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
+        <FileText size={18} /> 週會準備
+      </button>
 
       <button style={{ width: '100%', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, background: 'rgba(196,77,77,.1)', border: '1px solid rgba(196,77,77,.25)', borderRadius: 'var(--radius-sm)', color: 'var(--red)', fontSize: 15, fontWeight: 700, cursor: 'pointer' }} onClick={() => setShowAbnormal(true)}>
         <AlertTriangle size={18} /> 🚨 突發異常回報
