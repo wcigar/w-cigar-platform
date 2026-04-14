@@ -32,7 +32,8 @@ export default function StaffInventory() {
 
   async function loadRecords() {
     setRecordsLoading(true)
-    const { data } = await supabase.from('inventory_records').select('*').eq('staff_code', user.employee_id).order('created_at', { ascending: false }).limit(50)
+    const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7)
+    const { data } = await supabase.from('inventory_records').select('*').gte('created_at', weekAgo.toISOString()).order('created_at', { ascending: false }).limit(100)
     setRecords(data || [])
     setRecordsLoading(false)
   }
@@ -115,7 +116,7 @@ export default function StaffInventory() {
       {/* Tab switcher */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
         <button onClick={() => setTab('count')} style={{ flex: 1, padding: '8px 0', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', background: tab === 'count' ? 'var(--gold-glow)' : 'transparent', color: tab === 'count' ? 'var(--gold)' : 'var(--text-dim)', border: tab === 'count' ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>盤點作業</button>
-        <button onClick={() => setTab('records')} style={{ flex: 1, padding: '8px 0', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', background: tab === 'records' ? 'var(--gold-glow)' : 'transparent', color: tab === 'records' ? 'var(--gold)' : 'var(--text-dim)', border: tab === 'records' ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>我的紀錄</button>
+        <button onClick={() => setTab('records')} style={{ flex: 1, padding: '8px 0', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', background: tab === 'records' ? 'var(--gold-glow)' : 'transparent', color: tab === 'records' ? 'var(--gold)' : 'var(--text-dim)', border: tab === 'records' ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>本週紀錄</button>
       </div>
 
       {tab === 'records' ? (
@@ -127,7 +128,7 @@ export default function StaffInventory() {
             return <div key={r.id} className="card" style={{ padding: 12, marginBottom: 6 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 600 }}>{r.item_name}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ fontSize: 14, fontWeight: 600 }}>{r.item_name}</span>{r.staff_code && <span style={{ fontSize: 10, color: 'var(--text-muted)', background: 'var(--black)', padding: '1px 6px', borderRadius: 6 }}>{r.staff_code}</span>}</div>
                   <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>
                     {r.before_stock} → {r.after_stock}
                     <span style={{ marginLeft: 8, fontWeight: 700, color: r.diff > 0 ? 'var(--green)' : r.diff < 0 ? 'var(--red)' : 'var(--text-muted)' }}>
