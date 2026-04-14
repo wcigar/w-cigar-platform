@@ -25,6 +25,8 @@ export default function StaffHome() {
   const [motivation, setMotivation] = useState(null)
   const [monthRevenue, setMonthRevenue] = useState(0)
   const [cabinetRewards, setCabinetRewards] = useState([])
+  const [actionItems, setActionItems] = useState([])
+  const [progressNote, setProgressNote] = useState({})
   const today = format(new Date(), 'yyyy-MM-dd')
   const punchCamRef = useRef(null)
   const punchCanvasRef = useRef(null)
@@ -61,6 +63,9 @@ export default function StaffHome() {
     // Cabinet rewards for this employee this month
     const { data: crData } = await supabase.from('cabinet_rewards').select('*').eq('month', month).order('created_at', { ascending: false })
     setCabinetRewards((crData || []).filter(r => (r.staff_ids || []).includes(user.employee_id)))
+    // Action items assigned to me (pending + in_progress)
+    const { data: aiData } = await supabase.from('meeting_action_items').select('*').eq('assigned_to', user.employee_id).in('status', ['pending', 'in_progress']).order('due_date', { ascending: true })
+    setActionItems(aiData || [])
     setLoading(false)
   }
 
@@ -146,6 +151,12 @@ export default function StaffHome() {
   const h = new Date().getHours()
   const greeting = h < 12 ? '早安' : h < 18 ? '午安' : '晚安'
   const myGrabs = leaderboard.find(x => x.name === user.name)?.count || 0
+
+  async function updateActionItem(id, updates) {
+    await supabase.from('meeting_action_items').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id)
+    const { data } = await supabase.from('meeting_action_items').select('*').eq('assigned_to', user.employee_id).in('status', ['pending', 'in_progress']).order('due_date', { ascending: true })
+    setActionItems(data || [])
+  }
 
   if (loading) return <div className="page-container"><div className="loading-shimmer" style={{ height: 120, marginBottom: 12 }} /><div className="loading-shimmer" style={{ height: 80 }} /></div>
 
@@ -312,6 +323,53 @@ export default function StaffHome() {
       <button onClick={() => navigate('/meeting')} style={{ width: '100%', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, background: 'rgba(201,168,76,.08)', border: '1px solid var(--border-gold)', borderRadius: 'var(--radius-sm)', color: 'var(--gold)', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
         <FileText size={18} /> 週會準備
       </button>
+
+      {/* Action items from meetings */}
+      {actionItems.length > 0 && (
+        <div className="card" style={{ marginBottom: 16, borderColor: 'rgba(201,168,76,.25)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <span style={{ fontSize: 16 }}>📋</span>
+            <span style={{ fontSize: 14, fontWeight: 700 }}>待辦任務</span>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto' }}>{actionItems.length} 項</span>
+          </div>
+          {actionItems.map(item => {
+            const overdue = item.due_date && item.due_date < today
+            const priorityColor = item.priority === 'high' ? 'var(--red)' : item.priority === 'urgent' ? '#f59e0b' : 'var(--text-muted)'
+            return (
+              <div key={item.id} style={{ padding: '10px 0', borderTop: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: overdue ? 'var(--red)' : 'var(--text)' }}>{item.title}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                      {item.due_date && <span style={{ color: overdue ? 'var(--red)' : 'var(--text-dim)' }}>截止 {item.due_date} {overdue ? '(逾期!)' : ''}</span>}
+                      {item.priority !== 'normal' && <span style={{ color: priorityColor, marginLeft: 8, fontWeight: 600 }}>{item.priority === 'high' ? '高' : '緊急'}</span>}
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, fontWeight: 600, background: item.status === 'in_progress' ? 'rgba(77,140,196,.15)' : 'rgba(201,168,76,.1)', color: item.status === 'in_progress' ? 'var(--blue)' : 'var(--gold)' }}>
+                    {item.status === 'pending' ? '待執行' : '進行中'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                  {item.status === 'pending' && (
+                    <button onClick={() => updateActionItem(item.id, { status: 'in_progress' })} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'rgba(77,140,196,.08)', color: 'var(--blue)', cursor: 'pointer', fontWeight: 600 }}>🔄 開始執行</button>
+                  )}
+                  <button onClick={() => updateActionItem(item.id, { status: 'completed', completed_at: new Date().toISOString() })} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(77,168,108,.3)', background: 'rgba(77,168,108,.08)', color: 'var(--green)', cursor: 'pointer', fontWeight: 600 }}>✅ 完成</button>
+                </div>
+                {/* Progress note */}
+                <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                  <input
+                    value={progressNote[item.id] || item.progress_note || ''}
+                    onChange={e => setProgressNote(prev => ({ ...prev, [item.id]: e.target.value }))}
+                    placeholder="回報進度…"
+                    style={{ flex: 1, fontSize: 11, padding: '5px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text)' }}
+                  />
+                  <button onClick={() => { const note = progressNote[item.id] || item.progress_note || ''; if (note.trim()) updateActionItem(item.id, { progress_note: note.trim() }) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--black-card)', color: 'var(--text)', cursor: 'pointer' }}>💬</button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       <button style={{ width: '100%', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, background: 'rgba(196,77,77,.1)', border: '1px solid rgba(196,77,77,.25)', borderRadius: 'var(--radius-sm)', color: 'var(--red)', fontSize: 15, fontWeight: 700, cursor: 'pointer' }} onClick={() => setShowAbnormal(true)}>
         <AlertTriangle size={18} /> 🚨 突發異常回報

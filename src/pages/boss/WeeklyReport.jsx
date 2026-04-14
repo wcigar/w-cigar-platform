@@ -22,6 +22,9 @@ export default function WeeklyReport() {
   const [decisions, setDecisions] = useState('')
   const [bossComments, setBossComments] = useState({})
   const [meetingSaving, setMeetingSaving] = useState(false)
+  // Action items
+  const [actionItems, setActionItems] = useState([])
+  const [newTask, setNewTask] = useState({ title: '', assigned_to: '', due_date: '', priority: 'normal' })
 
   const baseDate = addWeeks(new Date(), weekOffset)
   const weekStart = startOfWeek(baseDate, { weekStartsOn: 1 })
@@ -34,12 +37,13 @@ export default function WeeklyReport() {
 
   async function load() {
     setLoading(true)
-    const [sR, pR, tR, nR, smR] = await Promise.all([
+    const [sR, pR, tR, nR, smR, aiR] = await Promise.all([
       supabase.from('schedules').select('*').gte('date', startStr).lte('date', endStr),
       supabase.from('punch_records').select('*').gte('date', startStr).lte('date', endStr),
       supabase.from('task_status').select('*').gte('date', startStr).lte('date', endStr),
       supabase.from('weekly_meeting_notes').select('*').eq('week', startStr),
       supabase.from('weekly_meeting_summary').select('*').eq('week', startStr).maybeSingle(),
+      supabase.from('meeting_action_items').select('*').eq('week', startStr).order('created_at'),
     ])
     setSchedules(sR.data || [])
     setPunches(pR.data || [])
@@ -53,6 +57,7 @@ export default function WeeklyReport() {
     const bc = {}
     ;(nR.data || []).forEach(n => { bc[n.employee_id] = n.boss_comment || '' })
     setBossComments(bc)
+    setActionItems(aiR.data || [])
     setLoading(false)
   }
 
@@ -109,6 +114,32 @@ export default function WeeklyReport() {
     }, { onConflict: 'week' })
     setMeetingSaving(false)
     alert('已儲存')
+    load()
+  }
+
+  async function addActionItem() {
+    if (!newTask.title.trim() || !newTask.assigned_to) return alert('請填寫任務描述並選擇負責人')
+    const staffName = STAFF.find(s => s === newTask.assigned_to) || newTask.assigned_to
+    await supabase.from('meeting_action_items').insert({
+      week: startStr, title: newTask.title.trim(), assigned_to: newTask.assigned_to,
+      assigned_to_name: staffName, due_date: newTask.due_date || null,
+      priority: newTask.priority, status: 'pending'
+    })
+    setNewTask({ title: '', assigned_to: '', due_date: '', priority: 'normal' })
+    load()
+  }
+
+  async function toggleActionItem(item) {
+    const newStatus = item.status === 'completed' ? 'pending' : 'completed'
+    await supabase.from('meeting_action_items').update({
+      status: newStatus, completed_at: newStatus === 'completed' ? new Date().toISOString() : null,
+      updated_at: new Date().toISOString()
+    }).eq('id', item.id)
+    load()
+  }
+
+  async function deleteActionItem(id) {
+    await supabase.from('meeting_action_items').delete().eq('id', id)
     load()
   }
 
@@ -250,9 +281,55 @@ export default function WeeklyReport() {
                 )
               })}
 
+              {/* Action items */}
+              <div style={{ borderRadius: 8, border: '1px solid var(--border)', padding: 14, marginBottom: 16 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--gold)', marginBottom: 12 }}>📋 任務分派</div>
+
+                {/* Existing items */}
+                {actionItems.length > 0 && actionItems.map(item => {
+                  const done = item.status === 'completed'
+                  const overdue = item.due_date && item.due_date < format(new Date(), 'yyyy-MM-dd') && !done
+                  const priorityColor = item.priority === 'high' ? 'var(--red)' : item.priority === 'urgent' ? '#f59e0b' : 'var(--text-muted)'
+                  return (
+                    <div key={item.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                      <input type="checkbox" checked={done} onChange={() => toggleActionItem(item)} style={{ marginTop: 3, cursor: 'pointer', accentColor: 'var(--gold)' }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, color: done ? 'var(--text-muted)' : overdue ? 'var(--red)' : 'var(--text)', textDecoration: done ? 'line-through' : 'none' }}>{item.title}</div>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
+                          <span style={{ color: 'var(--gold)' }}>{item.assigned_to_name}</span>
+                          {item.due_date && <span style={{ marginLeft: 8, color: overdue ? 'var(--red)' : 'var(--text-dim)' }}>截止 {item.due_date}{overdue ? ' (逾期!)' : ''}</span>}
+                          {item.priority !== 'normal' && <span style={{ marginLeft: 8, color: priorityColor, fontWeight: 600 }}>{item.priority === 'high' ? '高' : '緊急'}</span>}
+                          {item.status === 'in_progress' && <span style={{ marginLeft: 8, color: 'var(--blue)' }}>進行中</span>}
+                          {item.progress_note && <span style={{ marginLeft: 8, color: 'var(--text-dim)' }}>💬 {item.progress_note}</span>}
+                        </div>
+                      </div>
+                      <button onClick={() => deleteActionItem(item.id)} style={{ fontSize: 12, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px' }}>✕</button>
+                    </div>
+                  )
+                })}
+
+                {/* Add new */}
+                <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <input value={newTask.title} onChange={e => setNewTask(p => ({ ...p, title: e.target.value }))} placeholder="新任務描述…" style={{ width: '100%', fontSize: 13, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text)' }} />
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <select value={newTask.assigned_to} onChange={e => setNewTask(p => ({ ...p, assigned_to: e.target.value }))} style={{ flex: 1, fontSize: 12, padding: '6px 8px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text)' }}>
+                      <option value="">負責人</option>
+                      {STAFF.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                    <input type="date" value={newTask.due_date} onChange={e => setNewTask(p => ({ ...p, due_date: e.target.value }))} style={{ flex: 1, fontSize: 12, padding: '6px 8px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text)' }} />
+                    <select value={newTask.priority} onChange={e => setNewTask(p => ({ ...p, priority: e.target.value }))} style={{ width: 80, fontSize: 12, padding: '6px 8px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text)' }}>
+                      <option value="normal">一般</option>
+                      <option value="high">高</option>
+                      <option value="urgent">緊急</option>
+                    </select>
+                  </div>
+                  <button onClick={addActionItem} style={{ padding: '8px 0', fontSize: 13, fontWeight: 700, cursor: 'pointer', background: 'rgba(201,168,76,.1)', border: '1px solid var(--border-gold)', borderRadius: 8, color: 'var(--gold)' }}>＋ 分派任務</button>
+                </div>
+              </div>
+
               {/* Boss summary */}
               <div style={{ borderRadius: 8, border: '1px solid var(--border-gold)', padding: 14, marginBottom: 16, background: 'rgba(201,168,76,.03)' }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--gold)', marginBottom: 12 }}>老闆綜合備註</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--gold)', marginBottom: 12 }}>📌 會議總結 & 決議</div>
                 <textarea
                   value={bossNotes} onChange={e => setBossNotes(e.target.value)}
                   rows={4} placeholder="本週總結、觀察、要特別注意的事項…"
