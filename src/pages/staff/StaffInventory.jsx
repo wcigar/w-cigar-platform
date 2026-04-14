@@ -32,8 +32,24 @@ export default function StaffInventory() {
 
   async function loadRecords() {
     setRecordsLoading(true)
+    // Try with created_at first, fallback to no date filter
     const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7)
-    const { data } = await supabase.from('inventory_records').select('*').gte('created_at', weekAgo.toISOString()).order('created_at', { ascending: false }).limit(100)
+    let { data, error } = await supabase.from('inventory_records').select('*').gte('created_at', weekAgo.toISOString()).order('created_at', { ascending: false }).limit(100)
+    if (error || !data?.length) {
+      // Fallback: try without date filter (maybe column name differs or no recent data)
+      console.log('[inventory_records] first query:', error?.message, 'rows:', data?.length)
+      const res = await supabase.from('inventory_records').select('*').order('id', { ascending: false }).limit(100)
+      data = res.data; error = res.error
+      console.log('[inventory_records] fallback query:', error?.message, 'rows:', data?.length)
+    }
+    // Also try stock_transactions as alternative table name
+    if (!data?.length) {
+      const res2 = await supabase.from('stock_transactions').select('*').order('created_at', { ascending: false }).limit(100)
+      if (res2.data?.length) {
+        console.log('[stock_transactions] found', res2.data.length, 'rows')
+        data = res2.data.map(r => ({ ...r, item_name: r.item_name || r.product_name || r.notes, before_stock: r.before_qty, after_stock: r.after_qty || ((r.before_qty||0) + (r.direction === 'in' ? (r.quantity||0) : -(r.quantity||0))), diff: r.direction === 'in' ? (r.quantity||0) : -(r.quantity||0), staff_code: r.handled_by, reason_code: r.channel, note: r.notes }))
+      }
+    }
     setRecords(data || [])
     setRecordsLoading(false)
   }
