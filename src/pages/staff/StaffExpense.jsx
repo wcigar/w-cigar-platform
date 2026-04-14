@@ -58,6 +58,7 @@ export default function StaffExpense() {
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(true)
   const fileRef = useRef(null)
+  const galleryRef = useRef(null)
   const today = format(new Date(), 'yyyy-MM-dd')
   const month = format(new Date(), 'yyyy-MM')
   const [showCashForm, setShowCashForm] = useState(false)
@@ -247,9 +248,24 @@ export default function StaffExpense() {
             )}
           </div>
           <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={e => handlePhoto(e.target.files?.[0])} />
-          <button className="btn-outline" onClick={() => fileRef.current?.click()} style={{ width: '100%', padding: 14, display: noReceipt ? 'none' : 'flex', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 8, background: photo ? 'rgba(77,168,108,.06)' : undefined, borderColor: photo ? 'rgba(77,168,108,.3)' : undefined, color: photo ? 'var(--green)' : undefined }}>
-            <Camera size={18} /> {photo ? '已拍照 (' + Math.round(photo.size / 1024) + 'KB) 點擊重拍' : '📷 拍照上傳收據（必須）'}
-          </button>
+          <input ref={galleryRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => handlePhoto(e.target.files?.[0])} />
+          {!noReceipt && (
+            <>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                <button className="btn-outline" onClick={() => fileRef.current?.click()} style={{ flex: 1, padding: 14, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: photo ? 'rgba(77,168,108,.06)' : undefined, borderColor: photo ? 'rgba(77,168,108,.3)' : undefined, color: photo ? 'var(--green)' : undefined }}>
+                  <Camera size={18} /> 📷 拍照
+                </button>
+                <button className="btn-outline" onClick={() => galleryRef.current?.click()} style={{ flex: 1, padding: 14, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: photo ? 'rgba(77,168,108,.06)' : undefined, borderColor: photo ? 'rgba(77,168,108,.3)' : undefined, color: photo ? 'var(--green)' : undefined }}>
+                  🖼️ 相簿
+                </button>
+              </div>
+              {photo && (
+                <div style={{ marginBottom: 8, padding: '8px 12px', borderRadius: 8, background: 'rgba(77,168,108,.08)', border: '1px solid rgba(77,168,108,.3)', fontSize: 13, color: 'var(--green)', fontWeight: 600 }}>
+                  ✅ 已選擇照片 ({Math.round(photo.size / 1024)}KB)
+                </div>
+              )}
+            </>
+          )}
           {preview && <img src={preview} alt="" style={{ width: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 10, marginBottom: 10, border: '1px solid var(--border-gold)' }} />}
           <input placeholder="備註（選填）" value={form.note} onChange={e => setForm(p => ({ ...p, note: e.target.value }))} style={{ marginBottom: 14, fontSize: 13, padding: 10 }} />
           <button className="btn-gold" onClick={handleSubmitExpense} disabled={submitting} style={{ width: '100%', padding: 16, fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: submitting ? .5 : 1 }}>
