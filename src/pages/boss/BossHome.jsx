@@ -20,6 +20,7 @@ export default function BossHome() {
   const [monthRevenue, setMonthRevenue] = useState(0)
   const [pendingHandover, setPendingHandover] = useState(0)
   const [dealerPending, setDealerPending] = useState(0)
+  const [openActions, setOpenActions] = useState([])
   const [vipUnpaid, setVipUnpaid] = useState(0)
   const today = format(new Date(), 'yyyy-MM-dd')
   const month = format(new Date(), 'yyyy-MM')
@@ -95,6 +96,9 @@ export default function BossHome() {
     const counts = {}
     ;(lbR.data || []).forEach(r => { if (r.completed_by) counts[r.completed_by] = (counts[r.completed_by] || 0) + 1 })
     setLeaderboard(Object.entries(counts).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count))
+    // Open action items (pending + in_progress)
+    const { data: aiData } = await supabase.from('meeting_action_items').select('*').in('status', ['pending', 'in_progress']).order('due_date', { ascending: true }).limit(6)
+    setOpenActions(aiData || [])
     setLoading(false)
   }
 
@@ -220,6 +224,40 @@ export default function BossHome() {
           </div>
         )
       })}
+
+      {/* Action items tracking */}
+      {openActions.length > 0 && (
+        <div className="card" style={{ marginTop: 16, marginBottom: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 16 }}>📋</span>
+              <span style={{ fontSize: 14, fontWeight: 700 }}>任務追蹤</span>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{openActions.length} 項未完成</span>
+            </div>
+            <button onClick={() => navigate('/hr')} style={{ fontSize: 11, color: 'var(--gold)', background: 'none', border: '1px solid var(--border-gold)', borderRadius: 6, padding: '3px 10px', cursor: 'pointer' }}>週會報表 →</button>
+          </div>
+          {openActions.map(item => {
+            const overdue = item.due_date && item.due_date < today
+            const priorityColor = item.priority === 'high' ? 'var(--red)' : item.priority === 'urgent' ? '#f59e0b' : 'var(--text-muted)'
+            return (
+              <div key={item.id} style={{ padding: '8px 0', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: overdue ? 'var(--red)' : 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
+                    <span style={{ color: 'var(--gold)' }}>{item.assigned_to_name}</span>
+                    {item.due_date && <span style={{ marginLeft: 8, color: overdue ? 'var(--red)' : 'var(--text-dim)' }}>截止 {item.due_date}{overdue ? ' (逾期!)' : ''}</span>}
+                    {item.priority !== 'normal' && <span style={{ marginLeft: 8, color: priorityColor, fontWeight: 600 }}>{item.priority === 'high' ? '高' : '緊急'}</span>}
+                    {item.progress_note && <span style={{ marginLeft: 8, color: 'var(--text-dim)' }}>💬 {item.progress_note}</span>}
+                  </div>
+                </div>
+                <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, fontWeight: 600, flexShrink: 0, background: item.status === 'in_progress' ? 'rgba(77,140,196,.15)' : 'rgba(201,168,76,.1)', color: item.status === 'in_progress' ? 'var(--blue)' : 'var(--gold)' }}>
+                  {item.status === 'pending' ? '待執行' : '進行中'}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* Leaderboard */}
       {leaderboard.length > 0 && (
