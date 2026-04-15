@@ -261,10 +261,7 @@ export default function PosCheckout({ session, shift, onShiftChange, onCartCount
           unit_price: c.price,
           brand: c.brand || '',
           category: c.category ||
-            (c.sections?.[0] ? (SECTION_CATEGORY_MAP[c.sections[0]] || c.sections[0]) : '') ||
-            (c.id?.startsWith('DK') ? '飲品' :
-             c.id?.startsWith('FD') ? '餐食' :
-             c.id?.startsWith('AC') ? '配件' : '其他'),
+            (c.sections?.[0] ? (SECTION_CATEGORY_MAP[c.sections[0]] || c.sections[0]) : '其他'),
           original_price: c.originalPrice ?? c._originalPrice ?? c.price,
         })),
         p_payment_method: payMethod,
