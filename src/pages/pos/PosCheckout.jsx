@@ -120,10 +120,10 @@ export default function PosCheckout({ session, shift, onShiftChange, onCartCount
       let cigars = []
       const rpc = prodR.data?.products
       if (Array.isArray(rpc) && rpc.length > 0 && rpc[0].name) {
-        cigars = rpc.map(p => ({ ...p, _src: 'cigar', _cat: p.brand === 'Capadura' ? 'Capadura' : '古巴雪茄', _price: p.suggest_price || p.price_a || 0, _stock: p.stock_status || '現貨' }))
+        cigars = rpc.map(p => ({ ...p, _src: 'cigar', _cat: p.brand === 'Capadura' ? 'Capadura' : (SECTION_CATEGORY_MAP[p.sections?.[0]] || classifyItem(p.name, p.category) || '古巴雪茄'), _price: p.suggest_price || p.price_a || 0, _stock: p.stock_status || '現貨' }))
       } else {
         const { data: dp } = await supabase.from('products').select('id, brand, name, spec, price_a, suggest_price, image_url, stock_status, inv_master_id').eq('is_active', true).order('sort_order', { ascending: true })
-        cigars = (dp || []).map(p => ({ ...p, _src: 'cigar', _cat: p.brand === 'Capadura' ? 'Capadura' : '古巴雪茄', _price: p.suggest_price || p.price_a || 0, _stock: p.stock_status || '現貨' }))
+        cigars = (dp || []).map(p => ({ ...p, _src: 'cigar', _cat: p.brand === 'Capadura' ? 'Capadura' : (SECTION_CATEGORY_MAP[p.sections?.[0]] || classifyItem(p.name, p.category) || '古巴雪茄'), _price: p.suggest_price || p.price_a || 0, _stock: p.stock_status || '現貨' }))
       }
       const { data: inv } = await supabase.from('inventory_master').select('id, name, category, current_stock, safe_stock, retail_price, image_url').eq('enabled', true).in('category', ['吧台飲品', '餐飲', '酒類', '配件', '營運耗材']).gt('retail_price', 0)
       const bar = (inv || []).map(p => ({ id: p.id, name: p.name, brand: p.category, image_url: p.image_url, inv_master_id: p.id, _src: 'bar', _cat: classifyItem(p.name, p.category), _price: p.retail_price, _stock: deriveStock(p.current_stock, p.safe_stock) }))
