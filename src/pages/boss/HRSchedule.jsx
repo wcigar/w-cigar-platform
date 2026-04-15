@@ -16,6 +16,7 @@ export default function HRSchedule() {
   const [month, setMonth] = useState(new Date())
   const [emps, setEmps] = useState([])
   const [scheds, setScheds] = useState([])
+  const [prefs, setPrefs] = useState([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('schedule')
 
@@ -30,15 +31,18 @@ export default function HRSchedule() {
   async function load() {
     setLoading(true)
     const s = format(start, 'yyyy-MM-dd'), e = format(end, 'yyyy-MM-dd')
-    const [eR, sR] = await Promise.all([
+    const [eR, sR, pR] = await Promise.all([
       supabase.from('employees').select('*').eq('enabled', true).order('name'),
       supabase.from('schedules').select('*').gte('date', s).lte('date', e),
+      supabase.from('schedule_preferences').select('*').gte('date', s).lte('date', e),
     ])
-    setEmps((eR.data || []).filter(x => !x.is_admin)); setScheds(sR.data || [])
+    setEmps((eR.data || []).filter(x => !x.is_admin)); setScheds(sR.data || []); setPrefs(pR.data || [])
     setLoading(false)
   }
 
   function getShift(eid, ds) { return scheds.find(s => s.employee_id === eid && s.date === ds) }
+  function getPref(eid, ds) { return prefs.find(p => p.employee_id === eid && p.date === ds)?.preference }
+  const PREF_LABELS = { '早班': { t: '希早', c: '#3dd68c' }, '晚班': { t: '希晚', c: '#4d8ac4' }, '都可': { t: '希都可', c: 'var(--gold)' }, '休假': { t: '希休', c: '#ff9a9a' }, '不可': { t: '✗', c: 'var(--red)' } }
   async function setShiftVal(eid, ds, val) {
     const ex = getShift(eid, ds)
     if (ex) await supabase.from('schedules').update({ shift: val }).eq('id', ex.id)
@@ -148,6 +152,8 @@ export default function HRSchedule() {
                       const s = getShift(emp.id, ds), v = s?.shift || ''
                       const c = shiftColors[v] || 'var(--text-muted)'
                       const isHolWork = hol && (v === '早班' || v === '晚班')
+                      const pref = getPref(emp.id, ds)
+                      const prefInfo = pref ? PREF_LABELS[pref] : null
                       return <td key={emp.id} style={{ padding: 3, textAlign: 'center', background: isHolWork ? 'rgba(196,77,77,.12)' : undefined }}>
                         <select value={v} onChange={e => setShiftVal(emp.id, ds, e.target.value)} style={{
                           background: v ? c + '20' : 'var(--black)', color: isHolWork ? 'var(--red)' : c,
@@ -159,6 +165,7 @@ export default function HRSchedule() {
                           {ALL_SHIFTS.filter(Boolean).map(o => <option key={o} value={o}>{o}</option>)}
                         </select>
                         {isHolWork && <div style={{ fontSize: 7, color: 'var(--red)', fontWeight: 700 }}>2倍薪</div>}
+                        {prefInfo && <div style={{ fontSize: 8, color: prefInfo.c, fontWeight: 600, marginTop: 1 }}>{prefInfo.t}</div>}
                       </td>
                     })}
                   </tr>
