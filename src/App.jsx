@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './lib/auth'
 import { seedTodayTasks } from './lib/seeder'
+import ErrorBoundary from './components/ErrorBoundary'
 import Login from './components/Login'
 import Layout from './components/Layout'
 import StaffHome from './pages/staff/StaffHome'
@@ -26,7 +27,7 @@ import AmbassadorApp from './pages/ambassador/AmbassadorApp'
 import PosApp from './pages/pos/PosApp'
 import VipCellar from './pages/VipCellar'
 
-export default function App() {
+function AppInner() {
   const { user, loading } = useAuth()
 
   useEffect(() => {
@@ -97,4 +98,8 @@ export default function App() {
       )}
     </Layout>
   )
+}
+
+export default function App() {
+  return <ErrorBoundary><AppInner /></ErrorBoundary>
 }

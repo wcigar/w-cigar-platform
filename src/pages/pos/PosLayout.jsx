@@ -43,7 +43,14 @@ export default function PosLayout({ session, shift, summary, cartCount, heldCoun
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <DollarSign size={16} color="#c9a84c" />
-          <span style={{ fontSize: 14, fontWeight: 700, color: '#c9a84c', letterSpacing: 2 }}>POS</span>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: '#c9a84c', letterSpacing: 1 }}>
+              W CIGAR BAR
+            </span>
+            <span style={{ fontSize: 10, color: '#6b5a3a', letterSpacing: 0.5 }}>
+              {import.meta.env.VITE_STORE_NAME || '大安總店'}
+            </span>
+          </div>
         </div>
 
         {/* Nav tabs */}
