@@ -355,35 +355,80 @@ export default function PosCheckout({ session, shift, onShiftChange, onCartCount
       }, 100)
     }
   }
-  function printCigarLabel(item) {
-    const labelWin = window.open('', '_blank', 'width=400,height=300')
-    if (!labelWin) return
+  function printVipLabel(item) {
     const now = new Date().toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' })
-    labelWin.document.write(`
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
+    const orderNo = lastOrder?.order_no || ''
+    const qrData = encodeURIComponent(JSON.stringify({
+      customer: customer?.name || '',
+      phone: customer?.phone || '',
+      order: orderNo,
+      cigar: item.name,
+      date: now,
+    }))
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${qrData}`
+    const win = window.open('', '_blank', 'width=220,height=160')
+    if (!win) return
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
 <style>
-  body { margin: 0; padding: 2mm; font-family: sans-serif; font-size: 8px; width: 46mm; }
-  .title { font-size: 9px; font-weight: bold; border-bottom: 0.5px solid #000; padding-bottom: 1mm; margin-bottom: 1mm; display: flex; justify-content: space-between; }
-  .name { font-size: 10px; font-weight: bold; margin-bottom: 0.5mm; }
-  .cigar { font-size: 8px; color: #333; margin-bottom: 0.5mm; }
-  .footer { font-size: 7px; color: #666; margin-top: 1mm; }
+  @page { margin:0; size:50mm 30mm; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { width:50mm; height:30mm; padding:1.5mm; font-family:sans-serif; overflow:hidden; }
+  .wrap { display:flex; height:100%; gap:1.5mm; }
+  .left { flex:1; display:flex; flex-direction:column; justify-content:space-between; }
+  .right { width:10mm; display:flex; align-items:center; }
+  .brand { font-size:5.5pt; font-weight:bold; border-bottom:0.3pt solid #000; padding-bottom:0.5mm; letter-spacing:0.5pt; }
+  .customer { font-size:7pt; font-weight:bold; margin-top:0.5mm; }
+  .cigar { font-size:5pt; color:#333; margin-top:0.3mm; }
+  .cabinet { font-size:5.5pt; font-weight:bold; margin-top:0.5mm; }
+  .date { font-size:4.5pt; color:#666; margin-top:0.3mm; }
+  img { width:10mm; height:10mm; }
 </style>
-</head>
-<body>
-  <div class="title"><span>W CIGAR BAR 紳士雪茄館</span><span>🔑</span></div>
-  <div class="name">${customer?.name || '訪客'}</div>
-  <div class="cigar">${item.product_name || item.name}</div>
-  <div class="cigar">數量：${item.qty} 支</div>
-  <div class="footer">${now} ｜ ${lastOrder?.order_no || ''}</div>
-</body>
-</html>
-    `)
-    labelWin.document.close()
-    labelWin.focus()
-    setTimeout(() => { labelWin.print(); labelWin.close() }, 300)
+</head><body>
+  <div class="wrap">
+    <div class="left">
+      <div>
+        <div class="brand">W CIGAR BAR 紳士雪茄館</div>
+        <div class="customer">${customer?.name || '訪客'}</div>
+        <div class="cigar">${item.name}</div>
+      </div>
+      <div>
+        <div class="cabinet">窖位：${customer?.cabinet_no || '—'}</div>
+        <div class="date">入庫：${now} ｜ ${orderNo.slice(-8)}</div>
+      </div>
+    </div>
+    <div class="right"><img src="${qrUrl}" alt="QR"/></div>
+  </div>
+  <script>window.onload=function(){setTimeout(function(){window.print();window.close();},500);}<\/script>
+</body></html>`)
+    win.document.close()
+  }
+
+  function printBarcodeLabel(item) {
+    const code = item.id || item.barcode || ''
+    const win = window.open('', '_blank', 'width=220,height=160')
+    if (!win) return
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"><\/script>
+<style>
+  @page { margin:0; size:50mm 30mm; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { width:50mm; height:30mm; padding:1.5mm; font-family:sans-serif; text-align:center; }
+  .brand { font-size:6pt; font-weight:bold; letter-spacing:0.5pt; }
+  .name { font-size:7pt; font-weight:bold; margin:0.5mm 0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+  .price { font-size:6pt; font-weight:bold; margin-top:0.5mm; }
+  svg { width:100%; height:10mm; }
+</style>
+</head><body>
+    <div class="brand">W CIGAR BAR</div>
+    <div class="name">${item.name}</div>
+    <svg id="barcode"></svg>
+    <div class="price">NT$ ${(item.price || item._price || 0).toLocaleString()}</div>
+    <script>
+      JsBarcode('#barcode','${code}',{format:'CODE128',width:1.5,height:30,displayValue:true,fontSize:8,margin:2,textMargin:1});
+      window.onload=function(){setTimeout(function(){window.print();window.close();},600);}
+    <\/script>
+    </body></html>`)
+    win.document.close()
   }
 
   // ── Loading ──
@@ -446,8 +491,17 @@ export default function PosCheckout({ session, shift, onShiftChange, onCartCount
               <button onClick={() => updateQty(c.id, 1)} style={{ width: isTablet ? 32 : 24, height: isTablet ? 32 : 24, borderRadius: 6, border: '1px solid rgba(201,168,76,.3)', background: 'rgba(201,168,76,.1)', color: '#c9a84c', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Plus size={11} /></button>
             </div>
             <span style={{ width: 54, textAlign: 'right', fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-mono)', color: '#c9a84c' }}>${(c.price * c.qty).toLocaleString()}</span>
-            {!['奶茶咖啡','氣泡飲品','酒類','餐食','甜點'].includes(c._cat) && lastOrder && (
-              <button onClick={() => printCigarLabel(c)} title="列印標籤" style={{ fontSize: 11, padding: '3px 6px', borderRadius: 4, border: '1px solid rgba(201,168,76,.3)', background: 'transparent', color: '#c9a84c', cursor: 'pointer', marginLeft: 2 }}>🏷️</button>
+            {!['奶茶咖啡','氣泡飲品','酒類','餐食','甜點'].includes(c._cat) && (
+              <div style={{ display: 'flex', gap: 3, marginTop: 3 }}>
+                {customer?.is_vip && (
+                  <button onClick={() => printVipLabel(c)} style={{ fontSize: 10, padding: '2px 6px', borderRadius: 5, border: '1px solid rgba(201,168,76,.5)', background: 'rgba(201,168,76,.1)', color: '#c9a84c', cursor: 'pointer' }}>
+                    🔑 VIP
+                  </button>
+                )}
+                <button onClick={() => printBarcodeLabel(c)} style={{ fontSize: 10, padding: '2px 6px', borderRadius: 5, border: '1px solid rgba(255,255,255,.2)', background: 'rgba(255,255,255,.05)', color: '#aaa', cursor: 'pointer' }}>
+                  📦 條碼
+                </button>
+              </div>
             )}
             <button onClick={() => removeItem(c.id)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', padding: 2 }}><Trash2 size={13} /></button>
           </div>
