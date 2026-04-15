@@ -19,6 +19,17 @@ import {
   DRINK_CATS, calcMemberDiscount, scoreSearch, sortProducts, todayTaipei,
 } from './posUtils'
 
+const SECTION_CATEGORY_MAP = {
+  cuban:      '古巴雪茄',
+  exclusive:  '獨家雪茄',
+  capadura:   'Capadura',
+  monthly:    '月推薦',
+  hot:        '熱賣',
+  '熱賣專區': '熱賣',
+  mini:       '迷你雪茄',
+  preorder:   '預購',
+}
+
 export default function PosCheckout({ session, shift, onShiftChange, onCartCountChange, onHeldCountChange, showHeldFromLayout, onHeldFromLayoutDone, showOrdersFromLayout, onOrdersFromLayoutDone }) {
   // Responsive
   const [winW, setWinW] = useState(window.innerWidth)
@@ -249,7 +260,11 @@ export default function PosCheckout({ session, shift, onShiftChange, onCartCount
           qty: c.qty,
           unit_price: c.price,
           brand: c.brand || '',
-          category: c.category || c.sections?.[0] || '',
+          category: c.category ||
+            (c.sections?.[0] ? (SECTION_CATEGORY_MAP[c.sections[0]] || c.sections[0]) : '') ||
+            (c.id?.startsWith('DK') ? '飲品' :
+             c.id?.startsWith('FD') ? '餐食' :
+             c.id?.startsWith('AC') ? '配件' : '其他'),
           original_price: c.originalPrice ?? c._originalPrice ?? c.price,
         })),
         p_payment_method: payMethod,
