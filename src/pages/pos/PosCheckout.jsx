@@ -343,6 +343,49 @@ export default function PosCheckout({ session, shift, onShiftChange, onCartCount
     else alert('關班失敗: ' + (data?.error || ''))
   }
 
+  // ── Print ──
+  function printReceipt() {
+    if (!lastOrder) return
+    const el = document.getElementById('receipt-print')
+    if (el) {
+      el.style.display = 'block'
+      setTimeout(() => {
+        window.print()
+        setTimeout(() => { el.style.display = 'none' }, 800)
+      }, 100)
+    }
+  }
+  function printCigarLabel(item) {
+    const labelWin = window.open('', '_blank', 'width=400,height=300')
+    if (!labelWin) return
+    const now = new Date().toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' })
+    labelWin.document.write(`
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; padding: 2mm; font-family: sans-serif; font-size: 8px; width: 46mm; }
+  .title { font-size: 9px; font-weight: bold; border-bottom: 0.5px solid #000; padding-bottom: 1mm; margin-bottom: 1mm; display: flex; justify-content: space-between; }
+  .name { font-size: 10px; font-weight: bold; margin-bottom: 0.5mm; }
+  .cigar { font-size: 8px; color: #333; margin-bottom: 0.5mm; }
+  .footer { font-size: 7px; color: #666; margin-top: 1mm; }
+</style>
+</head>
+<body>
+  <div class="title"><span>W CIGAR BAR 紳士雪茄館</span><span>🔑</span></div>
+  <div class="name">${customer?.name || '訪客'}</div>
+  <div class="cigar">${item.product_name || item.name}</div>
+  <div class="cigar">數量：${item.qty} 支</div>
+  <div class="footer">${now} ｜ ${lastOrder?.order_no || ''}</div>
+</body>
+</html>
+    `)
+    labelWin.document.close()
+    labelWin.focus()
+    setTimeout(() => { labelWin.print(); labelWin.close() }, 300)
+  }
+
   // ── Loading ──
   if (loading) return (
     <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -403,6 +446,9 @@ export default function PosCheckout({ session, shift, onShiftChange, onCartCount
               <button onClick={() => updateQty(c.id, 1)} style={{ width: isTablet ? 32 : 24, height: isTablet ? 32 : 24, borderRadius: 6, border: '1px solid rgba(201,168,76,.3)', background: 'rgba(201,168,76,.1)', color: '#c9a84c', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Plus size={11} /></button>
             </div>
             <span style={{ width: 54, textAlign: 'right', fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-mono)', color: '#c9a84c' }}>${(c.price * c.qty).toLocaleString()}</span>
+            {!['奶茶咖啡','氣泡飲品','酒類','餐食','甜點'].includes(c._cat) && lastOrder && (
+              <button onClick={() => printCigarLabel(c)} title="列印標籤" style={{ fontSize: 11, padding: '3px 6px', borderRadius: 4, border: '1px solid rgba(201,168,76,.3)', background: 'transparent', color: '#c9a84c', cursor: 'pointer', marginLeft: 2 }}>🏷️</button>
+            )}
             <button onClick={() => removeItem(c.id)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', padding: 2 }}><Trash2 size={13} /></button>
           </div>
           {editPriceId === c.id && (
@@ -458,6 +504,20 @@ export default function PosCheckout({ session, shift, onShiftChange, onCartCount
   /* ════════ RENDER ════════ */
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#0d0b09', color: '#e8dcc8' }}>
+      <style>{`
+        @media print {
+          body * { visibility: hidden !important; }
+          #receipt-print, #receipt-print * { visibility: visible !important; }
+          #receipt-print {
+            position: fixed; top: 0; left: 0;
+            width: 76mm; padding: 3mm 4mm;
+            font-family: monospace; font-size: 11px;
+            color: #000; background: #fff;
+            line-height: 1.5;
+          }
+          @page { margin: 0; size: 80mm auto; }
+        }
+      `}</style>
       {/* Shift + Search bar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderBottom: '1px solid #2a2520', flexShrink: 0 }}>
         <button onClick={() => setShowShift(true)} style={{ background: 'none', border: '1px solid #2a2520', borderRadius: 6, padding: '3px 8px', fontSize: 10, color: '#8a7e6e', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}><Clock size={11} /> {shift ? '關班' : '開班'}</button>
@@ -624,6 +684,44 @@ export default function PosCheckout({ session, shift, onShiftChange, onCartCount
         </div>
       )}
 
+      {/* Hidden receipt for print */}
+      {lastOrder && (
+        <div id="receipt-print" style={{ display: 'none' }}>
+          <div style={{ textAlign: 'center', borderBottom: '1px dashed #000', paddingBottom: 6, marginBottom: 6 }}>
+            <div style={{ fontSize: 14, fontWeight: 'bold', letterSpacing: 2 }}>W CIGAR BAR</div>
+            <div style={{ fontSize: 10 }}>紳士雪茄館 ｜ 台北市大安區</div>
+          </div>
+          <div style={{ marginBottom: 6, fontSize: 11 }}>
+            <div>{new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })}</div>
+            <div>單號：{lastOrder.order_no}</div>
+            <div>收銀：{session?.name}</div>
+            {customer && <div>客戶：{customer.name}</div>}
+          </div>
+          <div style={{ borderTop: '1px dashed #000', borderBottom: '1px dashed #000', padding: '4px 0', marginBottom: 6 }}>
+            {cart.map((item, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                <span style={{ flex: 1 }}>{item.name} ×{item.qty}</span>
+                <span>${(item.price * item.qty).toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ marginBottom: 6 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>小計</span><span>${subtotal.toLocaleString()}</span></div>
+            {memberDiscount.discount > 0 && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>會員折扣</span><span>-${memberDiscount.discount.toLocaleString()}</span></div>}
+            {manualDiscountAmt > 0 && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>折扣 {discountPct}%</span><span>-${manualDiscountAmt.toLocaleString()}</span></div>}
+            {serviceFeeAmt > 0 && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>服務費</span><span>+${serviceFeeAmt.toLocaleString()}</span></div>}
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: 13, marginTop: 2 }}><span>總計</span><span>${lastOrder.total?.toLocaleString()}</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>實收</span><span>${lastOrder.paid?.toLocaleString()}</span></div>
+            {lastOrder.change > 0 && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>找零</span><span>${lastOrder.change?.toLocaleString()}</span></div>}
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>付款</span><span>{payMethod}</span></div>
+          </div>
+          <div style={{ textAlign: 'center', borderTop: '1px dashed #000', paddingTop: 6, fontSize: 10 }}>
+            <div>感謝您蒞臨 W Cigar Bar</div>
+            <div>請保留本收據以供查詢</div>
+          </div>
+        </div>
+      )}
+
       {/* Success modal */}
       {lastOrder && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,.85)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => { setLastOrder(null); setUpgradeInfo(null) }}>
@@ -637,6 +735,7 @@ export default function PosCheckout({ session, shift, onShiftChange, onCartCount
               {lastOrder.change > 0 && <div><div style={{ fontSize: 10, color: '#8a7e6e' }}>找零</div><div style={{ fontSize: 18, fontFamily: 'var(--font-mono)', fontWeight: 700, color: '#4da86c' }}>${lastOrder.change?.toLocaleString()}</div></div>}
             </div>
             {upgradeInfo && <div style={{ background: 'rgba(155,89,182,.1)', border: '1px solid rgba(155,89,182,.3)', borderRadius: 12, padding: 12, marginBottom: 12 }}><div style={{ fontSize: 16, fontWeight: 700, color: '#9b59b6' }}>🎉 升級！</div><div style={{ fontSize: 13, color: '#e8dcc8', marginTop: 4 }}>{lastOrder.customerName} → <b style={{ color: '#c9a84c' }}>「{upgradeInfo.new_tier}」</b></div></div>}
+            <button onClick={printReceipt} style={{ padding: '10px 20px', borderRadius: 10, border: 'none', background: '#c9a84c', color: '#1a1410', fontSize: 13, fontWeight: 700, cursor: 'pointer', marginBottom: 8, width: '100%' }}>🖨️ 列印收據</button>
             <button onClick={() => { setLastOrder(null); setUpgradeInfo(null) }} style={{ padding: '12px 40px', fontSize: 16, fontWeight: 700, cursor: 'pointer', background: '#c9a84c', border: 'none', borderRadius: 12, color: '#000' }}>完成</button>
           </div>
         </div>
