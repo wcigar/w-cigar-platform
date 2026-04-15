@@ -60,8 +60,10 @@ export function deriveStock(cur, safe) {
 }
 
 // ── 品項分類 ──
+const CAT_KEYS = new Set(['古巴雪茄','Capadura','雪茄配件','莊園品茗','奶茶咖啡','氣泡飲品','餐食','甜點','酒類'])
 export function classifyItem(n, cat) {
   const l = (n || '').toLowerCase()
+  if (CAT_KEYS.has(cat)) return cat
   if (cat === '配件' || cat === '營運耗材') return '雪茄配件'
   if (/奶茶|咖啡|拿鐵|espresso|latte|americano/.test(l)) return '奶茶咖啡'
   if (/氣泡|可樂|雪碧|蘋果汁|可爾必思|礦泉水|coke|sprite|zero|蘇打/.test(l)) return '氣泡飲品'
