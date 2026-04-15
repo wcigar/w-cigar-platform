@@ -19,6 +19,8 @@ import {
   DRINK_CATS, calcMemberDiscount, scoreSearch, sortProducts, todayTaipei,
 } from './posUtils'
 
+const STORE_ID = import.meta.env.VITE_STORE_ID || 'DA_AN'
+
 const SECTION_CATEGORY_MAP = {
   cuban:      '古巴雪茄',
   exclusive:  '獨家雪茄',
@@ -271,6 +273,7 @@ export default function PosCheckout({ session, shift, onShiftChange, onCartCount
         p_vip_id: customer?.id || null,
         p_guest_count: guestCount || 1,
         p_service_fee_amount: serviceFeeAmt || 0,
+        p_store_id: STORE_ID,
         p_notes: [
           customer ? `客戶: ${customer.name}` : '',
           guestCount > 1 ? `人數: ${guestCount}` : '',
