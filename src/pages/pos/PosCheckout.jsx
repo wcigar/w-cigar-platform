@@ -243,12 +243,22 @@ export default function PosCheckout({ session, shift, onShiftChange, onCartCount
       const checkoutParams = {
         p_employee_id: session?.operator_id,
         p_employee_name: session?.name,
-        p_items: cart.map(c => ({ product_id: c.id, product_name: (c.brand ? c.brand + ' ' : '') + c.name, qty: c.qty, unit_price: c.price })),
+        p_items: cart.map(c => ({
+          product_id: c.id,
+          product_name: (c.brand ? c.brand + ' ' : '') + c.name,
+          qty: c.qty,
+          unit_price: c.price,
+          brand: c.brand || '',
+          category: c.category || c.sections?.[0] || '',
+          original_price: c.originalPrice ?? c._originalPrice ?? c.price,
+        })),
         p_payment_method: payMethod,
         p_payment_amount: payMethod === 'cash' ? +payAmount : total,
         p_discount: memberDiscount.discount + manualDiscountAmt,
         p_table_no: tableNo || null,
         p_vip_id: customer?.id || null,
+        p_guest_count: guestCount || 1,
+        p_service_fee_amount: serviceFeeAmt || 0,
         p_notes: [
           customer ? `客戶: ${customer.name}` : '',
           guestCount > 1 ? `人數: ${guestCount}` : '',
@@ -259,6 +269,10 @@ export default function PosCheckout({ session, shift, onShiftChange, onCartCount
           ...cart.filter(c => c.note).map(c => `[${c.name}] ${c.note}`),
         ].filter(Boolean).join(' | ') || null,
       }
+
+      console.log('[POS] p_items sample:', checkoutParams.p_items?.slice(0,2))
+      const missingInv = (checkoutParams.p_items || []).filter(i => ['CU004','CU013'].includes(i.product_id))
+      if (missingInv.length) console.log('[POS] CU004/CU013 items in cart:', missingInv)
 
       // Try v2 first (with price override validation)
       let data, error
