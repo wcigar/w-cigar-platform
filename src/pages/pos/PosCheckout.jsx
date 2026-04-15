@@ -196,7 +196,12 @@ export default function PosCheckout({ session, shift, onShiftChange, onCartCount
   // ── Filter & sort ──
   const filtered = useMemo(() => {
     let list = products
-    if (activeCategory !== 'all') list = list.filter(p => p._cat === activeCategory)
+    if (activeCategory !== 'all') list = list.filter(p => {
+      if (p._cat === activeCategory) return true
+      if (p.category === activeCategory) return true
+      if (Array.isArray(p.sections) && p.sections.some(s => (SECTION_CATEGORY_MAP[s] || s) === activeCategory)) return true
+      return false
+    })
     if (search) return scoreSearch(list, search)
     return sortProducts(list, sortBy)
   }, [products, activeCategory, search, sortBy])
