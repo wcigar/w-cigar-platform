@@ -79,3 +79,51 @@ export async function printVipLabel(member) {
 export async function openDrawer() {
   return printRequest('/open-drawer');
 }
+
+/**
+ * 批次列印 VIP 窖藏櫃位標籤
+ * 每支雪茄一張標籤
+ */
+export async function printCellarLabels({ customer, items, orderNo, storedDate }) {
+  const labels = items.flatMap(item =>
+    Array.from({ length: item.qty }, (_, i) => ({
+      memberName: customer.name,
+      memberId: customer.vip_code || customer.id,
+      cabinetNo: item.cabinet_no,
+      cigarName: item.name,
+      unitPrice: item.price,
+      orderNo,
+      storedDate,
+      index: i + 1,
+      total: item.qty
+    }))
+  )
+  const res = await fetch(`${BASE}/print-cellar-labels`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ labels })
+  })
+  if (!res.ok) throw new Error('櫃位標籤列印失敗')
+  return res.json()
+}
+
+/**
+ * 列印 VIP 入櫃明細總表
+ */
+export async function printCellarSummary({ customer, items, orderNo, storedDate, totalAmount }) {
+  const res = await fetch(`${BASE}/print-cellar-summary`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      memberName: customer.name,
+      memberId: customer.vip_code || customer.id,
+      cabinetNo: items[0]?.cabinet_no || 'A1',
+      orderNo,
+      storedDate,
+      totalAmount,
+      items: items.map(i => ({ name: i.name, qty: i.qty, price: i.price, subtotal: i.price * i.qty }))
+    })
+  })
+  if (!res.ok) throw new Error('入櫃明細列印失敗')
+  return res.json()
+}
