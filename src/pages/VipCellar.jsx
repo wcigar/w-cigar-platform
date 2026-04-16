@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { printVipLabel } from '../utils/printer'
 
 /* ═══ CONSTANTS ═══ */
 const C = { bg:'#0a0a0a', panel:'#111111', card:'#1e1a16', border:'#2d2720', gold:'#d0a54f', text:'#e8e5df', muted:'#a39d91', danger:'#e45d5d', success:'#3db27d', warning:'#f0b14a', blue:'#4d8ac4', purple:'#9b59b6' }
@@ -278,6 +279,7 @@ function AppView({ member, employee, privacy, onBack }) {
         <div style={{ display:'flex', gap:4 }}>
           <button onClick={() => setCellarView('cabinet')} style={{ fontSize:11, padding:'5px 12px', borderRadius:10, cursor:'pointer', background:cellarView==='cabinet'?`${C.gold}20`:'transparent', color:cellarView==='cabinet'?C.gold:C.muted, border:`1px solid ${cellarView==='cabinet'?C.gold+'40':C.border}` }}>🗄️ 依實體櫃位檢視</button>
           <button onClick={() => setCellarView('brand')} style={{ fontSize:11, padding:'5px 12px', borderRadius:10, cursor:'pointer', background:cellarView==='brand'?`${C.gold}20`:'transparent', color:cellarView==='brand'?C.gold:C.muted, border:`1px solid ${cellarView==='brand'?C.gold+'40':C.border}` }}>🏷️ 依品牌系列檢視</button>
+          <button onClick={() => printVipLabel({ name: member.name, level: 'VIP', memberId: member.vip_code || member.vip_id, since: member.cabinet_opened }).catch(e => console.warn(e))} style={{ padding: '6px 12px', borderRadius: 6, border: 'none', background: '#7c3aed', color: '#fff', fontSize: 12, cursor: 'pointer' }}>Print VIP Label</button>
         </div>
         <GoldBtn onClick={() => setShowPrint(true)} style={{ fontSize:11, padding:'6px 14px' }}>🖨️ 列印窖藏清單</GoldBtn>
       </div>
