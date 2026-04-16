@@ -6,7 +6,8 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { toTaipei } from '../../lib/timezone'
-import { Search, Package, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { Search, Package, AlertTriangle, CheckCircle2, Printer } from 'lucide-react'
+import { printBarcode } from '../../utils/printer'
 
 const CATS = ['全部', '雪茄', '吧台飲品', '餐飲', '酒類', '配件', '營運耗材']
 
@@ -163,6 +164,9 @@ export default function PosInventory() {
                   </td>
                   <td style={{ padding: '8px 4px', textAlign: 'right', fontSize: 10, color: '#8a7e6e' }}>
                     {item.last_update ? toTaipei(item.last_update) : '—'}
+                  </td>
+                  <td style={{ padding: '8px 4px', textAlign: 'center' }}>
+                    <button onClick={() => printBarcode(item.id?.replace('p_','').replace('i_',''), item.name).catch(e => console.warn('[barcode]', e))} style={{ background: 'none', border: '1px solid #555', borderRadius: 4, padding: '2px 6px', color: '#8a7e6e', fontSize: 10, cursor: 'pointer' }} title="列印條碼"><Printer size={12} /></button>
                   </td>
                 </tr>
               )
