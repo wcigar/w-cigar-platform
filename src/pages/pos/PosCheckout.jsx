@@ -8,6 +8,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { logAudit } from '../../lib/audit'
+import { printReceipt, printKitchen, openDrawer } from '../../utils/printer'
 import {
   Search, ShoppingCart, X, Plus, Minus, Trash2, CreditCard, DollarSign,
   ChevronUp, ChevronDown, CheckCircle2, LogIn, LogOut as LogOutIcon,
@@ -322,6 +323,9 @@ export default function PosCheckout({ session, shift, onShiftChange, onCartCount
 
       setUpgradeInfo(upg)
       setLastOrder({ ...data, items: cart, payMethod, total, memberDiscount: memberDiscount.discount, paid: payMethod === 'cash' ? +payAmount : total, change: data.change ?? change, customerName: customer?.name })
+      // Auto-print receipt + kitchen ticket
+      printReceipt({ id: data?.order_id || '---', items: cart.map(c => ({ name: c.name, qty: c.qty, price: c.price })), subtotal: Math.round(subtotal), tax: 0, total: Math.round(finalTotal), payment: payMethod, cashier: session?.name || '', createdAt: new Date().toLocaleString('zh-TW') }).catch(e => console.warn('[print receipt]', e))
+      printKitchen({ id: data?.order_id || '---', items: cart.filter(c => !['cigar','accessory'].includes(c._cat)).map(c => ({ name: c.name, qty: c.qty, note: c.note })), table: '-', createdAt: new Date().toLocaleString('zh-TW') }).catch(e => console.warn('[print kitchen]', e))
       clearAll(); setPayAmount(''); setShowCheckout(false); setShowMobileCart(false); loadAll(); loadHeldOrders()
     } catch (e) { alert('結帳失敗: ' + e.message) } finally { setSubmitting(false) }
   }
