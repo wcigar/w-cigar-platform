@@ -11,6 +11,7 @@ import PosLogin from './PosLogin'
 import PosLayout from './PosLayout'
 import PosCheckout from './PosCheckout'
 import PosInventory from './PosInventory'
+import PrinterSettings from './PrinterSettings'
 
 const SESSION_KEY = 'w_pos_session'
 const SESSION_MAX_MS = 12 * 60 * 60 * 1000 // 12 hours
@@ -104,6 +105,7 @@ export default function PosApp() {
           />
         } />
         <Route path="/inventory" element={<PosInventory />} />
+                  <Route path="/printer-settings" element={<PrinterSettings />} />
         <Route path="*" element={<Navigate to="/pos-app" replace />} />
       </Routes>
     </PosLayout>
