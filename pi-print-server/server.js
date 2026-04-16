@@ -294,3 +294,74 @@ app.listen(SERVER_PORT, '0.0.0.0', () => {
   console.log(`[W Print Server] listening on :${SERVER_PORT}`);
   console.log(`[W Print Server] printer target ${PRINTER_HOST}:${PRINTER_PORT}`);
 });
+// ── VIP 窖藏櫃位標籤（批次）──
+app.post('/print-cellar-labels', (req, res) => {
+  const { labels } = req.body;
+  if (!labels || !labels.length) return res.status(400).json({ error: 'No labels' });
+
+  const cmds = [];
+  labels.forEach((lb, idx) => {
+    // 初始化
+    cmds.push(Buffer.from([0x1B, 0x40]));
+    // 置中
+    cmds.push(Buffer.from([0x1B, 0x61, 0x01]));
+    // 粗體
+    cmds.push(Buffer.from([0x1B, 0x45, 0x01]));
+    cmds.push(Buffer.from(`W CIGAR BAR VIP\n`, 'utf8'));
+    cmds.push(Buffer.from([0x1B, 0x45, 0x00]));
+    cmds.push(Buffer.from('--------------------------------\n', 'utf8'));
+    // 左對齊
+    cmds.push(Buffer.from([0x1B, 0x61, 0x00]));
+    cmds.push(Buffer.from(`VIP: ${lb.memberName}\n`, 'utf8'));
+    cmds.push(Buffer.from(`ID:  ${lb.memberId}\n`, 'utf8'));
+    cmds.push(Buffer.from(`CAB: ${lb.cabinetNo}\n`, 'utf8'));
+    cmds.push(Buffer.from(`品名: ${lb.cigarName}\n`, 'utf8'));
+    cmds.push(Buffer.from(`單價: $${lb.unitPrice}\n`, 'utf8'));
+    cmds.push(Buffer.from(`日期: ${lb.storedDate}\n`, 'utf8'));
+    cmds.push(Buffer.from(`編號: ${lb.index}/${lb.total}\n`, 'utf8'));
+    cmds.push(Buffer.from(`單號: ${lb.orderNo}\n`, 'utf8'));
+    cmds.push(Buffer.from('--------------------------------\n', 'utf8'));
+    // 切紙（部分切）
+    cmds.push(Buffer.from([0x1D, 0x56, 0x42, 0x03]));
+  });
+
+  const buf = Buffer.concat(cmds);
+  printRaw(buf)
+    .then(() => res.json({ ok: true, count: labels.length }))
+    .catch(e => res.status(500).json({ error: e.message }));
+});
+
+// ── VIP 入櫃明細總表 ──
+app.post('/print-cellar-summary', (req, res) => {
+  const { memberName, memberId, cabinetNo, orderNo, storedDate, totalAmount, items } = req.body;
+  const cmds = [];
+  cmds.push(Buffer.from([0x1B, 0x40]));
+  cmds.push(Buffer.from([0x1B, 0x61, 0x01]));
+  cmds.push(Buffer.from([0x1B, 0x45, 0x01]));
+  cmds.push(Buffer.from('W CIGAR BAR\n', 'utf8'));
+  cmds.push(Buffer.from('VIP 入櫃明細\n', 'utf8'));
+  cmds.push(Buffer.from([0x1B, 0x45, 0x00]));
+  cmds.push(Buffer.from('================================\n', 'utf8'));
+  cmds.push(Buffer.from([0x1B, 0x61, 0x00]));
+  cmds.push(Buffer.from(`VIP: ${memberName} (${memberId})\n`, 'utf8'));
+  cmds.push(Buffer.from(`櫃號: ${cabinetNo}\n`, 'utf8'));
+  cmds.push(Buffer.from(`單號: ${orderNo}\n`, 'utf8'));
+  cmds.push(Buffer.from(`日期: ${storedDate}\n`, 'utf8'));
+  cmds.push(Buffer.from('--------------------------------\n', 'utf8'));
+  (items || []).forEach(it => {
+    cmds.push(Buffer.from(`${it.name}\n`, 'utf8'));
+    cmds.push(Buffer.from(`  x${it.qty}  $${it.price}  = $${it.subtotal}\n`, 'utf8'));
+  });
+  cmds.push(Buffer.from('================================\n', 'utf8'));
+  cmds.push(Buffer.from([0x1B, 0x45, 0x01]));
+  cmds.push(Buffer.from(`合計: $${totalAmount}\n`, 'utf8'));
+  cmds.push(Buffer.from([0x1B, 0x45, 0x00]));
+  cmds.push(Buffer.from('\n\n', 'utf8'));
+  cmds.push(Buffer.from([0x1D, 0x56, 0x42, 0x03]));
+
+  const buf = Buffer.concat(cmds);
+  printRaw(buf)
+    .then(() => res.json({ ok: true }))
+    .catch(e => res.status(500).json({ error: e.message }));
+});
+
