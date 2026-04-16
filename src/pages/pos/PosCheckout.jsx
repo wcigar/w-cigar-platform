@@ -9,6 +9,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { logAudit } from '../../lib/audit'
 import { printReceipt, printKitchen, openDrawer } from '../../utils/printer'
+import VipCheckoutBridge from '../../components/VipCheckoutBridge'
 import {
   Search, ShoppingCart, X, Plus, Minus, Trash2, CreditCard, DollarSign,
   ChevronUp, ChevronDown, CheckCircle2, LogIn, LogOut as LogOutIcon,
@@ -97,6 +98,7 @@ export default function PosCheckout({ session, shift, onShiftChange, onCartCount
   const [editPriceId, setEditPriceId] = useState(null)
   const [editPriceVal, setEditPriceVal] = useState('')
   const [editPriceReason, setEditPriceReason] = useState('')
+  const [showVipBridge, setShowVipBridge] = useState(false)
   const canOverridePrice = session?.is_admin === true
 
   // Hold orders
@@ -326,7 +328,8 @@ export default function PosCheckout({ session, shift, onShiftChange, onCartCount
       // Auto-print receipt + kitchen ticket
       printReceipt({ id: data?.order_id || '---', items: cart.map(c => ({ name: c.name, qty: c.qty, price: c.price })), subtotal: Math.round(subtotal), tax: 0, total: Math.round(finalTotal), payment: payMethod, cashier: session?.name || '', createdAt: new Date().toLocaleString('zh-TW') }).catch(e => console.warn('[print receipt]', e))
       printKitchen({ id: data?.order_id || '---', items: cart.filter(c => !['cigar','accessory'].includes(c._cat)).map(c => ({ name: c.name, qty: c.qty, note: c.note })), table: '-', createdAt: new Date().toLocaleString('zh-TW') }).catch(e => console.warn('[print kitchen]', e))
-      clearAll(); setPayAmount(''); setShowCheckout(false); setShowMobileCart(false); loadAll(); loadHeldOrders()
+      clearAll(); setPayAmount(''); setShowCheckout(false)
+        if (customer?.is_vip) setShowVipBridge(true); setShowMobileCart(false); loadAll(); loadHeldOrders()
     } catch (e) { alert('結帳失敗: ' + e.message) } finally { setSubmitting(false) }
   }
 
@@ -746,6 +749,18 @@ export default function PosCheckout({ session, shift, onShiftChange, onCartCount
       )}
 
       {/* Hidden receipt for print */}
+        {showVipBridge && customer?.is_vip && (
+          <VipCheckoutBridge
+            customer={customer}
+            cartItems={lastOrder?.items || cart.map(c => ({ id: c.id, name: c.name, price: c.price, qty: c.qty, inv_master_id: c.inv_master_id }))}
+            staff={{ id: session?.employee_id, name: session?.employee_name }}
+            paymentMethod={payMethod}
+            totalAmount={lastOrder?.total || 0}
+            onDone={() => setShowVipBridge(false)}
+            onCancel={() => setShowVipBridge(false)}
+          />
+        )}
+
       {lastOrder && (
         <div id="receipt-print" style={{ display: 'none' }}>
           <div style={{ textAlign: 'center', borderBottom: '1px dashed #000', paddingBottom: 6, marginBottom: 6 }}>
