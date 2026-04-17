@@ -583,22 +583,31 @@ export default function PosCheckout({ session, shift, onShiftChange, onCartCount
         }
       `}</style>
       {/* Shift + Search bar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderBottom: '1px solid #2a2520', flexShrink: 0 }}>
-        <button onClick={() => setShowShift(true)} style={{ background: 'none', border: '1px solid #2a2520', borderRadius: 6, padding: '3px 8px', fontSize: 10, color: '#8a7e6e', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}><Clock size={11} /> {shift ? '關班' : '開班'}</button>
-        <div style={{ position: 'relative', flex: 1, minWidth: 80 }}>
-          <Search size={13} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: '#8a7e6e' }} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: '1px solid #2a2520', flexShrink: 0, background: 'linear-gradient(180deg, #1a1714 0%, #12100d 100%)' }}>
+        <button onClick={() => setShowShift(true)} style={{ background: 'linear-gradient(135deg, #2a2520, #1a1714)', border: '1px solid #3d3530', borderRadius: 8, padding: '6px 14px', fontSize: 12, color: '#c9a84c', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, fontWeight: 600, letterSpacing: 0.5, transition: 'all .2s' }}>
+          <Clock size={14} /> {shift ? '關班' : '開班'}
+        </button>
+        <div style={{ position: 'relative', flex: 1, minWidth: 100 }}>
+          <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#6b5f52' }} />
           <input placeholder="搜尋品牌 / 品名 / SKU…" value={search} onChange={e => setSearch(e.target.value)}
-            style={{ width: '100%', fontSize: 12, padding: isTablet ? '8px 8px 8px 32px' : '5px 6px 5px 28px', height: isTablet ? 44 : undefined, background: '#0d0b09', border: '1px solid #2a2520', borderRadius: 8, color: '#e8dcc8' }} />
+            style={{ width: '100%', fontSize: 13, padding: isTablet ? '10px 12px 10px 34px' : '7px 10px 7px 32px', height: isTablet ? 44 : undefined, background: '#0d0b09', border: '1px solid #2a2520', borderRadius: 8, color: '#e8dcc8', outline: 'none', letterSpacing: 0.3, transition: 'border-color .2s' }}
+            onFocus={e => e.target.style.borderColor = '#c9a84c'}
+            onBlur={e => e.target.style.borderColor = '#2a2520'} />
         </div>
-        <select value={sortBy} onChange={e => setSortBy(e.target.value)} style={{ fontSize: 10, padding: '5px 4px', background: '#0d0b09', border: '1px solid #2a2520', borderRadius: 6, color: '#e8dcc8' }}>
-          {SORTS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
-        </select>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: '#0d0b09', border: '1px solid #2a2520', borderRadius: 8, padding: '2px', flexShrink: 0 }}>
+          {SORTS.map(s => (
+            <button key={s.key} onClick={() => setSortBy(s.key)}
+              style={{ padding: '5px 10px', fontSize: 11, fontWeight: sortBy === s.key ? 700 : 400, color: sortBy === s.key ? '#c9a84c' : '#6b5f52', background: sortBy === s.key ? '#2a2520' : 'transparent', border: 'none', borderRadius: 6, cursor: 'pointer', transition: 'all .2s', whiteSpace: 'nowrap', letterSpacing: 0.3 }}>
+              {s.label}
+            </button>
+          ))}
+        </div>
         {isMobile && (
-          <button onClick={() => setShowMobileCart(true)} style={{ position: 'relative', background: '#c9a84c', border: 'none', borderRadius: 8, padding: '4px 10px', cursor: 'pointer', color: '#000', fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center' }}>
-            <ShoppingCart size={14} />
-            {cartCount > 0 && <span style={{ position: 'absolute', top: -5, right: -5, background: '#e74c3c', color: '#fff', borderRadius: '50%', width: 16, height: 16, fontSize: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{cartCount}</span>}
+          <button onClick={() => setShowCustomerSearch(true)} style={{ background: 'linear-gradient(135deg, #2a2520, #1a1714)', border: '1px solid #3d3530', borderRadius: 8, padding: '6px 10px', color: '#c9a84c', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+            <ShoppingCart size={14} />{cartCount > 0 && <span style={{ fontSize: 11, fontWeight: 700 }}>{cartCount}</span>}
           </button>
         )}
+      </div>
       </div>
 
       {/* Main content */}
