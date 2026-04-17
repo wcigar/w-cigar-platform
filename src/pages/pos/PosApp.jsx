@@ -1,9 +1,9 @@
 /**
- * POS App — 獨立入口
- * - 獨立 auth（不依賴員工系統的 AuthProvider）
- * - Session 綁定班次，12hr 上限
- * - 操作員切換需重新 PIN 驗證
- * - Routes: /pos-app (checkout), /pos-app/inventory
+ * POS App â ç¨ç«å¥å£
+ * - ç¨ç« authï¼ä¸ä¾è³´å¡å·¥ç³»çµ±ç AuthProviderï¼
+ * - Session ç¶å®ç­æ¬¡ï¼12hr ä¸é
+ * - æä½å¡åæééæ° PIN é©è­
+ * - Routes: /pos-app (checkout), /pos-app/inventory, /pos-app/customers
  */
 import { useState, useCallback } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
@@ -11,6 +11,7 @@ import PosLogin from './PosLogin'
 import PosLayout from './PosLayout'
 import PosCheckout from './PosCheckout'
 import PosInventory from './PosInventory'
+import PosCustomers from './PosCustomers'
 import PrinterSettings from './PrinterSettings'
 
 const SESSION_KEY = 'w_pos_session'
@@ -27,7 +28,9 @@ function loadSession() {
       return null
     }
     return s
-  } catch { return null }
+  } catch {
+    return null
+  }
 }
 
 export default function PosApp() {
@@ -79,7 +82,7 @@ export default function PosApp() {
     setCartCount(count)
   }, [])
 
-  // Not logged in → show PIN login
+  // Not logged in â show PIN login
   if (!session) return <PosLogin onLogin={handleLogin} />
 
   return (
@@ -95,21 +98,25 @@ export default function PosApp() {
       onShowOrders={() => setShowOrdersFromLayout(true)}
     >
       <Routes>
-        <Route path="/" element={
-          <PosCheckout
-            session={session}
-            shift={shift}
-            onShiftChange={handleShiftChange}
-            onCartCountChange={handleCartCountChange}
-            onHeldCountChange={(count) => setHeldCount(count)}
-            showHeldFromLayout={showHeldFromLayout}
-            onHeldFromLayoutDone={() => setShowHeldFromLayout(false)}
-            showOrdersFromLayout={showOrdersFromLayout}
-            onOrdersFromLayoutDone={() => setShowOrdersFromLayout(false)}
-          />
-        } />
+        <Route
+          path="/"
+          element={
+            <PosCheckout
+              session={session}
+              shift={shift}
+              onShiftChange={handleShiftChange}
+              onCartCountChange={handleCartCountChange}
+              onHeldCountChange={(count) => setHeldCount(count)}
+              showHeldFromLayout={showHeldFromLayout}
+              onHeldFromLayoutDone={() => setShowHeldFromLayout(false)}
+              showOrdersFromLayout={showOrdersFromLayout}
+              onOrdersFromLayoutDone={() => setShowOrdersFromLayout(false)}
+            />
+          }
+        />
         <Route path="/inventory" element={<PosInventory />} />
-                  <Route path="/printer-settings" element={<PrinterSettings />} />
+        <Route path="/customers" element={<PosCustomers />} />
+        <Route path="/printer-settings" element={<PrinterSettings />} />
         <Route path="*" element={<Navigate to="/pos-app" replace />} />
       </Routes>
     </PosLayout>
