@@ -30,7 +30,7 @@ export async function bridgePosToCellar({ customer, items, staff, signatureUrl, 
     .from('vip_orders')
     .insert({
       order_no: orderNo,
-      vip_id: customer.id,
+      vip_id: customer.vip_code,
       vip_name: customer.name,
       order_type: '現貨購買',
       order_total: totalAmount,
@@ -73,7 +73,7 @@ export async function bridgePosToCellar({ customer, items, staff, signatureUrl, 
     const { data: existing } = await supabase
       .from('vip_cabinets')
       .select('id, quantity')
-      .eq('vip_id', customer.id)
+      .eq('vip_id', customer.vip_code)
       .eq('cabinet_no', cabNo)
       .eq('product_name', item.name)
       .maybeSingle()
@@ -91,7 +91,7 @@ export async function bridgePosToCellar({ customer, items, staff, signatureUrl, 
       await supabase
         .from('vip_cabinets')
         .insert({
-          vip_id: customer.id,
+          vip_id: customer.vip_code,
           cabinet_no: cabNo,
           product_name: item.name,
           cigar_name: item.name,
@@ -145,7 +145,7 @@ export async function bridgePosToCellar({ customer, items, staff, signatureUrl, 
     .insert({
       order_id: order.id,
       order_no: orderNo,
-      vip_id: customer.id,
+      vip_id: customer.vip_code,
       amount: totalAmount,
       payment_method: paymentMethod || '現金',
       staff_id: staff.id,
