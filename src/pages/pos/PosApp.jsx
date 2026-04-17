@@ -64,12 +64,16 @@ export default function PosApp() {
   const handleShiftChange = useCallback((s) => {
     setShift(s)
     // Update session with shift binding
-    if (s && session) {
-      const updated = { ...session, shift_id: s.id }
-      setSession(updated)
-      localStorage.setItem(SESSION_KEY, JSON.stringify(updated))
+    if (s) {
+      setSession(prev => {
+        if (!prev) return prev
+        if (prev.shift_id === s.id) return prev
+        const updated = { ...prev, shift_id: s.id }
+        localStorage.setItem(SESSION_KEY, JSON.stringify(updated))
+        return updated
+      })
     }
-  }, [session])
+  }, [] /* fix: functional setState removes session dep */)
 
   const handleCartCountChange = useCallback((count) => {
     setCartCount(count)
