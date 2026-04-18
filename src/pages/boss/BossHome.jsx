@@ -278,6 +278,7 @@ export default function BossHome() {
                     ))}
                   </div>
                 )}
+              </div>
             )
           })}
         </div>
