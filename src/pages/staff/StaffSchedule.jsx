@@ -11,6 +11,15 @@ import { zhTW } from 'date-fns/locale'
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
 
+const LEAVE_MENU = [
+  { key: '休假', label: '休假', color: 'var(--red)' },
+  { key: '臨時請假', label: '臨時請假', color: 'var(--red)' },
+  { key: '病假', label: '病假', color: '#ffb347' },
+  { key: '事假', label: '事假', color: '#ffd700' },
+  { key: '特休', label: '特休', color: '#64c8ff' },
+  { key: '調班', label: '調班', color: '#c896ff' },
+]
+
 function ScheduleContent() {
   const { user } = useAuth()
   const [month, setMonth] = useState(new Date())
@@ -21,6 +30,8 @@ function ScheduleContent() {
   const [punches, setPunches] = useState([])
   const [loading, setLoading] = useState(true)
   const [pageMode, setPageMode] = useState('schedule')
+  const [leaveMenu, setLeaveMenu] = useState(null)
+  const [reasonInput, setReasonInput] = useState({ show: false, ds: '', type: '', text: '' })
 
   const start = startOfMonth(month), end = endOfMonth(month)
   const days = eachDayOfInterval({ start, end })
@@ -59,7 +70,7 @@ function ScheduleContent() {
         date: dateStr,
         leave_type: leaveType,
         original_shift: getMyShift(dateStr) || '',
-        reason: leaveType === '調班' ? prompt('請輸入調班原因：') || '' : prompt('請輸入請假原因：') || '',
+        reason: reasonInput.text || '',
         status: '待審核'
       })
       if (error) { alert('申請失敗: ' + error.message); return }
@@ -106,9 +117,7 @@ function ScheduleContent() {
             <div key={ds} style={{ padding: 3, textAlign: 'center', borderRadius: 8, background: td ? 'var(--gold-glow)' : hol ? 'rgba(196,77,77,.06)' : 'var(--black-card)', border: td ? '1px solid var(--border-gold)' : hol ? '1px solid rgba(196,77,77,.2)' : '1px solid var(--border)', opacity: past ? 0.4 : 1, minHeight: 52, display: 'flex', flexDirection: 'column', justifyContent: 'center', cursor: shift && !past && shift !== '休假' ? 'pointer' : 'default' }}
               onClick={() => {
                 if (past || !shift || shift === '休假') return
-                const choice = prompt(`${ds}${holName ? ' 🔴' + holName : ''}\n目前: ${shift}\n\n1=休假 2=臨時請假 3=病假 4=事假 5=特休 6=調班`)
-                const map = { '1': '休假', '2': '臨時請假', '3': '病假', '4': '事假', '5': '特休', '6': '調班' }
-                if (choice && map[choice]) requestLeave(ds, map[choice])
+                setLeaveMenu({ ds, shift, holName })
               }}>
               <div style={{ fontSize: 12, fontWeight: td ? 700 : 400, color: td ? 'var(--gold)' : isWeekend ? 'var(--red)' : 'var(--text)' }}>{format(day, 'd')}</div>
               {hol && <div style={{ fontSize: 7, color: 'var(--red)', fontWeight: 600, lineHeight: 1, marginTop: 1 }}>{holName.slice(0, 3)}</div>}
@@ -117,6 +126,57 @@ function ScheduleContent() {
           )
         })}
       </div>
+
+      {/* Leave type picker modal */}
+      {leaveMenu && !reasonInput.show && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,.7)', zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }} onClick={() => setLeaveMenu(null)}>
+          <div style={{ width: '100%', maxWidth: 400, background: 'var(--black-card)', borderRadius: '16px 16px 0 0', padding: 16 }} onClick={e => e.stopPropagation()}>
+            <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 700, color: 'var(--gold)', marginBottom: 4 }}>{leaveMenu.ds}</div>
+            <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
+              目前：{leaveMenu.shift}{leaveMenu.holName ? ' 🔴' + leaveMenu.holName : ''}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+              {LEAVE_MENU.map(opt => {
+                const needsReason = ['臨時請假','病假','事假','特休','調班'].includes(opt.key)
+                return (
+                  <button key={opt.key} onClick={() => {
+                    if (needsReason) {
+                      setReasonInput({ show: true, ds: leaveMenu.ds, type: opt.key, text: '' })
+                    } else {
+                      requestLeave(leaveMenu.ds, opt.key); setLeaveMenu(null)
+                    }
+                  }} style={{ padding: '14px 0', fontSize: 14, fontWeight: 600, borderRadius: 10, border: '1px solid ' + opt.color + '40', background: opt.color + '15', color: opt.color, cursor: 'pointer' }}>
+                    {opt.label}
+                  </button>
+                )
+              })}
+            </div>
+            <button onClick={() => setLeaveMenu(null)} style={{ width: '100%', marginTop: 10, padding: 12, fontSize: 14, fontWeight: 600, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text-muted)', cursor: 'pointer' }}>取消</button>
+          </div>
+        </div>
+      )}
+
+      {/* Reason input modal */}
+      {reasonInput.show && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,.7)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => { setReasonInput({ show: false, ds: '', type: '', text: '' }); setLeaveMenu(null) }}>
+          <div style={{ width: '100%', maxWidth: 360, background: 'var(--black-card)', borderRadius: 16, padding: 20 }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--gold)', marginBottom: 4, textAlign: 'center' }}>{reasonInput.type}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12, textAlign: 'center' }}>{reasonInput.ds}</div>
+            <textarea
+              autoFocus
+              value={reasonInput.text}
+              onChange={e => setReasonInput(prev => ({ ...prev, text: e.target.value }))}
+              placeholder={reasonInput.type === '調班' ? '請輸入調班原因…' : '請輸入請假原因…'}
+              rows={3}
+              style={{ width: '100%', fontSize: 14, padding: 10, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text)', resize: 'none', boxSizing: 'border-box' }}
+            />
+            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+              <button onClick={() => { setReasonInput({ show: false, ds: '', type: '', text: '' }); setLeaveMenu(null) }} style={{ flex: 1, padding: 12, fontSize: 14, fontWeight: 600, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text-muted)', cursor: 'pointer' }}>取消</button>
+              <button onClick={() => { requestLeave(reasonInput.ds, reasonInput.type); setReasonInput({ show: false, ds: '', type: '', text: '' }); setLeaveMenu(null) }} style={{ flex: 1, padding: 12, fontSize: 14, fontWeight: 700, borderRadius: 10, border: 'none', background: 'var(--gold)', color: 'var(--black)', cursor: 'pointer' }}>送出申請</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--gold)', marginBottom: 8 }}>同事今日班別</div>
       {emps.filter(e => e.id !== user.employee_id).map(emp => {
