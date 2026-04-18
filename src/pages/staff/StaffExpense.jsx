@@ -43,6 +43,12 @@ function SignaturePad({ title, onSave, onCancel }) {
   )
 }
 
+function parsePhotoUrls(val) {
+  if (!val) return []
+  try { const p = JSON.parse(val); if (Array.isArray(p)) return p.filter(Boolean) } catch {}
+  return val ? [val] : []
+}
+
 export default function StaffExpense() {
   const { user } = useAuth()
   const [categories, setCategories] = useState([])
@@ -120,7 +126,7 @@ export default function StaffExpense() {
       const { error } = await supabase.storage.from('photos').upload(path, photos[i])
       if (!error) { const { data } = supabase.storage.from('photos').getPublicUrl(path); photoUrls.push(data.publicUrl) }
     }
-    await supabase.from('expenses').insert({ date: today, category: form.category, vendor: form.vendor, item: form.item || form.category, amount: +form.amount, payment: form.payment, handler: user.name, submitted_by: user.employee_id, photo_url: photoUrls[0] || '', photo_urls: photoUrls.length > 0 ? photoUrls : null, note: (noReceipt ? '[無收據:' + noReceiptReason + '] ' : '') + form.note })
+    await supabase.from('expenses').insert({ date: today, category: form.category, vendor: form.vendor, item: form.item || form.category, amount: +form.amount, payment: form.payment, handler: user.name, submitted_by: user.employee_id, photo_url: photoUrls.length > 1 ? JSON.stringify(photoUrls) : (photoUrls[0] || ''), note: (noReceipt ? '[無收據:' + noReceiptReason + '] ' : '') + form.note })
     setSubmitting(false); alert('支出已提交！')
     setForm({ category: '', vendor: '', item: '', amount: '', payment: '現金', note: '' }); setPhotos([]); setPreviews([]); setNoReceipt(false); setNoReceiptReason(''); load()
   }
@@ -150,7 +156,7 @@ export default function StaffExpense() {
   function startEdit(r) {
     setEditing(r.id)
     setEditForm({ item: r.item || '', amount: String(r.amount || ''), note: r.note || '' })
-    const existing = r.photo_urls || (r.photo_url ? [r.photo_url] : [])
+    const existing = parsePhotoUrls(r.photo_url)
     setEditPreviews(existing)
     setEditPhotos([])
   }
@@ -186,7 +192,7 @@ export default function StaffExpense() {
       if (!error) { const { data } = supabase.storage.from('photos').getPublicUrl(path); newUrls.push(data.publicUrl) }
     }
     const allUrls = [...existingUrls, ...newUrls]
-    await supabase.from('expenses').update({ item: editForm.item, amount: +editForm.amount, note: editForm.note, photo_url: allUrls[0] || '', photo_urls: allUrls.length > 0 ? allUrls : null }).eq('id', id)
+    await supabase.from('expenses').update({ item: editForm.item, amount: +editForm.amount, note: editForm.note, photo_url: allUrls.length > 1 ? JSON.stringify(allUrls) : (allUrls[0] || '') }).eq('id', id)
     setEditing(null); setEditPhotos([]); setEditPreviews([])
     load()
   }
@@ -382,9 +388,9 @@ export default function StaffExpense() {
                       <div><div style={{ fontSize: 13, fontWeight: 600 }}>{r.item || r.category}</div><div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{r.date} · {r.category} · {r.vendor || '無廠商'} · <strong>{r.handler}</strong> · {r.payment}</div></div>
                       <div style={{ fontSize: 16, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--red)' }}>-${(r.amount || 0).toLocaleString()}</div>
                     </div>
-                    {(r.photo_urls || (r.photo_url ? [r.photo_url] : [])).length > 0 && (
+                    {parsePhotoUrls(r.photo_url).length > 0 && (
                       <div style={{ display: 'flex', gap: 4, overflowX: 'auto', marginTop: 6 }}>
-                        {(r.photo_urls || [r.photo_url]).map((url, i) => (
+                        {parsePhotoUrls(r.photo_url).map((url, i) => (
                           <img key={i} src={url} alt="" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)', cursor: 'pointer', flexShrink: 0 }} onClick={() => window.open(url)} />
                         ))}
                       </div>
