@@ -60,7 +60,7 @@ function ScheduleContent() {
   }
 
   async function requestLeave(dateStr, leaveType) {
-    const needsApproval = ['臨時請假','病假','事假','特休','調班']
+    const needsApproval = ['臨時請假','病假','事假','特休','調班','申請上班']
     if (needsApproval.includes(leaveType)) {
       const existing = await supabase.from('leave_requests').select('id').eq('employee_id', user.employee_id).eq('date', dateStr).eq('status', '待審核').maybeSingle()
       if (existing?.data) { alert('該日已有待審核申請'); return }
@@ -77,8 +77,12 @@ function ScheduleContent() {
       alert('已送出' + leaveType + '申請，等待老闆審核')
     } else {
       const existing = schedules.find(s => s.date === dateStr)
-      if (existing) await supabase.from('schedules').update({ shift: leaveType }).eq('id', existing.id)
-      else await supabase.from('schedules').insert({ date: dateStr, employee_id: user.employee_id, shift: leaveType })
+      if (existing) {
+        if (existing.shift === leaveType) return
+        await supabase.from('schedules').update({ shift: leaveType }).eq('id', existing.id)
+      } else {
+        await supabase.from('schedules').insert({ date: dateStr, employee_id: user.employee_id, shift: leaveType })
+      }
     }
     load()
   }
@@ -114,10 +118,10 @@ function ScheduleContent() {
           const ds = format(day, 'yyyy-MM-dd'), shift = getMyShift(ds), td = isSameDay(day, new Date()), past = day < new Date() && !td
           const hol = isHoliday(ds), holName = getHolidayName(ds), color = shiftColors[shift] || 'var(--text-muted)', isWeekend = day.getDay() === 0 || day.getDay() === 6
           return (
-            <div key={ds} style={{ padding: 3, textAlign: 'center', borderRadius: 8, background: td ? 'var(--gold-glow)' : hol ? 'rgba(196,77,77,.06)' : 'var(--black-card)', border: td ? '1px solid var(--border-gold)' : hol ? '1px solid rgba(196,77,77,.2)' : '1px solid var(--border)', opacity: past ? 0.4 : 1, minHeight: 52, display: 'flex', flexDirection: 'column', justifyContent: 'center', cursor: shift && !past && shift !== '休假' ? 'pointer' : 'default' }}
+            <div key={ds} style={{ padding: 3, textAlign: 'center', borderRadius: 8, background: td ? 'var(--gold-glow)' : hol ? 'rgba(196,77,77,.06)' : 'var(--black-card)', border: td ? '1px solid var(--border-gold)' : hol ? '1px solid rgba(196,77,77,.2)' : '1px solid var(--border)', opacity: past ? 0.4 : 1, minHeight: 52, display: 'flex', flexDirection: 'column', justifyContent: 'center', cursor: !past && shift ? 'pointer' : 'default' }}
               onClick={() => {
-                if (past || !shift || shift === '休假') return
-                setLeaveMenu({ ds, shift, holName })
+                if (past || !shift) return
+                setLeaveMenu({ ds, shift, holName, isOff: shift === '休假' })
               }}>
               <div style={{ fontSize: 12, fontWeight: td ? 700 : 400, color: td ? 'var(--gold)' : isWeekend ? 'var(--red)' : 'var(--text)' }}>{format(day, 'd')}</div>
               {hol && <div style={{ fontSize: 7, color: 'var(--red)', fontWeight: 600, lineHeight: 1, marginTop: 1 }}>{holName.slice(0, 3)}</div>}
@@ -135,8 +139,13 @@ function ScheduleContent() {
             <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
               目前：{leaveMenu.shift}{leaveMenu.holName ? ' 🔴' + leaveMenu.holName : ''}
             </div>
+            {leaveMenu.isOff && (
+              <button onClick={() => { setReasonInput({ show: true, ds: leaveMenu.ds, type: '申請上班', text: '' }) }} style={{ width: '100%', padding: '14px 0', fontSize: 15, fontWeight: 700, borderRadius: 10, border: '1px solid var(--green)', background: 'rgba(77,168,108,.12)', color: 'var(--green)', cursor: 'pointer', marginBottom: 10 }}>
+                💪 申請上班
+              </button>
+            )}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-              {LEAVE_MENU.map(opt => {
+              {LEAVE_MENU.filter(opt => !leaveMenu.isOff || opt.key !== '休假').map(opt => {
                 const needsReason = ['臨時請假','病假','事假','特休','調班'].includes(opt.key)
                 return (
                   <button key={opt.key} onClick={() => {
