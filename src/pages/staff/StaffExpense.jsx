@@ -51,10 +51,10 @@ export default function StaffExpense() {
   const [cashRecords, setCashRecords] = useState([])
   const [tab, setTab] = useState('new')
   const [form, setForm] = useState({ category: '', vendor: '', item: '', amount: '', payment: '現金', note: '' })
-  const [photo, setPhoto] = useState(null)
+  const [photos, setPhotos] = useState([])
+  const [previews, setPreviews] = useState([])
   const [noReceipt, setNoReceipt] = useState(false)
   const [noReceiptReason, setNoReceiptReason] = useState('')
-  const [preview, setPreview] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(true)
   const fileRef = useRef(null)
@@ -90,30 +90,35 @@ export default function StaffExpense() {
   const balance = totalCashIn - totalSpent
 
   async function handlePhoto(file) {
-    if (!file) { setPhoto(null); setPreview(null); return }
+    if (!file) return
     const compressed = await compressImage(file)
-    setPhoto(compressed)
+    setPhotos(prev => [...prev, compressed])
     const reader = new FileReader()
-    reader.onload = e => setPreview(e.target.result)
+    reader.onload = e => setPreviews(prev => [...prev, e.target.result])
     reader.readAsDataURL(compressed)
+  }
+
+  function removePhoto(idx) {
+    setPhotos(prev => prev.filter((_, i) => i !== idx))
+    setPreviews(prev => prev.filter((_, i) => i !== idx))
   }
 
   async function handleSubmitExpense() {
     if (!form.category) return alert('請選擇分類')
     if (!form.amount || +form.amount <= 0) return alert('請輸入金額')
-    if (!photo && !noReceipt) return alert('請拍照或勾選無收據')
+    if (photos.length === 0 && !noReceipt) return alert('請拍照或勾選無收據')
     if (noReceipt && !noReceiptReason) return alert('無收據請選擇原因')
     if (!confirm('確定提交 $' + (+form.amount).toLocaleString() + ' 的支出？')) return
     setSubmitting(true)
-    let photoUrl = ''
-    if (photo) {
-      const path = 'expenses/' + today + '/' + user.employee_id + '_' + Date.now() + '.jpg'
-      const { error } = await supabase.storage.from('photos').upload(path, photo)
-      if (!error) { const { data } = supabase.storage.from('photos').getPublicUrl(path); photoUrl = data.publicUrl }
+    const photoUrls = []
+    for (let i = 0; i < photos.length; i++) {
+      const path = 'expenses/' + today + '/' + user.employee_id + '_' + Date.now() + '_' + i + '.jpg'
+      const { error } = await supabase.storage.from('photos').upload(path, photos[i])
+      if (!error) { const { data } = supabase.storage.from('photos').getPublicUrl(path); photoUrls.push(data.publicUrl) }
     }
-    await supabase.from('expenses').insert({ date: today, category: form.category, vendor: form.vendor, item: form.item || form.category, amount: +form.amount, payment: form.payment, handler: user.name, submitted_by: user.employee_id, photo_url: photoUrl, note: (noReceipt ? '[無收據:' + noReceiptReason + '] ' : '') + form.note })
+    await supabase.from('expenses').insert({ date: today, category: form.category, vendor: form.vendor, item: form.item || form.category, amount: +form.amount, payment: form.payment, handler: user.name, submitted_by: user.employee_id, photo_url: photoUrls[0] || '', photo_urls: photoUrls.length > 0 ? photoUrls : null, note: (noReceipt ? '[無收據:' + noReceiptReason + '] ' : '') + form.note })
     setSubmitting(false); alert('支出已提交！')
-    setForm({ category: '', vendor: '', item: '', amount: '', payment: '現金', note: '' }); setPhoto(null); setPreview(null); setNoReceipt(false); setNoReceiptReason(''); load()
+    setForm({ category: '', vendor: '', item: '', amount: '', payment: '現金', note: '' }); setPhotos([]); setPreviews([]); setNoReceipt(false); setNoReceiptReason(''); load()
   }
 
   async function submitCashRequest(sigDataUrl) {
@@ -267,26 +272,35 @@ export default function StaffExpense() {
               </select>
             )}
           </div>
-          <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={e => handlePhoto(e.target.files?.[0])} />
-          <input ref={galleryRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => handlePhoto(e.target.files?.[0])} />
+          <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={e => { handlePhoto(e.target.files?.[0]); e.target.value = '' }} />
+          <input ref={galleryRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={e => { Array.from(e.target.files || []).forEach(f => handlePhoto(f)); e.target.value = '' }} />
           {!noReceipt && (
             <>
               <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                <button className="btn-outline" onClick={() => fileRef.current?.click()} style={{ flex: 1, padding: 14, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: photo ? 'rgba(77,168,108,.06)' : undefined, borderColor: photo ? 'rgba(77,168,108,.3)' : undefined, color: photo ? 'var(--green)' : undefined }}>
+                <button className="btn-outline" onClick={() => fileRef.current?.click()} style={{ flex: 1, padding: 14, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: photos.length ? 'rgba(77,168,108,.06)' : undefined, borderColor: photos.length ? 'rgba(77,168,108,.3)' : undefined, color: photos.length ? 'var(--green)' : undefined }}>
                   <Camera size={18} /> 📷 拍照
                 </button>
-                <button className="btn-outline" onClick={() => galleryRef.current?.click()} style={{ flex: 1, padding: 14, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: photo ? 'rgba(77,168,108,.06)' : undefined, borderColor: photo ? 'rgba(77,168,108,.3)' : undefined, color: photo ? 'var(--green)' : undefined }}>
-                  🖼️ 相簿
+                <button className="btn-outline" onClick={() => galleryRef.current?.click()} style={{ flex: 1, padding: 14, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: photos.length ? 'rgba(77,168,108,.06)' : undefined, borderColor: photos.length ? 'rgba(77,168,108,.3)' : undefined, color: photos.length ? 'var(--green)' : undefined }}>
+                  🖼️ 相簿（可多選）
                 </button>
               </div>
-              {photo && (
+              {photos.length > 0 && (
                 <div style={{ marginBottom: 8, padding: '8px 12px', borderRadius: 8, background: 'rgba(77,168,108,.08)', border: '1px solid rgba(77,168,108,.3)', fontSize: 13, color: 'var(--green)', fontWeight: 600 }}>
-                  ✅ 已選擇照片 ({Math.round(photo.size / 1024)}KB)
+                  ✅ 已選擇 {photos.length} 張照片
                 </div>
               )}
             </>
           )}
-          {preview && <img src={preview} alt="" style={{ width: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 10, marginBottom: 10, border: '1px solid var(--border-gold)' }} />}
+          {previews.length > 0 && (
+            <div style={{ display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 10, paddingBottom: 4 }}>
+              {previews.map((src, i) => (
+                <div key={i} style={{ position: 'relative', flexShrink: 0 }}>
+                  <img src={src} alt="" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border-gold)' }} />
+                  <button onClick={() => removePhoto(i)} style={{ position: 'absolute', top: -4, right: -4, width: 18, height: 18, borderRadius: '50%', background: 'var(--red)', color: '#fff', border: 'none', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+                </div>
+              ))}
+            </div>
+          )}
           <input placeholder="備註（選填）" value={form.note} onChange={e => setForm(p => ({ ...p, note: e.target.value }))} style={{ marginBottom: 14, fontSize: 13, padding: 10 }} />
           <button className="btn-gold" onClick={handleSubmitExpense} disabled={submitting} style={{ width: '100%', padding: 16, fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: submitting ? .5 : 1 }}>
             <Send size={18} /> {submitting ? '提交中...' : '提交支出'}
@@ -315,9 +329,15 @@ export default function StaffExpense() {
                       <div><div style={{ fontSize: 13, fontWeight: 600 }}>{r.item || r.category}</div><div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{r.date} · {r.category} · {r.vendor || '無廠商'} · <strong>{r.handler}</strong> · {r.payment}</div></div>
                       <div style={{ fontSize: 16, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--red)' }}>-${(r.amount || 0).toLocaleString()}</div>
                     </div>
-                    {r.photo_url && <img src={r.photo_url} alt="" style={{ width: '100%', maxHeight: 120, objectFit: 'cover', borderRadius: 8, marginTop: 6, border: '1px solid var(--border)' }} onClick={() => window.open(r.photo_url)} />}
+                    {(r.photo_urls || (r.photo_url ? [r.photo_url] : [])).length > 0 && (
+                      <div style={{ display: 'flex', gap: 4, overflowX: 'auto', marginTop: 6 }}>
+                        {(r.photo_urls || [r.photo_url]).map((url, i) => (
+                          <img key={i} src={url} alt="" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)', cursor: 'pointer', flexShrink: 0 }} onClick={() => window.open(url)} />
+                        ))}
+                      </div>
+                    )}
                     {r.note && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>📝 {r.note}</div>}
-                    {r.submitted_by === user.employee_id && (
+                    {(r.submitted_by === user.employee_id || user.role === 'boss') && (
                       <div style={{ display: 'flex', gap: 6, marginTop: 8, justifyContent: 'flex-end' }}>
                         <button onClick={() => startEdit(r)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--black-card)', color: 'var(--gold)', cursor: 'pointer', fontWeight: 600 }}>✏️ 編輯</button>
                         <button onClick={() => deleteExpense(r.id)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(196,77,77,.3)', background: 'rgba(196,77,77,.08)', color: 'var(--red)', cursor: 'pointer', fontWeight: 600 }}>🗑 刪除</button>
