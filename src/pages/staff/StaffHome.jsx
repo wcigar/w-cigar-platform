@@ -27,6 +27,8 @@ export default function StaffHome() {
   const [cabinetRewards, setCabinetRewards] = useState([])
   const [actionItems, setActionItems] = useState([])
   const [progressNote, setProgressNote] = useState({})
+  const [reassigning, setReassigning] = useState(null)
+  const [colleagues, setColleagues] = useState([])
   const today = format(new Date(), 'yyyy-MM-dd')
   const punchCamRef = useRef(null)
   const punchCanvasRef = useRef(null)
@@ -64,8 +66,12 @@ export default function StaffHome() {
     const { data: crData } = await supabase.from('cabinet_rewards').select('*').eq('month', month).order('created_at', { ascending: false })
     setCabinetRewards((crData || []).filter(r => (r.staff_ids || []).includes(user.employee_id)))
     // Action items assigned to me (pending + in_progress)
-    const { data: aiData } = await supabase.from('meeting_action_items').select('*').eq('assigned_to', user.employee_id).in('status', ['pending', 'in_progress']).order('due_date', { ascending: true })
-    setActionItems(aiData || [])
+    const [aiRes, colRes] = await Promise.all([
+      supabase.from('meeting_action_items').select('*').eq('assigned_to', user.employee_id).in('status', ['pending', 'in_progress']).order('due_date', { ascending: true }),
+      supabase.from('employees').select('id, name').eq('enabled', true),
+    ])
+    setActionItems(aiRes.data || [])
+    setColleagues((colRes.data || []).filter(e => e.id !== user.employee_id && e.id !== 'ADMIN'))
     setLoading(false)
   }
 
@@ -154,6 +160,17 @@ export default function StaffHome() {
 
   async function updateActionItem(id, updates) {
     await supabase.from('meeting_action_items').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id)
+    const { data } = await supabase.from('meeting_action_items').select('*').eq('assigned_to', user.employee_id).in('status', ['pending', 'in_progress']).order('due_date', { ascending: true })
+    setActionItems(data || [])
+  }
+
+  async function reassignTask(taskId, newEmpId, newEmpName) {
+    await supabase.from('meeting_action_items').update({
+      assigned_to: newEmpId, assigned_to_name: newEmpName,
+      progress_note: `由 ${user.name} 轉派`,
+      updated_at: new Date().toISOString(),
+    }).eq('id', taskId)
+    setReassigning(null)
     const { data } = await supabase.from('meeting_action_items').select('*').eq('assigned_to', user.employee_id).in('status', ['pending', 'in_progress']).order('due_date', { ascending: true })
     setActionItems(data || [])
   }
@@ -354,7 +371,15 @@ export default function StaffHome() {
                     <button onClick={() => updateActionItem(item.id, { status: 'in_progress' })} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'rgba(77,140,196,.08)', color: 'var(--blue)', cursor: 'pointer', fontWeight: 600 }}>🔄 開始執行</button>
                   )}
                   <button onClick={() => updateActionItem(item.id, { status: 'completed', completed_at: new Date().toISOString() })} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(77,168,108,.3)', background: 'rgba(77,168,108,.08)', color: 'var(--green)', cursor: 'pointer', fontWeight: 600 }}>✅ 完成</button>
+                  <button onClick={() => setReassigning(reassigning === item.id ? null : item.id)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--black-card)', color: 'var(--text-muted)', cursor: 'pointer', fontWeight: 600 }}>🔀 轉派</button>
                 </div>
+                {reassigning === item.id && (
+                  <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    {colleagues.map(c => (
+                      <button key={c.id} onClick={() => reassignTask(item.id, c.id, c.name)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border-gold)', background: 'rgba(201,168,76,.08)', color: 'var(--gold)', cursor: 'pointer' }}>{c.name}</button>
+                    ))}
+                  </div>
+                )}
                 {/* Progress note */}
                 <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
                   <input

@@ -21,6 +21,8 @@ export default function BossHome() {
   const [pendingHandover, setPendingHandover] = useState(0)
   const [dealerPending, setDealerPending] = useState(0)
   const [openActions, setOpenActions] = useState([])
+  const [allEmps, setAllEmps] = useState([])
+  const [reassigning, setReassigning] = useState(null)
   const [vipUnpaid, setVipUnpaid] = useState(0)
   const today = format(new Date(), 'yyyy-MM-dd')
   const month = format(new Date(), 'yyyy-MM')
@@ -53,6 +55,7 @@ export default function BossHome() {
     })
     setScheds(sc)
     setLowItems(low)
+    setAllEmps(emps.filter(e => !e.is_admin))
     setPunches(punchR.data || [])
     setMonthRevenue((revR.data || []).reduce((s, r) => s + (+r.total || 0), 0))
     setPendingHandover((hoR.data || []).length)
@@ -100,6 +103,16 @@ export default function BossHome() {
     const { data: aiData } = await supabase.from('meeting_action_items').select('*').in('status', ['pending', 'in_progress']).order('due_date', { ascending: true }).limit(6)
     setOpenActions(aiData || [])
     setLoading(false)
+  }
+
+  async function reassignTask(taskId, newEmpId, newEmpName) {
+    await supabase.from('meeting_action_items').update({
+      assigned_to: newEmpId, assigned_to_name: newEmpName,
+      updated_at: new Date().toISOString(),
+    }).eq('id', taskId)
+    setReassigning(null)
+    const { data } = await supabase.from('meeting_action_items').select('*').in('status', ['pending', 'in_progress']).order('due_date', { ascending: true }).limit(6)
+    setOpenActions(data || [])
   }
 
   const cards = [
@@ -250,10 +263,20 @@ export default function BossHome() {
                     {item.progress_note && <span style={{ marginLeft: 8, color: 'var(--text-dim)' }}>💬 {item.progress_note}</span>}
                   </div>
                 </div>
-                <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, fontWeight: 600, flexShrink: 0, background: item.status === 'in_progress' ? 'rgba(77,140,196,.15)' : 'rgba(201,168,76,.1)', color: item.status === 'in_progress' ? 'var(--blue)' : 'var(--gold)' }}>
-                  {item.status === 'pending' ? '待執行' : '進行中'}
-                </span>
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }}>
+                  <button onClick={() => setReassigning(reassigning === item.id ? null : item.id)} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, border: '1px solid var(--border)', background: 'var(--black-card)', color: 'var(--text-muted)', cursor: 'pointer' }}>🔀 轉派</button>
+                  <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, fontWeight: 600, background: item.status === 'in_progress' ? 'rgba(77,140,196,.15)' : 'rgba(201,168,76,.1)', color: item.status === 'in_progress' ? 'var(--blue)' : 'var(--gold)' }}>
+                    {item.status === 'pending' ? '待執行' : '進行中'}
+                  </span>
+                </div>
               </div>
+              {reassigning === item.id && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                  {allEmps.map(e => (
+                    <button key={e.id} onClick={() => reassignTask(item.id, e.id, e.name)} style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, border: '1px solid ' + (e.id === item.assigned_to ? 'var(--border-gold)' : 'var(--border)'), background: e.id === item.assigned_to ? 'rgba(201,168,76,.15)' : 'var(--black-card)', color: e.id === item.assigned_to ? 'var(--gold)' : 'var(--text)', cursor: 'pointer' }}>{e.name}</button>
+                  ))}
+                </div>
+              )}
             )
           })}
         </div>
