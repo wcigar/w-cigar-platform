@@ -103,6 +103,7 @@ export default function StaffExpense() {
     if (!file) return
     if (photos.length >= 5) return alert('最多 5 張照片')
     const compressed = await compressImage(file)
+    setPhotos(prev => [...prev, compressed])
     const reader = new FileReader()
     reader.onload = e => setPreviews(prev => [...prev, e.target.result])
     reader.readAsDataURL(compressed)
@@ -315,7 +316,7 @@ export default function StaffExpense() {
             )}
           </div>
           <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={e => { handlePhoto(e.target.files?.[0]); e.target.value = '' }} />
-          <input ref={galleryRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={e => { Array.from(e.target.files || []).forEach(f => handlePhoto(f)); e.target.value = '' }} />
+          <input ref={galleryRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={async e => { for (const f of Array.from(e.target.files || [])) await handlePhoto(f); e.target.value = '' }} />
           {!noReceipt && (
             <>
               <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
@@ -361,7 +362,7 @@ export default function StaffExpense() {
                     <input type="number" value={editForm.amount} onChange={e => setEditForm(f => ({ ...f, amount: e.target.value }))} placeholder="金額" style={{ width: '100%', fontSize: 13, padding: '6px 8px', marginBottom: 6, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text)', boxSizing: 'border-box' }} />
                     <input value={editForm.note} onChange={e => setEditForm(f => ({ ...f, note: e.target.value }))} placeholder="備註" style={{ width: '100%', fontSize: 13, padding: '6px 8px', marginBottom: 6, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text)', boxSizing: 'border-box' }} />
                     <input ref={editFileRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={e => { addEditPhoto(e.target.files?.[0]); e.target.value = '' }} />
-                    <input ref={editGalleryRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={e => { Array.from(e.target.files || []).forEach(f => addEditPhoto(f)); e.target.value = '' }} />
+                    <input ref={editGalleryRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={async e => { for (const f of Array.from(e.target.files || [])) await addEditPhoto(f); e.target.value = '' }} />
                     <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
                       <button onClick={() => editFileRef.current?.click()} className="btn-outline" style={{ flex: 1, padding: 8, fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>📷 補拍</button>
                       <button onClick={() => editGalleryRef.current?.click()} className="btn-outline" style={{ flex: 1, padding: 8, fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>🖼️ 相簿</button>
