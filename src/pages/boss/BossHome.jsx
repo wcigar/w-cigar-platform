@@ -93,18 +93,20 @@ export default function BossHome() {
       })
     })
 
-    // 4. 盤點提醒：今日盤點日但尚未完成的員工
-    const dayMap = ['週日','週一','週二','週三','週四','週五','週六']
-    const todayDay = dayMap[new Date().getDay()]
-    const { data: invAssigned } = await supabase.from('inventory_master').select('owner').eq('enabled', true).eq('count_day', todayDay)
-    if (invAssigned?.length) {
-      const assignedStaff = [...new Set(invAssigned.map(i => i.owner).filter(Boolean))]
-      const { data: todayRecords } = await supabase.from('inventory_records').select('staff_code').gte('created_at', today + 'T00:00:00')
-      const doneStaff = new Set((todayRecords || []).map(r => r.staff_code))
-      const pending = assignedStaff.filter(id => !doneStaff.has(id))
-      if (pending.length) {
-        const names = pending.map(id => emps.find(e => e.id === id)?.name || id).join('、')
-        dangerList.push({ type: 'inventory', severity: 50, icon: '📦', label: '盤點未完成', detail: names, color: '#f59e0b', action: '/boss-inventory' })
+    // 4. 盤點提醒：每月最後一天全員盤點
+    const nowDate = new Date()
+    const lastDay = new Date(nowDate.getFullYear(), nowDate.getMonth() + 1, 0).getDate()
+    if (nowDate.getDate() === lastDay) {
+      const { data: invAssigned } = await supabase.from('inventory_master').select('owner').eq('enabled', true)
+      const assignedStaff = [...new Set((invAssigned || []).map(i => i.owner).filter(Boolean))]
+      if (assignedStaff.length) {
+        const { data: todayRecords } = await supabase.from('inventory_records').select('staff_code').gte('created_at', today + 'T00:00:00')
+        const doneStaff = new Set((todayRecords || []).map(r => r.staff_code))
+        const pending = assignedStaff.filter(id => !doneStaff.has(id))
+        if (pending.length) {
+          const names = pending.map(id => emps.find(e => e.id === id)?.name || id).join('、')
+          dangerList.push({ type: 'inventory', severity: 50, icon: '📦', label: '月底盤點未完成', detail: names, color: '#f59e0b', action: '/boss-inventory' })
+        }
       }
     }
 

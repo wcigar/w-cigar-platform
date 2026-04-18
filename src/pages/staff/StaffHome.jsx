@@ -73,13 +73,18 @@ export default function StaffHome() {
     ])
     setActionItems(aiRes.data || [])
     setColleagues((colRes.data || []).filter(e => e.id !== user.employee_id && e.id !== 'ADMIN'))
-    // 盤點提醒：今天是否為指定盤點日
-    const dayMap = ['週日','週一','週二','週三','週四','週五','週六']
-    const todayDay = dayMap[new Date().getDay()]
-    const { data: invItems } = await supabase.from('inventory_master').select('id, name, category, current_stock, safe_stock, unit, count_day').eq('enabled', true).eq('owner', user.employee_id).eq('count_day', todayDay)
-    const todayRecords = await supabase.from('inventory_records').select('item_id').eq('staff_code', user.employee_id).gte('created_at', today + 'T00:00:00')
-    const doneIds = new Set((todayRecords.data || []).map(r => r.item_id))
-    setInvReminder((invItems || []).filter(i => !doneIds.has(i.id)))
+    // 盤點提醒：每月最後一天全員盤點
+    const now = new Date()
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+    const isLastDay = now.getDate() === lastDay
+    if (isLastDay) {
+      const { data: invItems } = await supabase.from('inventory_master').select('id, name, category, current_stock, safe_stock, unit').eq('enabled', true).eq('owner', user.employee_id)
+      const todayRecords = await supabase.from('inventory_records').select('item_id').eq('staff_code', user.employee_id).gte('created_at', today + 'T00:00:00')
+      const doneIds = new Set((todayRecords.data || []).map(r => r.item_id))
+      setInvReminder((invItems || []).filter(i => !doneIds.has(i.id)))
+    } else {
+      setInvReminder([])
+    }
     setLoading(false)
   }
 
