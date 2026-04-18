@@ -29,6 +29,7 @@ export default function StaffHome() {
   const [progressNote, setProgressNote] = useState({})
   const [reassigning, setReassigning] = useState(null)
   const [colleagues, setColleagues] = useState([])
+  const [invReminder, setInvReminder] = useState([])
   const today = format(new Date(), 'yyyy-MM-dd')
   const punchCamRef = useRef(null)
   const punchCanvasRef = useRef(null)
@@ -72,6 +73,13 @@ export default function StaffHome() {
     ])
     setActionItems(aiRes.data || [])
     setColleagues((colRes.data || []).filter(e => e.id !== user.employee_id && e.id !== 'ADMIN'))
+    // 盤點提醒：今天是否為指定盤點日
+    const dayMap = ['週日','週一','週二','週三','週四','週五','週六']
+    const todayDay = dayMap[new Date().getDay()]
+    const { data: invItems } = await supabase.from('inventory_master').select('id, name, category, current_stock, safe_stock, unit, count_day').eq('enabled', true).eq('owner', user.employee_id).eq('count_day', todayDay)
+    const todayRecords = await supabase.from('inventory_records').select('item_id').eq('staff_code', user.employee_id).gte('created_at', today + 'T00:00:00')
+    const doneIds = new Set((todayRecords.data || []).map(r => r.item_id))
+    setInvReminder((invItems || []).filter(i => !doneIds.has(i.id)))
     setLoading(false)
   }
 
@@ -336,6 +344,34 @@ export default function StaffHome() {
           </div>
         ))}
       </div>
+
+      {/* 盤點提醒 */}
+      {invReminder.length > 0 && (
+        <div className="card" style={{ marginBottom: 12, borderColor: 'rgba(245,158,11,.3)', background: 'rgba(245,158,11,.05)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 16 }}>📦</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: '#f59e0b' }}>今日盤點提醒</span>
+            </div>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{invReminder.length} 項待盤</span>
+          </div>
+          {invReminder.slice(0, 5).map(item => (
+            <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderTop: '1px solid var(--border)', fontSize: 12 }}>
+              <div>
+                <span style={{ fontWeight: 600, color: 'var(--text)' }}>{item.name}</span>
+                <span style={{ color: 'var(--text-muted)', marginLeft: 6 }}>{item.category}</span>
+              </div>
+              <span style={{ fontFamily: 'var(--font-mono)', color: item.current_stock <= (item.safe_stock || 0) ? 'var(--red)' : 'var(--text-dim)' }}>
+                {item.current_stock ?? '?'} {item.unit}
+              </span>
+            </div>
+          ))}
+          {invReminder.length > 5 && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>...還有 {invReminder.length - 5} 項</div>}
+          <button onClick={() => navigate('/inventory')} style={{ width: '100%', marginTop: 8, padding: 10, fontSize: 13, fontWeight: 700, borderRadius: 8, border: '1px solid rgba(245,158,11,.3)', background: 'rgba(245,158,11,.1)', color: '#f59e0b', cursor: 'pointer' }}>
+            📋 前往盤點
+          </button>
+        </div>
+      )}
 
       <button onClick={() => navigate('/meeting')} style={{ width: '100%', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, background: 'rgba(201,168,76,.08)', border: '1px solid var(--border-gold)', borderRadius: 'var(--radius-sm)', color: 'var(--gold)', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
         <FileText size={18} /> 週會準備
