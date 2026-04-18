@@ -1,8 +1,8 @@
 /**
- * POS Layout â iPad æ©«å±å¨è¢å¹ Layout
- * - é é¨åï¼Logo + æä½å¡ + ç­æ¬¡çæ + çæ¶æè¦ + åæ/ç»åº
- * - ç¡åºé¨ navï¼POS å¨è¢å¹æä½ï¼
- * - æä½å¡åæåé²åï¼è³¼ç©è»/ç­æ¬¡æª¢æ¥ï¼
+ * POS Layout — iPad 橫屏全螢幕 Layout
+ * - 頂部列：Logo + 操作員 + 班次狀態 + 營收摘要 + 切換/登出
+ * - 無底部 nav（POS 全螢幕操作）
+ * - 操作員切換前防呆（購物車/班次檢查）
  */
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
@@ -10,10 +10,10 @@ import { DollarSign, Package, LogOut, RefreshCw, Clock, User, ShoppingCart, Prin
 import { getStatus } from '../../utils/printer'
 
 const NAV_ITEMS = [
-  { path: '/pos-app', icon: ShoppingCart, label: 'æ¶é' },
-  { path: '/pos-app/inventory', icon: Package, label: 'åº«å­' },
-  { path: '/pos-app/customers', icon: Users, label: 'å®¢æ¶' },
-  { path: '/pos-app/printer-settings', icon: Printer, label: 'åå°' },
+  { path: '/pos-app', icon: ShoppingCart, label: '收銀' },
+  { path: '/pos-app/inventory', icon: Package, label: '庫存' },
+  { path: '/pos-app/customers', icon: Users, label: '客戶' },
+  { path: '/pos-app/printer-settings', icon: Printer, label: '列印' },
 ]
 
 export default function PosLayout({
@@ -35,7 +35,7 @@ export default function PosLayout({
   const [showSwitchConfirm, setShowSwitchConfirm] = useState(false)
 
   function handleSwitchClick() {
-    // é²åï¼è³¼ç©è»ææ±è¥¿æç­æ¬¡éè
+    // 防呆：購物車有東西或班次開著
     if (cartCount > 0) {
       setShowSwitchConfirm(true)
       return
@@ -65,7 +65,7 @@ export default function PosLayout({
               W CIGAR BAR
             </span>
             <span style={{ fontSize: 10, color: '#6b5a3a', letterSpacing: 0.5 }}>
-              {import.meta.env.VITE_STORE_NAME || 'å¤§å®ç¸½åº'}
+              {import.meta.env.VITE_STORE_NAME || '大安總店'}
             </span>
           </div>
         </div>
@@ -101,7 +101,7 @@ export default function PosLayout({
             fontSize: 9, background: 'rgba(77,168,108,.15)', color: '#4da86c',
             padding: '2px 8px', borderRadius: 10, fontWeight: 600,
           }}>
-            çæ¥­ä¸­
+            營業中
           </span>
         )}
 
@@ -113,7 +113,7 @@ export default function PosLayout({
             border: '1px solid rgba(245,158,11,.2)', cursor: 'pointer',
             display: 'flex', alignItems: 'center', gap: 4
           }}>
-            â¸ æå®
+            ⏸ 掛單
             <span style={{
               background: '#e74c3c', color: '#fff', borderRadius: '50%',
               width: 16, height: 16, fontSize: 9, display: 'inline-flex',
@@ -128,7 +128,7 @@ export default function PosLayout({
         {/* Revenue summary */}
         <div style={{ display: 'flex', gap: 8, fontSize: 10, color: '#8a7e6e', alignItems: 'center' }}>
           <span>${(summary?.revenue?.total || 0).toLocaleString()}</span>
-          <span>{summary?.orders || 0}å®</span>
+          <span>{summary?.orders || 0}單</span>
         </div>
 
         {/* Today orders */}
@@ -137,7 +137,7 @@ export default function PosLayout({
           padding: '3px 8px', cursor: 'pointer',
           display: 'flex', alignItems: 'center', gap: 3,
           color: '#8a7e6e', fontSize: 10
-        }}>ð è¨å®</button>
+        }}>📋 訂單</button>
 
         {/* Operator */}
         <div style={{
@@ -151,13 +151,13 @@ export default function PosLayout({
         </div>
 
         {/* Switch operator */}
-        <button onClick={handleSwitchClick} title="åææä½å¡" style={{
+        <button onClick={handleSwitchClick} title="切換操作員" style={{
           background: 'none', border: '1px solid #2a2520', borderRadius: 6,
           padding: '4px 8px', cursor: 'pointer',
           display: 'flex', alignItems: 'center', gap: 3,
           color: '#8a7e6e', fontSize: 10,
         }}>
-          <RefreshCw size={11} /> åæ
+          <RefreshCw size={11} /> 切換
         </button>
 
         {/* Logout */}
@@ -187,25 +187,25 @@ export default function PosLayout({
             textAlign: 'center',
           }} onClick={e => e.stopPropagation()}>
             <div style={{ fontSize: 18, fontWeight: 700, color: '#f59e0b', marginBottom: 12 }}>
-              â ï¸ è³¼ç©è»æªçµå¸³
+              ⚠️ 購物車未結帳
             </div>
             <div style={{ fontSize: 13, color: '#e8dcc8', marginBottom: 8 }}>
-              ç®åè³¼ç©è»æ <strong style={{ color: '#c9a84c' }}>{cartCount}</strong> ä»¶ååå°æªçµå¸³ã
+              目前購物車有 <strong style={{ color: '#c9a84c' }}>{cartCount}</strong> 件商品尚未結帳。
             </div>
             <div style={{ fontSize: 12, color: '#8a7e6e', marginBottom: 20 }}>
-              åææä½å¡å°æ¸ç©ºè³¼ç©è»ï¼ç¢ºå®è¦ç¹¼çºåï¼
+              切換操作員將清空購物車，確定要繼續嗎？
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={() => setShowSwitchConfirm(false)} style={{
                 flex: 1, padding: 12, borderRadius: 10,
                 border: '1px solid #2a2520', background: '#0d0b09',
                 color: '#8a7e6e', fontSize: 14, fontWeight: 600, cursor: 'pointer',
-              }}>åæ¶</button>
+              }}>取消</button>
               <button onClick={confirmSwitch} style={{
                 flex: 1, padding: 12, borderRadius: 10,
                 border: 'none', background: '#f59e0b', color: '#000',
                 fontSize: 14, fontWeight: 700, cursor: 'pointer',
-              }}>ç¢ºèªåæ</button>
+              }}>確認切換</button>
             </div>
           </div>
         </div>
