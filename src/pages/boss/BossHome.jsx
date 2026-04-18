@@ -253,30 +253,31 @@ export default function BossHome() {
             const overdue = item.due_date && item.due_date < today
             const priorityColor = item.priority === 'high' ? 'var(--red)' : item.priority === 'urgent' ? '#f59e0b' : 'var(--text-muted)'
             return (
-              <div key={item.id} style={{ padding: '8px 0', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: overdue ? 'var(--red)' : 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</div>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
-                    <span style={{ color: 'var(--gold)' }}>{item.assigned_to_name}</span>
-                    {item.due_date && <span style={{ marginLeft: 8, color: overdue ? 'var(--red)' : 'var(--text-dim)' }}>截止 {item.due_date}{overdue ? ' (逾期!)' : ''}</span>}
-                    {item.priority !== 'normal' && <span style={{ marginLeft: 8, color: priorityColor, fontWeight: 600 }}>{item.priority === 'high' ? '高' : '緊急'}</span>}
-                    {item.progress_note && <span style={{ marginLeft: 8, color: 'var(--text-dim)' }}>💬 {item.progress_note}</span>}
+              <div key={item.id} style={{ padding: '8px 0', borderTop: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: overdue ? 'var(--red)' : 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
+                      <span style={{ color: 'var(--gold)' }}>{item.assigned_to_name}</span>
+                      {item.due_date && <span style={{ marginLeft: 8, color: overdue ? 'var(--red)' : 'var(--text-dim)' }}>截止 {item.due_date}{overdue ? ' (逾期!)' : ''}</span>}
+                      {item.priority !== 'normal' && <span style={{ marginLeft: 8, color: priorityColor, fontWeight: 600 }}>{item.priority === 'high' ? '高' : '緊急'}</span>}
+                      {item.progress_note && <span style={{ marginLeft: 8, color: 'var(--text-dim)' }}>💬 {item.progress_note}</span>}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }}>
+                    <button onClick={() => setReassigning(reassigning === item.id ? null : item.id)} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, border: '1px solid var(--border)', background: 'var(--black-card)', color: 'var(--text-muted)', cursor: 'pointer' }}>🔀 轉派</button>
+                    <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, fontWeight: 600, background: item.status === 'in_progress' ? 'rgba(77,140,196,.15)' : 'rgba(201,168,76,.1)', color: item.status === 'in_progress' ? 'var(--blue)' : 'var(--gold)' }}>
+                      {item.status === 'pending' ? '待執行' : '進行中'}
+                    </span>
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }}>
-                  <button onClick={() => setReassigning(reassigning === item.id ? null : item.id)} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, border: '1px solid var(--border)', background: 'var(--black-card)', color: 'var(--text-muted)', cursor: 'pointer' }}>🔀 轉派</button>
-                  <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, fontWeight: 600, background: item.status === 'in_progress' ? 'rgba(77,140,196,.15)' : 'rgba(201,168,76,.1)', color: item.status === 'in_progress' ? 'var(--blue)' : 'var(--gold)' }}>
-                    {item.status === 'pending' ? '待執行' : '進行中'}
-                  </span>
-                </div>
-              </div>
-              {reassigning === item.id && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
-                  {allEmps.map(e => (
-                    <button key={e.id} onClick={() => reassignTask(item.id, e.id, e.name)} style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, border: '1px solid ' + (e.id === item.assigned_to ? 'var(--border-gold)' : 'var(--border)'), background: e.id === item.assigned_to ? 'rgba(201,168,76,.15)' : 'var(--black-card)', color: e.id === item.assigned_to ? 'var(--gold)' : 'var(--text)', cursor: 'pointer' }}>{e.name}</button>
-                  ))}
-                </div>
-              )}
+                {reassigning === item.id && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                    {allEmps.map(e => (
+                      <button key={e.id} onClick={() => reassignTask(item.id, e.id, e.name)} style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, border: '1px solid ' + (e.id === item.assigned_to ? 'var(--border-gold)' : 'var(--border)'), background: e.id === item.assigned_to ? 'rgba(201,168,76,.15)' : 'var(--black-card)', color: e.id === item.assigned_to ? 'var(--gold)' : 'var(--text)', cursor: 'pointer' }}>{e.name}</button>
+                    ))}
+                  </div>
+                )}
             )
           })}
         </div>
