@@ -66,6 +66,8 @@ export default function StaffExpense() {
   const [newVendorName, setNewVendorName] = useState('')
   const [cashForm, setCashForm] = useState({ amount: '', method: '現金', given_by: 'Wilson', note: '' })
   const [showSign, setShowSign] = useState(false)
+  const [editing, setEditing] = useState(null)
+  const [editForm, setEditForm] = useState({ item: '', amount: '', note: '' })
 
   useEffect(() => { load() }, [])
 
@@ -128,6 +130,24 @@ export default function StaffExpense() {
     setShowSign(false); setShowCashForm(false); setSubmitting(false)
     alert('零用金 $' + (+cashForm.amount).toLocaleString() + ' 已收到！')
     setCashForm({ amount: '', method: '現金', given_by: 'Wilson', note: '' }); load()
+  }
+
+  async function deleteExpense(id) {
+    if (!confirm('確定刪除此筆支出？')) return
+    await supabase.from('expenses').delete().eq('id', id)
+    load()
+  }
+
+  function startEdit(r) {
+    setEditing(r.id)
+    setEditForm({ item: r.item || '', amount: String(r.amount || ''), note: r.note || '' })
+  }
+
+  async function saveEdit(id) {
+    if (!editForm.amount || +editForm.amount <= 0) return alert('金額不可為空')
+    await supabase.from('expenses').update({ item: editForm.item, amount: +editForm.amount, note: editForm.note }).eq('id', id)
+    setEditing(null)
+    load()
   }
 
   function handleCashSubmit() {
@@ -279,12 +299,32 @@ export default function StaffExpense() {
           {expenses.length === 0 ? <div className="card" style={{ textAlign: 'center', padding: 30, color: 'var(--text-dim)' }}>本月無支出</div> :
             expenses.map(r => (
               <div key={r.id} className="card" style={{ padding: 12, marginBottom: 6 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                  <div><div style={{ fontSize: 13, fontWeight: 600 }}>{r.item || r.category}</div><div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{r.date} · {r.category} · {r.vendor || '無廠商'} · <strong>{r.handler}</strong> · {r.payment}</div></div>
-                  <div style={{ fontSize: 16, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--red)' }}>-${(r.amount || 0).toLocaleString()}</div>
-                </div>
-                {r.photo_url && <img src={r.photo_url} alt="" style={{ width: '100%', maxHeight: 120, objectFit: 'cover', borderRadius: 8, marginTop: 6, border: '1px solid var(--border)' }} onClick={() => window.open(r.photo_url)} />}
-                {r.note && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>📝 {r.note}</div>}
+                {editing === r.id ? (
+                  <div>
+                    <input value={editForm.item} onChange={e => setEditForm(f => ({ ...f, item: e.target.value }))} placeholder="品項" style={{ width: '100%', fontSize: 13, padding: '6px 8px', marginBottom: 6, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text)', boxSizing: 'border-box' }} />
+                    <input type="number" value={editForm.amount} onChange={e => setEditForm(f => ({ ...f, amount: e.target.value }))} placeholder="金額" style={{ width: '100%', fontSize: 13, padding: '6px 8px', marginBottom: 6, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text)', boxSizing: 'border-box' }} />
+                    <input value={editForm.note} onChange={e => setEditForm(f => ({ ...f, note: e.target.value }))} placeholder="備註" style={{ width: '100%', fontSize: 13, padding: '6px 8px', marginBottom: 8, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text)', boxSizing: 'border-box' }} />
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button onClick={() => saveEdit(r.id)} style={{ flex: 1, padding: 8, fontSize: 12, fontWeight: 700, borderRadius: 6, border: 'none', background: 'var(--gold)', color: 'var(--black)', cursor: 'pointer' }}>✅ 儲存</button>
+                      <button onClick={() => setEditing(null)} style={{ flex: 1, padding: 8, fontSize: 12, fontWeight: 600, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--black-card)', color: 'var(--text-muted)', cursor: 'pointer' }}>取消</button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <div><div style={{ fontSize: 13, fontWeight: 600 }}>{r.item || r.category}</div><div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{r.date} · {r.category} · {r.vendor || '無廠商'} · <strong>{r.handler}</strong> · {r.payment}</div></div>
+                      <div style={{ fontSize: 16, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--red)' }}>-${(r.amount || 0).toLocaleString()}</div>
+                    </div>
+                    {r.photo_url && <img src={r.photo_url} alt="" style={{ width: '100%', maxHeight: 120, objectFit: 'cover', borderRadius: 8, marginTop: 6, border: '1px solid var(--border)' }} onClick={() => window.open(r.photo_url)} />}
+                    {r.note && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>📝 {r.note}</div>}
+                    {r.submitted_by === user.employee_id && (
+                      <div style={{ display: 'flex', gap: 6, marginTop: 8, justifyContent: 'flex-end' }}>
+                        <button onClick={() => startEdit(r)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--black-card)', color: 'var(--gold)', cursor: 'pointer', fontWeight: 600 }}>✏️ 編輯</button>
+                        <button onClick={() => deleteExpense(r.id)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(196,77,77,.3)', background: 'rgba(196,77,77,.08)', color: 'var(--red)', cursor: 'pointer', fontWeight: 600 }}>🗑 刪除</button>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             ))}
         </div>
