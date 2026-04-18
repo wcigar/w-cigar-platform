@@ -73,11 +73,11 @@ export default function StaffHome() {
     ])
     setActionItems(aiRes.data || [])
     setColleagues((colRes.data || []).filter(e => e.id !== user.employee_id && e.id !== 'ADMIN'))
-    // 盤點提醒：每月最後一天全員盤點
+    // 盤點提醒：每月最後3天全員盤點
     const now = new Date()
     const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
-    const isLastDay = now.getDate() === lastDay
-    if (isLastDay) {
+    const daysLeft = lastDay - now.getDate()
+    if (daysLeft <= 2) {
       const { data: invItems } = await supabase.from('inventory_master').select('id, name, category, current_stock, safe_stock, unit').eq('enabled', true).eq('owner', user.employee_id)
       const todayRecords = await supabase.from('inventory_records').select('item_id').eq('staff_code', user.employee_id).gte('created_at', today + 'T00:00:00')
       const doneIds = new Set((todayRecords.data || []).map(r => r.item_id))

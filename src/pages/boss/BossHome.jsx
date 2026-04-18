@@ -93,10 +93,10 @@ export default function BossHome() {
       })
     })
 
-    // 4. 盤點提醒：每月最後一天全員盤點
+    // 4. 盤點提醒：每月最後3天全員盤點
     const nowDate = new Date()
     const lastDay = new Date(nowDate.getFullYear(), nowDate.getMonth() + 1, 0).getDate()
-    if (nowDate.getDate() === lastDay) {
+    if (lastDay - nowDate.getDate() <= 2) {
       const { data: invAssigned } = await supabase.from('inventory_master').select('owner').eq('enabled', true)
       const assignedStaff = [...new Set((invAssigned || []).map(i => i.owner).filter(Boolean))]
       if (assignedStaff.length) {
