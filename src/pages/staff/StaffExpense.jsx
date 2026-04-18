@@ -68,6 +68,10 @@ export default function StaffExpense() {
   const [showSign, setShowSign] = useState(false)
   const [editing, setEditing] = useState(null)
   const [editForm, setEditForm] = useState({ item: '', amount: '', note: '' })
+  const [editPhotos, setEditPhotos] = useState([])
+  const [editPreviews, setEditPreviews] = useState([])
+  const editFileRef = useRef(null)
+  const editGalleryRef = useRef(null)
 
   useEffect(() => { load() }, [])
 
@@ -91,8 +95,8 @@ export default function StaffExpense() {
 
   async function handlePhoto(file) {
     if (!file) return
+    if (photos.length >= 5) return alert('最多 5 張照片')
     const compressed = await compressImage(file)
-    setPhotos(prev => [...prev, compressed])
     const reader = new FileReader()
     reader.onload = e => setPreviews(prev => [...prev, e.target.result])
     reader.readAsDataURL(compressed)
@@ -146,12 +150,44 @@ export default function StaffExpense() {
   function startEdit(r) {
     setEditing(r.id)
     setEditForm({ item: r.item || '', amount: String(r.amount || ''), note: r.note || '' })
+    const existing = r.photo_urls || (r.photo_url ? [r.photo_url] : [])
+    setEditPreviews(existing)
+    setEditPhotos([])
+  }
+
+  async function addEditPhoto(file) {
+    if (!file) return
+    const total = editPreviews.length + editPhotos.length
+    if (total >= 5) return alert('最多 5 張照片')
+    const compressed = await compressImage(file)
+    setEditPhotos(prev => [...prev, compressed])
+    const reader = new FileReader()
+    reader.onload = e => setEditPreviews(prev => [...prev, e.target.result])
+    reader.readAsDataURL(compressed)
+  }
+
+  function removeEditPhoto(idx) {
+    if (idx < editPreviews.length - editPhotos.length) {
+      setEditPreviews(prev => prev.filter((_, i) => i !== idx))
+    } else {
+      const photoIdx = idx - (editPreviews.length - editPhotos.length)
+      setEditPhotos(prev => prev.filter((_, i) => i !== photoIdx))
+      setEditPreviews(prev => prev.filter((_, i) => i !== idx))
+    }
   }
 
   async function saveEdit(id) {
     if (!editForm.amount || +editForm.amount <= 0) return alert('金額不可為空')
-    await supabase.from('expenses').update({ item: editForm.item, amount: +editForm.amount, note: editForm.note }).eq('id', id)
-    setEditing(null)
+    const existingUrls = editPreviews.filter(p => p.startsWith('http'))
+    const newUrls = []
+    for (let i = 0; i < editPhotos.length; i++) {
+      const path = 'expenses/' + today + '/' + user.employee_id + '_' + Date.now() + '_e' + i + '.jpg'
+      const { error } = await supabase.storage.from('photos').upload(path, editPhotos[i])
+      if (!error) { const { data } = supabase.storage.from('photos').getPublicUrl(path); newUrls.push(data.publicUrl) }
+    }
+    const allUrls = [...existingUrls, ...newUrls]
+    await supabase.from('expenses').update({ item: editForm.item, amount: +editForm.amount, note: editForm.note, photo_url: allUrls[0] || '', photo_urls: allUrls.length > 0 ? allUrls : null }).eq('id', id)
+    setEditing(null); setEditPhotos([]); setEditPreviews([])
     load()
   }
 
@@ -317,10 +353,27 @@ export default function StaffExpense() {
                   <div>
                     <input value={editForm.item} onChange={e => setEditForm(f => ({ ...f, item: e.target.value }))} placeholder="品項" style={{ width: '100%', fontSize: 13, padding: '6px 8px', marginBottom: 6, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text)', boxSizing: 'border-box' }} />
                     <input type="number" value={editForm.amount} onChange={e => setEditForm(f => ({ ...f, amount: e.target.value }))} placeholder="金額" style={{ width: '100%', fontSize: 13, padding: '6px 8px', marginBottom: 6, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text)', boxSizing: 'border-box' }} />
-                    <input value={editForm.note} onChange={e => setEditForm(f => ({ ...f, note: e.target.value }))} placeholder="備註" style={{ width: '100%', fontSize: 13, padding: '6px 8px', marginBottom: 8, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text)', boxSizing: 'border-box' }} />
+                    <input value={editForm.note} onChange={e => setEditForm(f => ({ ...f, note: e.target.value }))} placeholder="備註" style={{ width: '100%', fontSize: 13, padding: '6px 8px', marginBottom: 6, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text)', boxSizing: 'border-box' }} />
+                    <input ref={editFileRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={e => { addEditPhoto(e.target.files?.[0]); e.target.value = '' }} />
+                    <input ref={editGalleryRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={e => { Array.from(e.target.files || []).forEach(f => addEditPhoto(f)); e.target.value = '' }} />
+                    <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                      <button onClick={() => editFileRef.current?.click()} className="btn-outline" style={{ flex: 1, padding: 8, fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>📷 補拍</button>
+                      <button onClick={() => editGalleryRef.current?.click()} className="btn-outline" style={{ flex: 1, padding: 8, fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>🖼️ 相簿</button>
+                      <span style={{ fontSize: 10, color: 'var(--text-muted)', alignSelf: 'center' }}>{editPreviews.length}/5</span>
+                    </div>
+                    {editPreviews.length > 0 && (
+                      <div style={{ display: 'flex', gap: 4, overflowX: 'auto', marginBottom: 8, paddingBottom: 4 }}>
+                        {editPreviews.map((src, i) => (
+                          <div key={i} style={{ position: 'relative', flexShrink: 0 }}>
+                            <img src={src} alt="" style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)' }} />
+                            <button onClick={() => removeEditPhoto(i)} style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, borderRadius: '50%', background: 'var(--red)', color: '#fff', border: 'none', fontSize: 9, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     <div style={{ display: 'flex', gap: 6 }}>
                       <button onClick={() => saveEdit(r.id)} style={{ flex: 1, padding: 8, fontSize: 12, fontWeight: 700, borderRadius: 6, border: 'none', background: 'var(--gold)', color: 'var(--black)', cursor: 'pointer' }}>✅ 儲存</button>
-                      <button onClick={() => setEditing(null)} style={{ flex: 1, padding: 8, fontSize: 12, fontWeight: 600, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--black-card)', color: 'var(--text-muted)', cursor: 'pointer' }}>取消</button>
+                      <button onClick={() => { setEditing(null); setEditPhotos([]); setEditPreviews([]) }} style={{ flex: 1, padding: 8, fontSize: 12, fontWeight: 600, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--black-card)', color: 'var(--text-muted)', cursor: 'pointer' }}>取消</button>
                     </div>
                   </div>
                 ) : (
