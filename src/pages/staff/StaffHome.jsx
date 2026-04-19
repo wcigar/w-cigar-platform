@@ -30,6 +30,7 @@ export default function StaffHome() {
   const [reassigning, setReassigning] = useState(null)
   const [colleagues, setColleagues] = useState([])
   const [invReminder, setInvReminder] = useState([])
+  const [crossDayPunchDate, setCrossDayPunchDate] = useState(null)
   const today = format(new Date(), 'yyyy-MM-dd')
   const punchCamRef = useRef(null)
   const punchCanvasRef = useRef(null)
@@ -53,8 +54,21 @@ export default function StaffHome() {
     ])
     setShift(sRes.data); setTasks(tRes.data || []); setPunch(pRes.data); setNotices(nRes.data || [])
     const punchRecords = pRes.data || []
-    const pIn = punchRecords.find(r => r.punch_type === '上班')
-    const pOut = [...punchRecords].reverse().find(r => r.punch_type === '下班')
+    let pIn = punchRecords.find(r => r.punch_type === '上班')
+    let pOut = [...punchRecords].reverse().find(r => r.punch_type === '下班')
+    setCrossDayPunchDate(null)
+    // 晚班跨日：凌晨0-6點若今天無上班卡，檢查昨天
+    const hour = new Date().getHours()
+    if (!pIn && hour < 6) {
+      const yesterday = format(new Date(Date.now() - 86400000), 'yyyy-MM-dd')
+      const { data: yPunches } = await supabase.from('punch_records').select('*').eq('employee_id', user.employee_id).eq('date', yesterday).order('time', { ascending: true })
+      const yIn = (yPunches || []).find(r => r.punch_type === '上班')
+      const yOut = [...(yPunches || [])].reverse().find(r => r.punch_type === '下班')
+      if (yIn && !yOut) {
+        pIn = yIn
+        setCrossDayPunchDate(yesterday)
+      }
+    }
     setPunchIn(pIn || null)
     setPunchOut(pOut || null)
     const counts = {}
@@ -154,7 +168,8 @@ export default function StaffHome() {
       const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat * Math.PI / 180) * Math.cos(25.0269184 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
       const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
       const valid = dist <= 100
-      await supabase.from('punch_records').insert({ date: today, employee_id: user.employee_id, name: user.name, punch_type: type, photo_url: photoUrl || null, lat, lng, distance_m: Math.round(dist), is_valid: valid })
+      const punchDate = (type === '下班' && crossDayPunchDate) ? crossDayPunchDate : today
+      await supabase.from('punch_records').insert({ date: punchDate, employee_id: user.employee_id, name: user.name, punch_type: type, photo_url: photoUrl || null, lat, lng, distance_m: Math.round(dist), is_valid: valid })
       if (valid) {
         const msgs = ['今天也是充滿雪茄香氣的一天！🚬','每一支雪茄背後都有你的專業服務 💎','好的開始是成功的一半，準備好迎接貴客了！✨','專業、熱情、細心 — 這就是你 🌟','讓每位客人都感受到 VIP 尊榮 👑','今天的努力是明天的業績 💰','雪茄不只是商品，是一種生活態度 🎩','服務從微笑開始，業績從細節累積 📈','你的專業讓每支雪茄都更有價值 🏆','準備好了嗎？今天又是滿分服務日！⭐','細心呵護每一位會員的窖藏 🗄️','用心推薦，讓客人找到命定的那支 💫','每一次開櫃都是信任的延續 🔑','你不只是店員，你是雪茄管家 🎯','今天的一杯好茶配一支好茄 = 完美 ☕']
         setMotivation({ text: msgs[Math.floor(Math.random() * msgs.length)], type })
@@ -316,8 +331,8 @@ export default function StaffHome() {
           <>
           <div style={{ display: 'flex', gap: 12, marginTop: 12, padding: '8px 10px', background: 'rgba(201,168,76,.06)', borderRadius: 8 }}>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>上班打卡</div>
-              {punchIn ? <div style={{ fontSize: 16, fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--green)' }}>{toTaipei(punchIn.time, true)}</div>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>上班打卡{crossDayPunchDate ? ` (${crossDayPunchDate.slice(5)})` : ''}</div>
+              {punchIn ? <div style={{ fontSize: 16, fontFamily: 'var(--font-mono)', fontWeight: 600, color: crossDayPunchDate ? '#f59e0b' : 'var(--green)' }}>{toTaipei(punchIn.time, true)}</div>
                 : <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>尚未上班打卡</div>}
             </div>
             <div style={{ flex: 1 }}>
