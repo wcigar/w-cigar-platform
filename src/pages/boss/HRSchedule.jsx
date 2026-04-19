@@ -6,7 +6,7 @@ import { isHoliday, getHolidayName, calcMonthRestDays, TW_HOLIDAYS_2026 } from '
 import { toTaipei } from '../../lib/timezone'
 import WeeklyReport from './WeeklyReport'
 import { ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react'
-import { format, startOfMonth, endOfMonth, addMonths, subMonths, eachDayOfInterval } from 'date-fns'
+import { format, startOfMonth, endOfMonth, addMonths, subMonths, eachDayOfInterval, isSameDay } from 'date-fns'
 import SmartScheduleBtn from '../../components/SmartSchedule'
 
 const WEEKDAYS = ['日','一','二','三','四','五','六']
@@ -133,13 +133,14 @@ export default function HRSchedule() {
                 const dow = day.getDay()
                 const isWeekend = dow === 0 || dow === 6
                 const isFri = dow === 5
+                const isToday = isSameDay(day, new Date())
                 const hol = isHoliday(ds)
                 const holName = getHolidayName(ds)
                 const working = emps.filter(e => { const s = getShift(e.id, ds); return s?.shift === '早班' || s?.shift === '晚班' }).length
                 return (
-                  <tr key={ds} style={{ background: hol ? 'rgba(196,77,77,.06)' : isFri ? 'rgba(201,168,76,.03)' : undefined }}>
-                    <td style={{ position: 'sticky', left: 0, background: hol ? 'rgba(196,77,77,.08)' : 'var(--black-card)', zIndex: 1, fontWeight: 600, fontSize: 11, whiteSpace: 'nowrap' }}>
-                      {ds.slice(5)}
+                  <tr key={ds} style={{ background: isToday ? 'rgba(201,168,76,.1)' : hol ? 'rgba(196,77,77,.06)' : isFri ? 'rgba(201,168,76,.03)' : undefined, border: isToday ? '2px solid rgba(201,168,76,.5)' : undefined }}>
+                    <td style={{ position: 'sticky', left: 0, background: isToday ? 'rgba(201,168,76,.15)' : hol ? 'rgba(196,77,77,.08)' : 'var(--black-card)', zIndex: 1, fontWeight: isToday ? 800 : 600, fontSize: isToday ? 13 : 11, whiteSpace: 'nowrap' }}>
+                      {isToday && <span style={{ marginRight: 2 }}>👉</span>}{ds.slice(5)}
                       {hol && <span style={{ color: 'var(--red)', marginLeft: 3 }}>🔴</span>}
                       {isFri && !hol && <span style={{ marginLeft: 2 }}>🍷</span>}
                       {holName && <div style={{ fontSize: 8, color: 'var(--red)', fontWeight: 400 }}>{holName.length > 5 ? holName.slice(0, 5) : holName}</div>}
