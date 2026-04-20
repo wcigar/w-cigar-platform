@@ -182,7 +182,7 @@ export default function Payroll() {
   // 薪資手動調整
   const [adjustments, setAdjustments] = useState({})
   const [editingAdj, setEditingAdj] = useState(null)
-  const [adjForm, setAdjForm] = useState({ amount: '', reason: '' })
+  const [adjForm, setAdjForm] = useState({ base: '', bonus: '', deduction: '', final_pay: '', reason: '' })
 
   const isCurrentMonth = month === format(new Date(), 'yyyy-MM')
   const today = new Date()
@@ -212,7 +212,7 @@ export default function Payroll() {
     try {
       const { data: adjData } = await supabase.from('payroll_adjustments').select('*').eq('month', month)
       const adjMap = {}
-      ;(adjData || []).forEach(a => { adjMap[a.employee_id] = { amount: a.amount, reason: a.reason, id: a.id } })
+      ;(adjData || []).forEach(a => { adjMap[a.employee_id] = { id: a.id, base: a.base_override, bonus: a.bonus_override, deduction: a.deduction_override, final_pay: a.final_pay_override, amount: a.amount, reason: a.reason } })
       setAdjustments(adjMap)
     } catch { setAdjustments({}) }
     setLoading(false)
@@ -235,16 +235,23 @@ export default function Payroll() {
     setEditingSal(null); load()
   }
   async function saveAdjustment(eid) {
-    const amt = +adjForm.amount
-    if (!amt) return alert('請輸入調整金額')
+    const row = {
+      base_override: adjForm.base ? +adjForm.base : null,
+      bonus_override: adjForm.bonus ? +adjForm.bonus : null,
+      deduction_override: adjForm.deduction ? +adjForm.deduction : null,
+      final_pay_override: adjForm.final_pay ? +adjForm.final_pay : null,
+      amount: +adjForm.final_pay || +adjForm.base || 0,
+      reason: adjForm.reason,
+    }
+    if (!row.base_override && !row.bonus_override && !row.deduction_override && !row.final_pay_override) return alert('請至少填寫一項覆寫')
     const existing = adjustments[eid]
     if (existing?.id) {
-      await supabase.from('payroll_adjustments').update({ amount: amt, reason: adjForm.reason }).eq('id', existing.id)
+      await supabase.from('payroll_adjustments').update(row).eq('id', existing.id)
     } else {
-      await supabase.from('payroll_adjustments').insert({ employee_id: eid, month, amount: amt, reason: adjForm.reason })
+      await supabase.from('payroll_adjustments').insert({ employee_id: eid, month, ...row })
     }
-    logAudit('PayrollAdjust', `${eid} 手動調整 $${amt} ${adjForm.reason}`, 'ADMIN')
-    setEditingAdj(null); setAdjForm({ amount: '', reason: '' }); load()
+    logAudit('PayrollAdjust', `${eid} 覆寫 底薪:${row.base_override||'-'} 獎金:${row.bonus_override||'-'} 扣款:${row.deduction_override||'-'} 實發:${row.final_pay_override||'-'} ${row.reason}`, 'ADMIN')
+    setEditingAdj(null); setAdjForm({ base: '', bonus: '', deduction: '', final_pay: '', reason: '' }); load()
   }
 
   async function deleteAdjustment(eid) {
@@ -314,7 +321,15 @@ export default function Payroll() {
   const months = Array.from({ length: 6 }, (_, i) => format(subMonths(new Date(), i), 'yyyy-MM'))
   const totalExp = expenses.reduce((s, e) => s + (e.amount || 0), 0)
   const allCalcs = emps.map(e => ({ emp: e, calc: getCalc(e) }))
-  const totalPayable = allCalcs.reduce((s, { emp, calc }) => s + calc.currentPayable + (adjustments[emp.id]?.amount || 0), 0)
+  function getFinalPay(emp, calc) {
+    const adj = adjustments[emp.id]
+    if (adj?.final_pay != null) return adj.final_pay
+    const base = adj?.base != null ? adj.base : calc.proratedBase
+    const bonus = adj?.bonus != null ? adj.bonus : calc.totalBonuses
+    const deduct = adj?.deduction != null ? adj.deduction : calc.totalDeductions
+    return base + bonus - deduct
+  }
+  const totalPayable = allCalcs.reduce((s, { emp, calc }) => s + getFinalPay(emp, calc), 0)
   const totalER = allCalcs.reduce((s, { calc }) => s + calc.erCost, 0)
   const tabList = [
     { id: 'payroll', l: '薪資明細' },
@@ -423,7 +438,7 @@ export default function Payroll() {
               </div>
               <div style={{display:'flex',alignItems:'center',gap:8}}>
                 <div style={{textAlign:'right'}}>
-                  <div style={{fontSize:16,fontFamily:'var(--font-mono)',fontWeight:600,color:'var(--gold)'}}>${(p.currentPayable + (adjustments[emp.id]?.amount || 0)).toLocaleString()}</div>
+                  <div style={{fontSize:16,fontFamily:'var(--font-mono)',fontWeight:600,color:adjustments[emp.id]?'#f59e0b':'var(--gold)'}}>${getFinalPay(emp, p).toLocaleString()}{adjustments[emp.id]?' ✏️':''}</div>
                   {isCurrentMonth&&<div style={{fontSize:9,color:'var(--text-muted)'}}>出勤{p.actualWorkedDays}天</div>}
                 </div>
                 {ex?<ChevronUp size={16} color="var(--text-muted)"/>:<ChevronDown size={16} color="var(--text-muted)"/>}
@@ -458,21 +473,27 @@ export default function Payroll() {
               {p.absentDeduct>0&&<R label={`- 曠職${p.att.absent}天`} value={-p.absentDeduct} negative/>}
               <div style={{height:2,background:'var(--gold)',margin:'8px 0'}}/>
               <R label="＝ 系統計算" value={p.currentPayable} highlight/>
-              {/* 手動調整 */}
-              {adjustments[emp.id] && (
-                <div style={{display:'flex',justifyContent:'space-between',padding:'3px 0',fontSize:13}}>
-                  <span style={{color:'var(--text-dim)'}}>✏️ 手動調整 <span style={{fontSize:10,color:'var(--text-muted)'}}>{adjustments[emp.id].reason}</span></span>
-                  <span style={{fontFamily:'var(--font-mono)',color:adjustments[emp.id].amount>=0?'var(--green)':'var(--red)'}}>{adjustments[emp.id].amount>=0?'+':''}${adjustments[emp.id].amount.toLocaleString()}</span>
+              {/* 手動覆寫摘要 */}
+              {adjustments[emp.id] && (() => { const a = adjustments[emp.id]; return (
+                <div style={{padding:'6px 0',fontSize:11}}>
+                  {a.base != null && <div style={{display:'flex',justifyContent:'space-between',color:'#f59e0b'}}><span>✏️ 底薪覆寫</span><span style={{fontFamily:'var(--font-mono)'}}>${a.base.toLocaleString()}</span></div>}
+                  {a.bonus != null && <div style={{display:'flex',justifyContent:'space-between',color:'#f59e0b'}}><span>✏️ 獎金覆寫</span><span style={{fontFamily:'var(--font-mono)'}}>${a.bonus.toLocaleString()}</span></div>}
+                  {a.deduction != null && <div style={{display:'flex',justifyContent:'space-between',color:'#f59e0b'}}><span>✏️ 扣款覆寫</span><span style={{fontFamily:'var(--font-mono)'}}>${a.deduction.toLocaleString()}</span></div>}
+                  {a.final_pay != null && <div style={{display:'flex',justifyContent:'space-between',color:'#f59e0b'}}><span>✏️ 實發覆寫</span><span style={{fontFamily:'var(--font-mono)'}}>${a.final_pay.toLocaleString()}</span></div>}
+                  {a.reason && <div style={{color:'var(--text-muted)',marginTop:2}}>原因：{a.reason}</div>}
                 </div>
-              )}
-              {adjustments[emp.id] && <R label="＝ 實際應發" value={p.currentPayable + (adjustments[emp.id]?.amount || 0)} highlight/>}
+              )})()}
+              {adjustments[emp.id] && <R label="＝ 實際應發" value={getFinalPay(emp, p)} highlight/>}
               {editingAdj === emp.id ? (
                 <div style={{marginTop:6,padding:10,background:'rgba(201,168,76,.05)',borderRadius:8,border:'1px solid var(--border-gold)'}}>
-                  <div style={{fontSize:11,fontWeight:600,color:'var(--gold)',marginBottom:6}}>✏️ 手動調整金額</div>
-                  <div style={{display:'flex',gap:6,marginBottom:6}}>
-                    <input type="number" value={adjForm.amount} onChange={e=>setAdjForm(f=>({...f,amount:e.target.value}))} placeholder="金額（正=加、負=扣）" style={{flex:1,fontSize:13,padding:'6px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--black)',color:'var(--text)'}} />
+                  <div style={{fontSize:11,fontWeight:600,color:'var(--gold)',marginBottom:6}}>✏️ 手動覆寫（留空 = 不覆寫，用系統計算值）</div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:6}}>
+                    <div><div style={{fontSize:10,color:'var(--text-muted)',marginBottom:2}}>底薪（系統 ${p.proratedBase.toLocaleString()}）</div><input type="number" value={adjForm.base} onChange={e=>setAdjForm(f=>({...f,base:e.target.value}))} placeholder="不覆寫" style={{width:'100%',fontSize:13,padding:'6px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--black)',color:'var(--text)',boxSizing:'border-box'}} /></div>
+                    <div><div style={{fontSize:10,color:'var(--text-muted)',marginBottom:2}}>獎金（系統 ${p.totalBonuses.toLocaleString()}）</div><input type="number" value={adjForm.bonus} onChange={e=>setAdjForm(f=>({...f,bonus:e.target.value}))} placeholder="不覆寫" style={{width:'100%',fontSize:13,padding:'6px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--black)',color:'var(--text)',boxSizing:'border-box'}} /></div>
+                    <div><div style={{fontSize:10,color:'var(--text-muted)',marginBottom:2}}>扣款（系統 ${p.totalDeductions.toLocaleString()}）</div><input type="number" value={adjForm.deduction} onChange={e=>setAdjForm(f=>({...f,deduction:e.target.value}))} placeholder="不覆寫" style={{width:'100%',fontSize:13,padding:'6px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--black)',color:'var(--text)',boxSizing:'border-box'}} /></div>
+                    <div><div style={{fontSize:10,color:'var(--red)',marginBottom:2,fontWeight:600}}>直接覆寫實發金額</div><input type="number" value={adjForm.final_pay} onChange={e=>setAdjForm(f=>({...f,final_pay:e.target.value}))} placeholder="不覆寫" style={{width:'100%',fontSize:13,padding:'6px 8px',borderRadius:6,border:'1px solid rgba(196,77,77,.3)',background:'var(--black)',color:'var(--text)',boxSizing:'border-box'}} /></div>
                   </div>
-                  <input value={adjForm.reason} onChange={e=>setAdjForm(f=>({...f,reason:e.target.value}))} placeholder="原因（如：績效獎金、扣款等）" style={{width:'100%',fontSize:12,padding:'6px 8px',marginBottom:8,borderRadius:6,border:'1px solid var(--border)',background:'var(--black)',color:'var(--text)',boxSizing:'border-box'}} />
+                  <input value={adjForm.reason} onChange={e=>setAdjForm(f=>({...f,reason:e.target.value}))} placeholder="覆寫原因（如：談好固定薪、績效獎金等）" style={{width:'100%',fontSize:12,padding:'6px 8px',marginBottom:8,borderRadius:6,border:'1px solid var(--border)',background:'var(--black)',color:'var(--text)',boxSizing:'border-box'}} />
                   <div style={{display:'flex',gap:6}}>
                     <button onClick={()=>saveAdjustment(emp.id)} style={{flex:1,padding:8,fontSize:12,fontWeight:700,borderRadius:6,border:'none',background:'var(--gold)',color:'var(--black)',cursor:'pointer'}}>✅ 儲存</button>
                     {adjustments[emp.id]&&<button onClick={()=>deleteAdjustment(emp.id)} style={{padding:'8px 12px',fontSize:12,fontWeight:600,borderRadius:6,border:'1px solid rgba(196,77,77,.3)',background:'rgba(196,77,77,.08)',color:'var(--red)',cursor:'pointer'}}>🗑</button>}
@@ -480,7 +501,7 @@ export default function Payroll() {
                   </div>
                 </div>
               ) : (
-                <button onClick={()=>{setEditingAdj(emp.id);setAdjForm({amount:String(adjustments[emp.id]?.amount||''),reason:adjustments[emp.id]?.reason||''})}} style={{width:'100%',marginTop:6,padding:8,fontSize:12,fontWeight:600,borderRadius:6,border:'1px solid var(--border)',background:'var(--black-card)',color:'var(--gold)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:4}}>✏️ 手動調整薪資</button>
+                <button onClick={()=>{const a=adjustments[emp.id];setEditingAdj(emp.id);setAdjForm({base:a?.base!=null?String(a.base):'',bonus:a?.bonus!=null?String(a.bonus):'',deduction:a?.deduction!=null?String(a.deduction):'',final_pay:a?.final_pay!=null?String(a.final_pay):'',reason:a?.reason||''})}} style={{width:'100%',marginTop:6,padding:8,fontSize:12,fontWeight:600,borderRadius:6,border:'1px solid var(--border)',background:'var(--black-card)',color:'var(--gold)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:4}}>✏️ 手動覆寫薪資</button>
               )}
               {isCurrentMonth&&<div style={{fontSize:10,color:'var(--text-muted)',marginTop:4,textAlign:'center'}}>⚠️ 依實際出勤，非月底應發</div>}
               <div style={{height:1,background:'var(--border)',margin:'8px 0'}}/>
