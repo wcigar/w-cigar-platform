@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 
 const STORE_ID   = import.meta.env.VITE_STORE_ID   || 'DA_AN'
-const STORE_NAME = import.meta.env.VITE_STORE_NAME || 'å¤§å®ç¸½åº'
+const STORE_NAME = import.meta.env.VITE_STORE_NAME || '大安總店'
 const BASE_URL   = window.location.origin
 
 export default function QRCodePage() {
@@ -11,7 +11,7 @@ export default function QRCodePage() {
   const joinUrl = `${BASE_URL}/join`
   const refUrl  = refCode ? `${BASE_URL}/join?ref=${refCode}` : ''
 
-  // QR Code ç¨ api.qrserver.com åè²»çæ
+  // QR Code 用 api.qrserver.com 免賻生成
   const joinQR = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(joinUrl)}&bgcolor=1a1714&color=c9a84c&format=png`
   const refQR  = refUrl ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(refUrl)}&bgcolor=1a1714&color=c9a84c&format=png` : ''
 
@@ -37,54 +37,54 @@ export default function QRCodePage() {
 
   return (
     <div style={S.page}>
-      <div style={S.title}>ð± QR Code ç®¡ç</div>
-      <div style={S.sub}>ææå³å¯å å¥æå¡æå¡«å¥æ¨è¦ç¢¼</div>
+      <div style={S.title}>📱 QR Code 管理</div>
+      <div style={S.sub}>掃描即可加入會員或填入推薦碼</div>
 
       <div style={S.tabs}>
-        <button style={S.tab(tab==='join')}     onClick={()=>setTab('join')}>ð å å¥æå¡</button>
-        <button style={S.tab(tab==='referral')} onClick={()=>setTab('referral')}>ð æ¨è¦å°å±¬</button>
+        <button style={S.tab(tab==='join')}     onClick={()=>setTab('join')}>🔑 加入會員</button>
+        <button style={S.tab(tab==='referral')} onClick={()=>setTab('referral')}>🔗 推薦專屬</button>
       </div>
 
       {tab === 'join' && (
         <div style={S.card}>
           <div style={{ color:'#c9a84c', fontSize:15, fontWeight:700, marginBottom:16 }}>
-            W Cigar Bar æå¡ç³è«
+            W Cigar Bar 會員申請
           </div>
-          <img src={joinQR} alt="å å¥æå¡ QR" style={S.qr}
+          <img src={joinQR} alt="加入會員 QR" style={S.qr}
             onError={e => e.target.style.display='none'}/>
           <div style={S.url}>{joinUrl}</div>
           <div style={{ color:'#666', fontSize:12, marginBottom:16, lineHeight:1.7 }}>
-            å®¢äººææå¾å¡«å¯«è³æ<br/>å¡å·¥å¯©æ ¸ééå³æçºæå¡
+            客人掃描後填寫資料<br/>員工審核通過即成為會員
           </div>
-          <button onClick={print} style={S.btn}>ð¨ï¸ åå°æ­¤ QR Code</button>
+          <button onClick={print} style={S.btn}>🖨️ 列印此 QR Code</button>
         </div>
       )}
 
       {tab === 'referral' && (
         <div style={S.card}>
           <div style={{ color:'#c9a84c', fontSize:15, fontWeight:700, marginBottom:12 }}>
-            æå¡å°å±¬æ¨è¦ QR
+            會員專屬推薦 QR
           </div>
           <div style={{ color:'#888', fontSize:12, marginBottom:12 }}>
-            è¼¸å¥æå¡æ¨è§ç¢¼ï¼ç¢çå°å±¬é£çµ
+            輸入會員推薦碼，產生專屬連結
           </div>
           <input
             value={refCode}
             onChange={e=>setRefCode(e.target.value.toUpperCase())}
-            placeholder="è¼¸å¥æ¨è¦ç¢¼ï¼6ç¢¼ï¼"
+            placeholder="輸入推薦碼（6碼）"
             maxLength={8}
             style={S.input}
           />
           {refQR && (
             <>
-              <img src={refQR} alt="æ¨è¦ QR" style={S.qr}/>
+              <img src={refQR} alt="推薦 QR" style={S.qr}/>
               <div style={S.url}>{refUrl}</div>
-              <button onClick={print} style={S.btn}>ð¨ï¸ åå°æ¨è¦ QR</button>
+              <button onClick={print} style={S.btn}>🖨️ 列印推薦 QR</button>
             </>
           )}
           {!refCode && (
             <div style={{ color:'#333', fontSize:13, padding:40 }}>
-              è¼¸å¥æ¨è¦ç¢¼å¾é¡¯ç¤º QR Code
+              輸入推薦碼後顯示 QR Code
             </div>
           )}
         </div>
