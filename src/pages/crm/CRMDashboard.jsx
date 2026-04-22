@@ -3,8 +3,8 @@ import { supabase } from '../../lib/supabase'
 
 const STORE_ID = import.meta.env.VITE_STORE_ID || 'DA_AN'
 
-const TIER_COLOR = { 'éæå¡':'#555', 'ç´³å£«ä¿±æ¨é¨':'#c9a84c', 'é²éæå¡':'#a0c4ff', 'å°æ¦®æå¡':'#ffd700' }
-const TIER_BG    = { 'éæå¡':'#1a1714','ç´³å£«ä¿±æ¨é¨':'rgba(201,168,76,.1)','é²éæå¡':'rgba(160,196,255,.1)','å°æ¦­æå¡':'rgba(255,215,0,.1)' }
+const TIER_COLOR = { '非會員':'#555', '紳士俱樂部':'#c9a84c', '進階會員':'#a0c4ff', '尊榮會員':'#ffd700' }
+const TIER_BG    = { '非會員':'#1a1714','紳士俱樂部':'rgba(201,168,76,.1)','進階會員':'rgba(160,196,255,.1)','尊榮會員':'rgba(255,215,0,.1)' }
 
 export default function CRMDashboard({ navigate }) {
   const [stats,     setStats]     = useState(null)
@@ -51,9 +51,9 @@ export default function CRMDashboard({ navigate }) {
   }
 
   async function runWinback(days) {
-    if (!confirm(`å·è¡ ${days} å¤©ååæ´»åï¼`)) return
+    if (!confirm(`執行 ${days} 天喚回活動？`)) return
     const { data } = await supabase.rpc('crm_run_winback', { p_store_id: STORE_ID, p_days: days })
-    alert(`â å·²å»ºç« ${data?.processed || 0} åååä»»å`)
+    alert(`✅ 已建立 ${data?.processed || 0} 個喚回任務`)
     loadDashboard()
   }
 
@@ -88,26 +88,26 @@ export default function CRMDashboard({ navigate }) {
   return (
     <div style={S.page}>
       <div style={S.header}>
-        <div style={S.title}>ð CRM å®¢æ¶ç®¡çä¸­å¿</div>
-        <button onClick={() => navigate?.('/marketing')} style={S.btn()}>ð£ è¡é·ç¼é</button>
+        <div style={S.title}>🏆 CRM 客戶管理中心</div>
+        <button onClick={() => navigate?.('/marketing')} style={S.btn()}>📣 行銷發送</button>
       </div>
 
       <div style={S.tabs}>
-        {[['overview','ð ç¸½è¦½'],['customers','ð¥ å®¢æ¶'],['tasks','â è·é²ä»»å'],['automation','â¡ èªåå']].map(([k,l])=>(
+        {[['overview','📊 總覽'],['customers','👥 客戶'],['tasks','✅ 跟進任務'],['automation','⚡ 自動化']].map(([k,l])=>(
           <button key={k} style={S.tab(tab===k)} onClick={()=>setTab(k)}>{l}</button>
         ))}
       </div>
 
-      {/* ââ ç¸½è¦½ ââ */}
+      {/* ── 總覽 ── */}
       {tab === 'overview' && stats && (
         <div>
-          {/* æ ¸å¿ææ¨ */}
+          {/* 核心指標 */}
           <div style={S.grid4}>
             {[
-              { val: fmt(stats.total_members),       lbl:'ç¸½æå¡æ¸' },
-              { val: fmt(stats.new_this_month),       lbl:'æ¬ææ°å¢' },
-              { val: fmt(stats.active_30d),           lbl:'30å¤©æ´»èº' },
-              { val: fmt(stats.birthday_this_month),  lbl:'æ¬æå£½æ' },
+              { val: fmt(stats.total_members),       lbl:'總會員數' },
+              { val: fmt(stats.new_this_month),       lbl:'本月新增' },
+              { val: fmt(stats.active_30d),           lbl:'30天活躍' },
+              { val: fmt(stats.birthday_this_month),  lbl:'本月壽星' },
             ].map(m=>(
               <div key={m.lbl} style={S.metric}>
                 <div style={S.mval}>{m.val}</div>
@@ -116,14 +116,14 @@ export default function CRMDashboard({ navigate }) {
             ))}
           </div>
 
-          {/* ç­ç´åå¸ */}
+          {/* 等級分布 */}
           <div style={S.grid2}>
             <div style={S.card}>
-              <div style={{ color:'#aaa', fontSize:12, marginBottom:14 }}>æå¡ç­ç´åå¸</div>
+              <div style={{ color:'#aaa', fontSize:12, marginBottom:14 }}>會員等級分布</div>
               {Object.entries(stats.tier_count||{}).map(([tier,cnt])=>(
                 <div key={tier} style={{ display:'flex', justifyContent:'space-between', marginBottom:8, alignItems:'center' }}>
                   <span style={{ color:TIER_COLOR[tier]||'#888', fontSize:13 }}>
-                    {{'éæå¡':'ð¤','ç´³å£«ä¿±æ¨é¨':'ð¥','é²éæå¡':'â­','å°æ¦®æå¡':'ð'}[tier]} {tier}
+                    {{'非會員':'👤','紳士俱樂部':'🥃','進階會員':'⭐','尊榮會員':'👑'}[tier]} {tier}
                   </span>
                   <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                     <div style={{ width:80, height:6, background:'#111', borderRadius:3, overflow:'hidden' }}>
@@ -137,12 +137,12 @@ export default function CRMDashboard({ navigate }) {
             </div>
 
             <div style={S.card}>
-              <div style={{ color:'#aaa', fontSize:12, marginBottom:14 }}>è¡é·è¦èç</div>
+              <div style={{ color:'#aaa', fontSize:12, marginBottom:14 }}>行銷覆蓋率</div>
               {[
-                { lbl:'å¯ç¼ç°¡è¨',  val:stats.has_phone, icon:'ð±' },
-                { lbl:'å¯ç¼Email', val:stats.has_email, icon:'ð§' },
-                { lbl:'å·²åæè¡é·',val:stats.marketing_consent, icon:'â' },
-                { lbl:'ç´¯è¨çºé»æ¸',val:fmt(stats.total_points_issued)+'é»', icon:'ð°' },
+                { lbl:'可發簡訊',  val:stats.has_phone, icon:'📱' },
+                { lbl:'可發Email', val:stats.has_email, icon:'📧' },
+                { lbl:'已同意行銷',val:stats.marketing_consent, icon:'✅' },
+                { lbl:'累計発點數',val:fmt(stats.total_points_issued)+'點', icon:'💰' },
               ].map(r=>(
                 <div key={r.lbl} style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
                   <span style={{ color:'#666', fontSize:12 }}>{r.icon} {r.lbl}</span>
@@ -154,50 +154,50 @@ export default function CRMDashboard({ navigate }) {
             </div>
           </div>
 
-          {/* å¿«éåä½ */}
+          {/* 快速動作 */}
           <div style={S.card}>
-            <div style={{ color:'#aaa', fontSize:12, marginBottom:14 }}>â¡ å¿«éå·è¡</div>
+            <div style={{ color:'#aaa', fontSize:12, marginBottom:14 }}>⚡ 快速執行</div>
             <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
-              <button onClick={()=>runWinback(90)}  style={S.btn('#2a2218')}>ð´ 90å¤©åå ({fmt(stats.inactive_90d)}äºº)</button>
-              <button onClick={()=>supabase.rpc('generate_birthday_notifications',{p_store_id:STORE_ID}).then(({data})=>alert(`â å·²æç¨ ${data?.sms_queued||0} å°çæ¥ç°¡è¨`))}
-                style={S.btn('#2a2218')}>ð ä»æ¥çæ¥æç¨</button>
-              <button onClick={()=>supabase.rpc('crm_calculate_rfm',{p_store_id:STORE_ID}).then(({data})=>alert(`â RFM å·²æ´æ° ${data?.updated||0} ä½å®¢æ¶`))}
-                style={S.btn('#2a2218')}>ð æ´æ° RFM åæ</button>
-              <button onClick={()=>setTab('customers')} style={S.btn()}>ð¥ æ¥çå®¢æ¶åè¡¨</button>
+              <button onClick={()=>runWinback(90)}  style={S.btn('#2a2218')}>😴 90天喚回 ({fmt(stats.inactive_90d)}人)</button>
+              <button onClick={()=>supabase.rpc('generate_birthday_notifications',{p_store_id:STORE_ID}).then(({data})=>alert(`✅ 已排程 ${data?.sms_queued||0} 封生日簡訊`))}
+                style={S.btn('#2a2218')}>🎂 今日生日排程</button>
+              <button onClick={()=>supabase.rpc('crm_calculate_rfm',{p_store_id:STORE_ID}).then(({data})=>alert(`✅ RFM 已更新 ${data?.updated||0} 位客戶`))}
+                style={S.btn('#2a2218')}>📊 更新 RFM 分析</button>
+              <button onClick={()=>setTab('customers')} style={S.btn()}>👥 查看客戶列表</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ââ å®¢æ¶åè¡¨ ââ */}
+      {/* ── 客戶列表 ── */}
       {tab === 'customers' && (
         <div>
-          {/* ç¯©é¸å */}
+          {/* 篩選列 */}
           <div style={{ display:'flex', gap:8, marginBottom:16, flexWrap:'wrap' }}>
             <input value={filter.search}
               onChange={e=>{ setFilter(p=>({...p,search:e.target.value})); setPage(0) }}
-              placeholder="ð æå°å§å/ææ©"
+              placeholder="🔍 搜尋姓名/手機"
               style={{...S.input, flex:1, minWidth:180}}/>
             <select value={filter.tier}
               onChange={e=>{ setFilter(p=>({...p,tier:e.target.value})); setPage(0) }}
               style={{...S.input}}>
-              {['all','éæå¡','ç´³å£«ä¿±æ¨é¨','é²éæå¡','å°æ¦®æå¡'].map(t=>(
-                <option key={t} value={t}>{t==='all'?'å¨é¨ç­ç´':t}</option>
+              {['all','非會員','紳士俱樂部','進階會員','尊榮會員'].map(t=>(
+                <option key={t} value={t}>{t==='all'?'全部等級':t}</option>
               ))}
             </select>
             <select value={filter.inactive||''}
               onChange={e=>{ setFilter(p=>({...p,inactive:e.target.value?Number(e.target.value):null})); setPage(0) }}
               style={S.input}>
-              <option value="">æææ´»èºåº¦</option>
-              <option value="30">30å¤©æªä¾è¨ª</option>
-              <option value="90">90å¤©æªä¾è¨ª</option>
-              <option value="180">180å¤©æªä¾è¨ª</option>
+              <option value="">所有活躍度</option>
+              <option value="30">30天未來訪</option>
+              <option value="90">90天未來訪</option>
+              <option value="180">180天未來訪</option>
             </select>
           </div>
 
-          <div style={{ color:'#555', fontSize:12, marginBottom:12 }}>å± {fmt(total)} ä½å®¢æ¶</div>
+          <div style={{ color:'#555', fontSize:12, marginBottom:12 }}>共 {fmt(total)} 位客戶</div>
 
-          {loading ? <div style={{textAlign:'center',color:'#555',padding:40}}>è¼å¥ä¸­...</div>
+          {loading ? <div style={{textAlign:'center',color:'#555',padding:40}}>載入中...</div>
           : customers.map(c=>(
             <div key={c.id} style={S.ccard}
               onMouseEnter={e=>e.currentTarget.style.borderColor='rgba(201,168,76,.4)'}
@@ -209,23 +209,23 @@ export default function CRMDashboard({ navigate }) {
                     <span style={{ padding:'2px 8px', borderRadius:6, fontSize:11,
                       background:TIER_BG[c.membership_tier]||'#1a1714',
                       color:TIER_COLOR[c.membership_tier]||'#555' }}>
-                      {c.membership_tier||'éæå¡'}
+                      {c.membership_tier||'非會員'}
                     </span>
                   </div>
                   <div style={{ color:'#555', fontSize:12, lineHeight:1.8 }}>
-                    ð± {c.phone}
-                    {c.email && <span style={{marginLeft:10}}>âï¸ {c.email}</span>}
-                    {c.preferred_cigar && <span style={{marginLeft:10}}>ð¬ {c.preferred_cigar}</span>}
+                    📱 {c.phone}
+                    {c.email && <span style={{marginLeft:10}}>✉️ {c.email}</span>}
+                    {c.preferred_cigar && <span style={{marginLeft:10}}>🚬 {c.preferred_cigar}</span>}
                   </div>
                 </div>
                 <div style={{ textAlign:'right', marginLeft:12 }}>
                   <div style={{ color:'#c9a84c', fontSize:15, fontWeight:700 }}>
                     NT${fmt(c.total_spent)}
                   </div>
-                  <div style={{ color:'#555', fontSize:11 }}>{c.visit_count||0}æ¬¡æ¶è²»</div>
+                  <div style={{ color:'#555', fontSize:11 }}>{c.visit_count||0}次消費</div>
                   {c.days_since_visit && (
                     <div style={{ color: c.days_since_visit > 90 ? '#e06060' : '#555', fontSize:11 }}>
-                      {c.days_since_visit}å¤©åå°è¨ª
+                      {c.days_since_visit}天前到訪
                     </div>
                   )}
                 </div>
@@ -240,37 +240,37 @@ export default function CRMDashboard({ navigate }) {
                 {c.total_points > 0 && (
                   <span style={{ padding:'2px 8px', borderRadius:10, fontSize:10,
                     background:'rgba(90,180,100,.1)', color:'#5a9', border:'1px solid rgba(90,180,100,.2)' }}>
-                    ð° {fmt(c.total_points)}é»
+                    💰 {fmt(c.total_points)}點
                   </span>
                 )}
               </div>
             </div>
           ))}
 
-          {/* åé  */}
+          {/* 分頁 */}
           {total > 20 && (
             <div style={{ display:'flex', gap:8, justifyContent:'center', marginTop:16 }}>
               <button onClick={()=>setPage(p=>Math.max(0,p-1))} disabled={page===0}
-                style={{...S.btn('#1a1714'), opacity:page===0?0.4:1}}>â ä¸ä¸é </button>
+                style={{...S.btn('#1a1714'), opacity:page===0?0.4:1}}>← 上一頁</button>
               <span style={{ color:'#555', fontSize:13, padding:'9px 0' }}>
-                ç¬¬ {page+1} / {Math.ceil(total/20)} é 
+                第 {page+1} / {Math.ceil(total/20)} 頁
               </span>
               <button onClick={()=>setPage(p=>p+1)} disabled={(page+1)*20>=total}
-                style={{...S.btn('#1a1714'), opacity:(page+1)*20>=total?0.4:1}}>ä¸ä¸é  â</button>
+                style={{...S.btn('#1a1714'), opacity:(page+1)*20>=total?0.4:1}}>下一頁 →</button>
             </div>
           )}
         </div>
       )}
 
-      {/* ââ è·é²ä»»å ââ */}
+      {/* ── 跟進任務 ── */}
       {tab === 'tasks' && (
         <div>
           <div style={{ display:'flex', justifyContent:'space-between', marginBottom:16 }}>
-            <div style={{ color:'#555', fontSize:13 }}>å¾èç {tasks.length} ä»¶</div>
-            <button onClick={()=>runWinback(90)} style={S.btn()}>+ å»ºç«ååä»»å</button>
+            <div style={{ color:'#555', fontSize:13 }}>待處理 {tasks.length} 件</div>
+            <button onClick={()=>runWinback(90)} style={S.btn()}>+ 建立喚回任務</button>
           </div>
           {tasks.length === 0 ? (
-            <div style={{ textAlign:'center', color:'#444', padding:40 }}>ç®åæ²æå¾èçä»»å ð</div>
+            <div style={{ textAlign:'center', color:'#444', padding:40 }}>目前沒有待處理任務 🎉</div>
           ) : tasks.map(t=>(
             <div key={t.id} style={{ ...S.card, marginBottom:8, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
               <div>
@@ -278,28 +278,28 @@ export default function CRMDashboard({ navigate }) {
                   <span style={{ padding:'2px 8px', borderRadius:6, fontSize:10,
                     background:t.priority==='high'?'rgba(200,60,60,.15)':'rgba(201,168,76,.1)',
                     color:t.priority==='high'?'#e06060':'#c9a84c' }}>
-                    {t.priority==='high'?'â ï¸ ç·æ¥':'ä¸è¬'}
+                    {t.priority==='high'?'⚠️ 緊急':'一般'}
                   </span>
                   <span style={{ color:'#e8e0d0', fontSize:14 }}>{t.customer_name}</span>
                 </div>
                 <div style={{ color:'#888', fontSize:13 }}>{t.title}</div>
                 {t.due_date && (
                   <div style={{ color: new Date(t.due_date) < new Date() ? '#e06060' : '#555', fontSize:11, marginTop:2 }}>
-                    æªæ­¢ï¼{t.due_date}
+                    截止：{t.due_date}
                   </div>
                 )}
               </div>
               <button onClick={()=>doneTask(t.id)}
                 style={{ padding:'7px 14px', borderRadius:8, border:'none', background:'rgba(90,180,100,.1)',
                          color:'#5a9', fontSize:13, cursor:'pointer' }}>
-                â å®æ
+                ✅ 完成
               </button>
             </div>
           ))}
         </div>
       )}
 
-      {/* ââ èªåå ââ */}
+      {/* ── 自動化 ── */}
       {tab === 'automation' && <AutomationPanel />}
     </div>
   )
@@ -320,16 +320,16 @@ function AutomationPanel() {
   }
 
   const TRIGGER_LABELS = {
-    birthday_month:'ð çæ¥æä»½', birthday_day:'ð çæ¥ç¶å¤©',
-    new_member:'ð± æ°æå¡å å¥', tier_upgrade:'â­ åç­',
-    no_visit_days:'ð´ ä¹æªä¾è¨ª', first_purchase:'ð¯ é¦æ¬¡æ¶è²»',
-    points_milestone:'ð° é»æ¸éç¨', referral_milestone:'ð æ¨è¦éç¨',
+    birthday_month:'🎂 生日月份', birthday_day:'🎂 生日當天',
+    new_member:'🌱 新會員加入', tier_upgrade:'⭐ 升等',
+    no_visit_days:'😴 久未來訪', first_purchase:'🎯 首次消費',
+    points_milestone:'💰 點數里程', referral_milestone:'🔗 推薦里程',
   }
 
   return (
     <div>
       <div style={{ color:'#555', fontSize:13, marginBottom:16 }}>
-        èªååè¦åéåå¾ï¼ç³»çµ±æ¯å¤©èªåå·è¡ä¸¦ç¼ééç¥
+        自動化規則開啟後，系統每天自動執行並發送通知
       </div>
       {automations.map(a => (
         <div key={a.id} style={{ background:'#1a1714', border:'1px solid #2a2218', borderRadius:12,
@@ -338,16 +338,16 @@ function AutomationPanel() {
             <div style={{ color:'#e8e0d0', fontSize:14, fontWeight:600, marginBottom:4 }}>{a.name}</div>
             <div style={{ color:'#555', fontSize:12 }}>
               {TRIGGER_LABELS[a.trigger_type]||a.trigger_type}
-              {a.trigger_value && <span style={{marginLeft:6}}>ï¼{a.trigger_value}å¤©ï¼</span>}
+              {a.trigger_value && <span style={{marginLeft:6}}>（{a.trigger_value}天）</span>}
               <span style={{ marginLeft:10 }}>
-                {{sms:'ð±',email:'ð§',both:'ð±+ð§',task:'ð'}[a.channel]}
+                {{sms:'📱',email:'📧',both:'📱+📧',task:'📋'}[a.channel]}
               </span>
-              {a.run_count > 0 && <span style={{ marginLeft:10, color:'#444' }}>å·²å·è¡{a.run_count}æ¬¡</span>}
+              {a.run_count > 0 && <span style={{ marginLeft:10, color:'#444' }}>已執行{a.run_count}次</span>}
             </div>
           </div>
           <div style={{ display:'flex', alignItems:'center', gap:8 }}>
             <span style={{ fontSize:11, color:a.is_active?'#5a9':'#555' }}>
-              {a.is_active?'éè¡ä¸­':'å·²æ«å'}
+              {a.is_active?'運行中':'已暫停'}
             </span>
             <div onClick={() => toggle(a.id, a.is_active)}
               style={{ width:40, height:22, borderRadius:11, cursor:'pointer', transition:'background .2s',
