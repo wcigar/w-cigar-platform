@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase'
 const STORE_ID = import.meta.env.VITE_STORE_ID || 'DA_AN'
 
 export default function CampaignBuilder({ onClose, onSend }) {
-  const [step,       setStep]       = useState(1) // 1:ç®æ¨ 2:å§å®¹ 3:é è¦½ 4:å®æ
+  const [step,       setStep]       = useState(1) // 1:目標 2:內容 3:預覽 4:完成
   const [templates,  setTemplates]  = useState([])
   const [form,       setForm]       = useState({
     title: '', type: 'sms', subject: '', content: '',
@@ -34,7 +34,7 @@ export default function CampaignBuilder({ onClose, onSend }) {
   }
 
   async function send() {
-    if (!form.title || !form.content) { alert('è«å¡«å¯«æ¨é¡åå§å®¹'); return }
+    if (!form.title || !form.content) { alert('請填寫標題和內容'); return }
     setSending(true)
     const { error } = await supabase.from('marketing_messages').insert({
       store_id: STORE_ID,
@@ -45,18 +45,18 @@ export default function CampaignBuilder({ onClose, onSend }) {
       target_tier: form.target_tier,
       status:   form.is_scheduled ? 'scheduled' : 'sending',
       total_count: preview.count,
-      sent_count:  form.is_scheduled? 0 : preview.count,
+      sent_count:  form.is_scheduled ? 0 : preview.count,
       scheduled_at: form.is_scheduled ? form.scheduled_at : null,
       sent_at:  form.is_scheduled ? null : new Date().toISOString(),
       created_by: 'ADMIN',
     })
     setSending(false)
-    if (error) { alert('å»ºçå¤±æï¼' + error.message); return }
+    if (error) { alert('建立失敗：' + error.message); return }
     setStep(4)
     onSend?.()
   }
 
-  const STEPS = ['ç®æ¨å®¢ç¾¤', 'è¨æ¯å§å®¹', 'é è¦½æ¢®èª', 'å®æ']
+  const STEPS = ['目標客群', '訊息內容', '預覽確認', '完成']
 
   const S = {
     overlay: { position:'fixed', inset:0, background:'rgba(0,0,0,.92)', display:'flex',
@@ -78,7 +78,7 @@ export default function CampaignBuilder({ onClose, onSend }) {
                background:'transparent', color:'#888', fontSize:14, cursor:'pointer' },
   }
 
-  // æ­¥é©æç¤ºå©
+  // 步驟指示器
   const StepBar = () => (
     <div style={{ display:'flex', alignItems:'center', marginBottom:20 }}>
       {STEPS.map((s, i) => (
@@ -89,7 +89,7 @@ export default function CampaignBuilder({ onClose, onSend }) {
               fontSize:12, fontWeight:700,
               background: step > i+1 ? '#5a9' : step === i+1 ? '#c9a84c' : '#2a2218',
               color:       step > i+1 ? '#fff'  : step === i+1 ? '#1a1410' : '#555',
-            }}>{step > i+1 ? 'â' : i+1}</div>
+            }}>{step > i+1 ? '✓' : i+1}</div>
             <div style={{ fontSize:10, color: step===i+1?'#c9a84c':'#444', marginTop:4, textAlign:'center' }}>{s}</div>
           </div>
           {i < STEPS.length-1 && (
@@ -101,40 +101,40 @@ export default function CampaignBuilder({ onClose, onSend }) {
   )
 
   const TIER_OPTIONS = [
-    { v:'all',      l:'å¨é¨æå¡' },
-    { v:'å±¨æå¡',   l:'éæå¡' },
-    { v:'ç´³å£«ä¿±æ¨é¨',l:'ç´³å£«ä¿±æ¨é¨' },
-    { v:'é²éæå¡', l:'é²éæå¡' },
-    { v:'å°çµæå¡', l:'å°çµæå¡' },
+    { v:'all',      l:'全部會員' },
+    { v:'非會員',   l:'非會員' },
+    { v:'紳士俱樂部',l:'紳士俱樂部' },
+    { v:'進階會員', l:'進階會員' },
+    { v:'尊榮會員', l:'尊榮會員' },
   ]
 
   const CHANNEL_OPTS = [
-    { v:'sms',   l:'ð± ç°¡è¨',    d:'70å­ä»¥å§å¯çè³»ç¨ï¼å³æéé4' },
-    { v:'email', l:'ð§ Email',   d:'æ¯æ´HTMLæ ¼å¼ï¼é©ååæä¸¦è' },
-    { v:'both',  l:'ð±+ð§ å¨è¯', d:'æé«è§¸åçï¼åæç¼é' },
+    { v:'sms',   l:'📱 簡訊',    d:'70字以內省費用，即時送達' },
+    { v:'email', l:'📧 Email',   d:'支援HTML格式，適合圖文並茂' },
+    { v:'both',  l:'📱+📧 兩者', d:'最高觸及率，同時發送' },
   ]
 
   return (
-    <div style={S.overlayý onClick={e => e.target === e.currentTarget && onClose?.()}>
+    <div style={S.overlay} onClick={e => e.target === e.currentTarget && onClose?.()}>
       <div style={S.modal}>
         <div style={S.header}>
           <div style={{ display:'flex', justifyContent:'space-between', marginBottom:16 }}>
-            <div style={{ color:'#c9a84c', fontSize:16, fontWeight:700 }}>ð£ å»ºç«è¡é·æ´»å</div>
-            <button onClick={onClose} style={{ background:'none', border:'none', color:'#555', cursor:'pointer', fontSize:20 }}>â</button>
+            <div style={{ color:'#c9a84c', fontSize:16, fontWeight:700 }}>📣 建立行銷活動</div>
+            <button onClick={onClose} style={{ background:'none', border:'none', color:'#555', cursor:'pointer', fontSize:20 }}>✕</button>
           </div>
           <StepBar />
         </div>
 
         <div style={S.body}>
 
-          {/* Step 1: ç®æ¨å®¢ç¾¤ */}
+          {/* Step 1: 目標客群 */}
           {step === 1 && (
             <div>
-              <label style={S.label}>æ´»ååç¨± *</label>
+              <label style={S.label}>活動名稱 *</label>
               <input value={form.title} onChange={e=>set('title',e.target.value)}
-                placeholder="å¦ï¼5ææ°åå°è²¨éç¥" style={S.input}/>
+                placeholder="如：5月新品到貨通知" style={S.input}/>
 
-              <label style={S.label} style={{marginTop:14,display:'block',color:'#aaa',fontSize:12}}>ç®æ¨æ¯ç¾¤</label>
+              <label style={S.label} style={{marginTop:14,display:'block',color:'#aaa',fontSize:12}}>目標客群</label>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
                 {TIER_OPTIONS.map(o=>(
                   <button key={o.v} onClick={()=>set('target_tier',o.v)} style={{
@@ -147,7 +147,7 @@ export default function CampaignBuilder({ onClose, onSend }) {
                 ))}
               </div>
 
-              <label style={{marginTop:14,display:'block',color:'#aaa',fontSize:12}}>ç¼éç®¡é</label>
+              <label style={{marginTop:14,display:'block',color:'#aaa',fontSize:12}}>發送管道</label>
               {CHANNEL_OPTS.map(o=>(
                 <button key={o.v} onClick={()=>set('type',o.v)} style={{
                   width:'100%', padding:'12px 14px', borderRadius:10, border:'none', cursor:'pointer',
@@ -164,19 +164,19 @@ export default function CampaignBuilder({ onClose, onSend }) {
               ))}
 
               <div style={S.row}>
-                <button onClick={onClose} style={S.btnGray}>åæ¶</button>
+                <button onClick={onClose} style={S.btnGray}>取消</button>
                 <button onClick={()=>setStep(2)} disabled={!form.title} style={{...S.btnGold,opacity:form.title?1:0.5}}>
-                  ä¸ä¸æ­¥ â
+                  下一步 →
                 </button>
               </div>
             </div>
           )}
 
-          {/* Step 2: è¨æ¯å§å®¹ */}
+          {/* Step 2: 訊息內容 */}
           {step === 2 && (
             <div>
-              {/* ç¯æ¬å¿«é¸ */}
-              <label style={{...S.label}}>å¿«éå¥ç¨ç¯æ¬</label>
+              {/* 範本快選 */}
+              <label style={{...S.label}}>快速套用範本</label>
               <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:16 }}>
                 {templates.map(t=>(
                   <button key={t.id}
@@ -190,41 +190,41 @@ export default function CampaignBuilder({ onClose, onSend }) {
 
               {(form.type==='email'||form.type==='both') && (
                 <>
-                  <label style={S.label}>Email ä¸»æ¨</label>
+                  <label style={S.label}>Email 主旨</label>
                   <input value={form.subject} onChange={e=>set('subject',e.target.value)}
-                    placeholder="W Cigar Bar æå¡å°å±¬éç¥" style={{...S.input, marginBottom:12}}/>
+                    placeholder="W Cigar Bar 會員專屬通知" style={{...S.input, marginBottom:12}}/>
                 </>
               )}
 
               <label style={S.label}>
-                è¨æ¯å§å®¹ *
+                訊息內容 *
                 <span style={{ color:'#555', marginLeft:8, fontWeight:400 }}>
-                  å¯ç¨ï¼{'{{name}}'} {'{{tier}}'} {'{{points}}'}
+                  可用：{'{{name}}'} {'{{tier}}'} {'{{points}}'}
                 </span>
               </label>
               <textarea value={form.content} onChange={e=>set('content',e.target.value)}
-                placeholder="è¦ªæç {{name}}ï¼..." style={S.textarea}/>
+                placeholder="親愛的 {{name}}，..." style={S.textarea}/>
 
               <div style={{ display:'flex', justifyContent:'space-between', marginTop:6 }}>
                 <div style={{ color:'#444', fontSize:11 }}>
-                  {form.content.length} å­
+                  {form.content.length} 字
                   {form.type!=='email' && form.content.length > 70 &&
-                    <span style={{color:'#ffd700',marginLeft:8}}>â ï¸ è¶70å­è¨2åè³»ç¨</span>}
+                    <span style={{color:'#ffd700',marginLeft:8}}>⚠️ 超70字計2則費用</span>}
                 </div>
-                <div style={{ color:'#444', fontSize:11 }}>é è¨è²»ç¨ï¼
+                <div style={{ color:'#444', fontSize:11 }}>預計費用：
                   <span style={{color:'#c9a84c'}}>
-                    NT${Math.ceil(form.content.length/70) * 0.15} / å°
+                    NT${Math.ceil(form.content.length/70) * 0.15} / 封
                   </span>
                 </div>
               </div>
 
-              {/* æç¨é¸é ¡ */}
+              {/* 排程選項 */}
               <div style={{ marginTop:14, background:'#111', borderRadius:10, padding:'12px 14px' }}>
                 <div style={{ display:'flex', gap:10, alignItems:'center', marginBottom: form.is_scheduled?10:0 }}>
                   <input type="checkbox" id="sched" checked={form.is_scheduled}
                     onChange={e=>set('is_scheduled',e.target.checked)}
                     style={{accentColor:'#c9a84c'}}/>
-                  <label htmlFor="sched" style={{color:'#888',fontSize:13,cursor:'pointer'}}>æç¨ç¼éï¼æå®æéï¼</label>
+                  <label htmlFor="sched" style={{color:'#888',fontSize:13,cursor:'pointer'}}>排程發送（指定時間）</label>
                 </div>
                 {form.is_scheduled && (
                   <input type="datetime-local" value={form.scheduled_at}
@@ -234,26 +234,26 @@ export default function CampaignBuilder({ onClose, onSend }) {
               </div>
 
               <div style={S.row}>
-                <button onClick={()=>setStep(1)} style={S.btnGray}>â ä¸ä¸æ­¥</button>
+                <button onClick={()=>setStep(1)} style={S.btnGray}>← 上一步</button>
                 <button onClick={()=>setStep(3)} disabled={!form.content}
-                  style={{...S.btnGold,opacity:form.content?1:0.5}}>é è¦½ â</button>
+                  style={{...S.btnGold,opacity:form.content?1:0.5}}>預覽 →</button>
               </div>
             </div>
           )}
 
-          {/* Step 3: é è¦½æ¢®èª */}
+          {/* Step 3: 預覽確認 */}
           {step === 3 && (
             <div>
               <div style={{ background:'#111', borderRadius:12, padding:16, marginBottom:16 }}>
                 <div style={{ display:'flex', justifyContent:'space-between', marginBottom:12 }}>
-                  <span style={{ color:'#aaa', fontSize:12 }}>é è¨ç¼éå°è±¡</span>
-                  <span style={{ color:'#c9a84c', fontSize:20, fontWeight:700 }}>{preview.count} ä½</span>
+                  <span style={{ color:'#aaa', fontSize:12 }}>預計發送對象</span>
+                  <span style={{ color:'#c9a84c', fontSize:20, fontWeight:700 }}>{preview.count} 位</span>
                 </div>
                 {[
-                  ['æ´»ååç¨²', form.title],
-                  ['ç¼éééZ', {sms:'ð± ç°¡è¨',email:'ð§ Email',both:'ð±+ð§'}[form.type]],
-                  ['ç®æ¨å®¢ç¾¤', form.target_tier==='all'?'å¨é¨æå¡':form.target_tier],
-                  ['ç¼éæ¹å¼', form.is_scheduled?`æç¨ï¼${form.scheduled_at}`:'ç«å³ç¼é'],
+                  ['活動名稱', form.title],
+                  ['發送管道', {sms:'📱 簡訊',email:'📧 Email',both:'📱+📧'}[form.type]],
+                  ['目標客群', form.target_tier==='all'?'全部會員':form.target_tier],
+                  ['發送方式', form.is_scheduled?`排程：${form.scheduled_at}`:'立即發送'],
                 ].map(([k,v])=>(
                   <div key={k} style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}>
                     <span style={{ color:'#555', fontSize:12 }}>{k}</span>
@@ -262,18 +262,18 @@ export default function CampaignBuilder({ onClose, onSend }) {
                 ))}
               </div>
 
-              {/* è¨æ¯é è¦½ */}
+              {/* 訊息預覽 */}
               <div style={{ background:'#0f0d0a', borderRadius:12, padding:16, marginBottom:16 }}>
-                <div style={{ color:'#555', fontSize:11, marginBottom:8 }}>è¨æ¯é è¦½</div>
+                <div style={{ color:'#555', fontSize:11, marginBottom:8 }}>訊息預覽</div>
                 <div style={{ color:'#e8e0d0', fontSize:13, lineHeight:1.7, whiteSpace:'pre-wrap' }}>
-                  {form.content.replace('{{name}}', preview.sample[0]?.name || 'çå°æ')}
+                  {form.content.replace('{{name}}', preview.sample[0]?.name || '王小明')}
                 </div>
               </div>
 
-              {/* æ¶ä»¶äººé è¦½ */}
+              {/* 收件人預覽 */}
               {preview.sample.length > 0 && (
                 <div style={{ marginBottom:16 }}>
-                  <div style={{ color:'#555', fontSize:11, marginBottom:8 }}>å5ä½æ¶ä»¶äºº</div>
+                  <div style={{ color:'#555', fontSize:11, marginBottom:8 }}>前5位收件人</div>
                   {preview.sample.map(c=>(
                     <div key={c.id} style={{ display:'flex', justifyContent:'space-between',
                       padding:'6px 0', borderBottom:'1px solid #1a1714' }}>
@@ -281,38 +281,38 @@ export default function CampaignBuilder({ onClose, onSend }) {
                       <span style={{ color:'#555', fontSize:12 }}>{c.phone}</span>
                     </div>
                   ))}
-                  {preview.count > 5 && <div style={{color:'#333',fontSize:11,marginTop:4}}>â¦e±{preview.count}ä½</div>}
+                  {preview.count > 5 && <div style={{color:'#333',fontSize:11,marginTop:4}}>…共{preview.count}位</div>}
                 </div>
               )}
 
               <div style={{ background:'rgba(201,168,76,.05)', borderRadius:10, padding:'10px 14px', marginBottom:16 }}>
                 <div style={{ color:'#6b5a3a', fontSize:11, lineHeight:1.7 }}>
-                  ð¡ å¯¦éç¼ééå¨ Supabase è¨­å® Every8dï¼ç°¡è¨ï¼å Resendï¼Emailï¼API éé°ï¼
-                  ç¼éç´éå°ä¿å­æ¼è¡é·å¾å°ã
+                  💡 實際發送需在 Supabase 設定 Every8d（簡訊）和 Resend（Email）API 金鑰，
+                  發送紀錄將保存於行銷後台。
                 </div>
               </div>
 
               <div style={S.row}>
-                <button onClick={()=>setStep(2)} style={S.btnGray}>â ä¿®æ¹</button>
+                <button onClick={()=>setStep(2)} style={S.btnGray}>← 修改</button>
                 <button onClick={send} disabled={sending||!preview.count}
                   style={{...S.btnGold, opacity:(sending||!preview.count)?0.5:1}}>
-                  {sending ? 'å»ºç«ä¸­...' : form.is_scheduled ? 'ð å»ºç«æç¨' : `ð¤ ç«å³ç¼é`}
+                  {sending ? '建立中...' : form.is_scheduled ? '📅 建立排程' : `📤 立即發送`}
                 </button>
               </div>
             </div>
           )}
 
-          {/* Step 4: å®æ */}
+          {/* Step 4: 完成 */}
           {step === 4 && (
             <div style={{ textAlign:'center', padding:'20px 0' }}>
-              <div style={{ fontSize:48, marginBottom:16 }}>â</div>
+              <div style={{ fontSize:48, marginBottom:16 }}>✅</div>
               <div style={{ color:'#c9a84c', fontSize:18, fontWeight:700, marginBottom:8 }}>
-                è¡é·æ´»åå·²å»ºç«ï¼
+                行銷活動已建立！
               </div>
               <div style={{ color:'#888', fontSize:14, lineHeight:1.8, marginBottom:24 }}>
-                {form.is_scheduled ? 'å·²æç¨ç¼éï¼å±æèªåå·è¡' : `å·²æéç¼éçµ¦ ${preview.count} ä½å®¢æ¶`}
+                {form.is_scheduled ? '已排程發送，屆時自動執行' : `已排隊發送給 ${preview.count} 位客戶`}
               </div>
-              <button onClick={onClose} style={{...S.btnGold, width:'100%'}}>å®æ</button>
+              <button onClick={onClose} style={{...S.btnGold, width:'100%'}}>完成</button>
             </div>
           )}
         </div>
