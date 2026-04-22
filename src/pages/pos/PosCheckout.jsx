@@ -99,6 +99,7 @@ export default function PosCheckout({ session, shift, onShiftChange, onCartCount
   const [editPriceVal, setEditPriceVal] = useState('')
   const [editPriceReason, setEditPriceReason] = useState('')
   const [showVipBridge, setShowVipBridge] = useState(false)
+  const [isBirthday, setIsBirthday] = useState(false)
   const canOverridePrice = session?.is_admin === true
 
   // Hold orders
@@ -195,8 +196,16 @@ export default function PosCheckout({ session, shift, onShiftChange, onCartCount
     setCustomerSearching(false)
   }
   useEffect(() => { if (showCustomerSearch) searchCustomers(customerQuery) }, [showCustomerSearch])
-  function selectCustomer(c) { setCustomer(c); setCustomerTier(tiers.find(t => t.id === c.membership_tier) || null); setAttributedTo(c.belongs_to || '店內'); setShowCustomerSearch(false) }
-  function clearCustomer() { setCustomer(null); setCustomerTier(null); setAttributedTo('店內') }
+  function selectCustomer(c) {
+    setCustomer(c); setCustomerTier(tiers.find(t => t.id === c.membership_tier) || null); setAttributedTo(c.belongs_to || '店內'); setShowCustomerSearch(false)
+    // Birthday detection
+    if (c.birthday) {
+      const today = new Date()
+      const bd = new Date(c.birthday)
+      setIsBirthday(bd.getMonth() === today.getMonth() && bd.getDate() === today.getDate())
+    } else { setIsBirthday(false) }
+  }
+  function clearCustomer() { setCustomer(null); setCustomerTier(null); setAttributedTo('店內'); setIsBirthday(false) }
 
   // ── Filter & sort ──
   const filtered = useMemo(() => {
@@ -292,21 +301,35 @@ export default function PosCheckout({ session, shift, onShiftChange, onCartCount
       const missingInv = (checkoutParams.p_items || []).filter(i => ['CU004','CU013'].includes(i.product_id))
       if (missingInv.length) console.log('[POS] CU004/CU013 items in cart:', missingInv)
 
-      // Try v2 first (with price override validation)
+      // Try v3 → v2 → v1 fallback chain
       let data, error
       try {
-        const v2 = await supabase.rpc('pos_checkout_v2', {
+        const v3 = await supabase.rpc('pos_checkout_v3', {
           ...checkoutParams,
+          p_store_id: STORE_ID,
+          p_use_points: customer?.use_points || false,
           p_price_overrides: overriddenItems.length > 0 ? overriddenItems : null,
           p_operator_is_admin: session?.is_admin || false,
         })
-        data = v2.data; error = v2.error
-        if (error?.code === '42883') throw new Error('v2_not_found') // function not exists, fallback
+        data = v3.data; error = v3.error
+        if (error?.code === '42883') throw new Error('v3_not_found')
       } catch (e) {
-        if (e.message === 'v2_not_found' || e.message?.includes('42883')) {
-          // Fallback to v1
-          const v1 = await supabase.rpc('pos_checkout', checkoutParams)
-          data = v1.data; error = v1.error
+        if (e.message === 'v3_not_found' || e.message?.includes('42883')) {
+          // Fallback to v2
+          try {
+            const v2 = await supabase.rpc('pos_checkout_v2', {
+              ...checkoutParams,
+              p_price_overrides: overriddenItems.length > 0 ? overriddenItems : null,
+              p_operator_is_admin: session?.is_admin || false,
+            })
+            data = v2.data; error = v2.error
+            if (error?.code === '42883') throw new Error('v2_not_found')
+          } catch (e2) {
+            if (e2.message === 'v2_not_found' || e2.message?.includes('42883')) {
+              const v1 = await supabase.rpc('pos_checkout', checkoutParams)
+              data = v1.data; error = v1.error
+            } else throw e2
+          }
         } else throw e
       }
 
@@ -660,6 +683,7 @@ export default function PosCheckout({ session, shift, onShiftChange, onCartCount
                   <button onClick={clearCustomer} style={{ background: 'none', border: 'none', color: '#8a7e6e', cursor: 'pointer', padding: 2 }}><X size={13} /></button>
                 </div>}
               </div>
+              {isBirthday && customer && <div style={{ background: 'linear-gradient(90deg, rgba(255,105,180,.15), rgba(255,215,0,.15))', border: '1px solid rgba(255,105,180,.4)', borderRadius: 8, padding: '4px 8px', marginTop: 4, fontSize: 11, color: '#ff69b4', textAlign: 'center', fontWeight: 700 }}>🎂 今天是 {customer.name} 的生日！</div>}
               {!customer && <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
                 <span style={{ fontSize: 9, color: '#8a7e6e', whiteSpace: 'nowrap' }}>歸屬</span>
                 {['老闆', '老闆娘', '店內'].map(a => <button key={a} onClick={() => setAttributedTo(a)} style={{ flex: 1, padding: '2px 0', borderRadius: 6, fontSize: 9, fontWeight: 600, cursor: 'pointer', background: attributedTo === a ? 'rgba(201,168,76,.15)' : '#1a1714', color: attributedTo === a ? '#c9a84c' : '#8a7e6e', border: attributedTo === a ? '1px solid rgba(201,168,76,.3)' : '1px solid #2a2520' }}>{a}</button>)}
