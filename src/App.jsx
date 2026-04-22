@@ -26,6 +26,11 @@ import DealerOrders from './pages/DealerOrders'
 import AmbassadorApp from './pages/ambassador/AmbassadorApp'
 import PosApp from './pages/pos/PosApp'
 import VipCellar from './pages/VipCellar'
+import JoinPage from './pages/join/JoinPage'
+import MemberRegistrations from './pages/members/MemberRegistrations'
+import MarketingPage from './pages/marketing/MarketingPage'
+import QRCodePage from './pages/members/QRCodePage'
+import CRMDashboard from './pages/crm/CRMDashboard'
 
 function AppInner() {
   const { user, loading } = useAuth()
@@ -38,6 +43,19 @@ function AppInner() {
     <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a0a' }}>
       <div className="loading-shimmer" style={{ width: 120, height: 120, borderRadius: '50%' }} />
     </div>
+  )
+
+  // Public pages (no auth required)
+  if (window.location.pathname.startsWith('/join')) return (
+    <Routes>
+      <Route path="/join" element={<JoinPage />} />
+    </Routes>
+  )
+
+  if (window.location.pathname.startsWith('/qrcode')) return (
+    <Routes>
+      <Route path="/qrcode" element={<QRCodePage />} />
+    </Routes>
   )
 
   // VIP Cellar has its own auth
@@ -80,6 +98,9 @@ function AppInner() {
           <Route path="/pos" element={<StaffPOS />} />
           <Route path="/revenue" element={<StaffRevenue />} />
           <Route path="/settings" element={<BossSettings />} />
+          <Route path="/members/registrations" element={<MemberRegistrations />} />
+          <Route path="/marketing" element={<MarketingPage />} />
+          <Route path="/crm" element={<CRMDashboard />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       ) : (
