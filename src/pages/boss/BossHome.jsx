@@ -230,7 +230,7 @@ export default function BossHome() {
       {/* 4 category cards */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
         {cards.map(c => (
-          <div key={c.path} className="card" style={{ padding: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14 }} onClick={() => navigate(c.path)}>
+          <div key={c.path} className="card" style={{ padding: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14 }} onClick={() => ['/join','/qrcode','/vip-cellar'].some(p => c.path.startsWith(p)) ? window.location.href = c.path : navigate(c.path)}>
             <div style={{ width: 44, height: 44, borderRadius: 12, background: c.color + '15', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><c.icon size={22} color={c.color} /></div>
             <div style={{ flex: 1 }}><div style={{ fontSize: 15, fontWeight: 600 }}>{c.label}</div><div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>{c.sub}</div></div>
             <div style={{ color: 'var(--text-muted)', fontSize: 18 }}>›</div>
