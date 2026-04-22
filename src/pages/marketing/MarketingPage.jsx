@@ -3,10 +3,10 @@ import { supabase } from '../../lib/supabase'
 const STORE_ID = import.meta.env.VITE_STORE_ID || 'DA_AN'
 
 const TEMPLATES = {
-  birthday:'è¦ªæç {{name}}ï¼æ¬ææ¯æ¨ççæ¥ï¼W Cigar Bar æ¬ç»çæ¥å°å±¬ç¦¬éï¼ææ­¤è¨æ¯è³éå¸äº« 9 æåªæ  ðð¥',
-  newItem:'è¦ªæç {{name}}ï¼W Cigar Bar æ°åå°è²¨éç¥ï¼ééçèï¼æ­¡è¿èè¨åé ð¬',
-  event:'è¦ªæç {{name}}ï¼W Cigar Bar èª é¯é¨è«æ¨åå åéæ´»åï¼è©³æè«æ´½é å¸ ð',
-  vip:'è¦ªæç {{name}}ï¼æè¬æ¨é·æçæ¯æãå°æ¦®æå¡å°å±¬åªæ å³æ¥èµ·çæï¼æå¾æ¨çèè¨ ð',
+  birthday:'親愛的 {{name}}，本月是您的生日！W Cigar Bar 敬獻生日專屬禮遇，憑此訊息至門市享 9 折優惠 🎂🥃',
+  newItem:'親愛的 {{name}}，W Cigar Bar 新品到貨通知，限量珍藏，歡迎蒞臨品鑑 🚬',
+  event:'親愛的 {{name}}，W Cigar Bar 誠摯還請您參加品鑑活動，詳情請洽镠市 🔑',
+  vip:'親愛的 {{name}}，感謝您長期的支持。尊榮會員專屬優惠即日起生效，期待您的蒞臨 👑',
 }
 
 export default function MarketingPage() {
@@ -38,10 +38,10 @@ export default function MarketingPage() {
   }
 
   async function send(){
-    if(!form.title){alert('è«å¡«å¯«æ´»ååç¨±');return}
-    if(!form.content){alert('è«å¡«å¯«è¨æ¯å§å®¹');return}
-    if(!count){alert('æ²æç¬¦åæ¢ä»¶çå®¢æ¶');return}
-    if(!confirm(`ç¢ºå®ç¼éçµ¦ ${count} ä½å®¢æ¶ï¼`)) return
+    if(!form.title){alert('請填寫活動名稱');return}
+    if(!form.content){alert('請填寫訊息內容');return}
+    if(!count){alert('沒有符合條件的客戶');return}
+    if(!confirm(`確定發送給 ${count} 位客戶？`)) return
     setSending(true)
     const {error}=await supabase.from('marketing_messages').insert({
       store_id:STORE_ID,title:form.title,type:form.type,subject:form.subject,
@@ -50,8 +50,8 @@ export default function MarketingPage() {
       sent_at:new Date().toISOString(),
     })
     setSending(false)
-    if(error){alert('å»ºç«å¤±æï¼'+error.message);return}
-    alert(`â è¡é·æ´»åå·²å»ºç«ï¼å± ${count} ä½æ¶ä»¶äºº\n\næ³¨æï¼å¯¦éç°¡è¨/Email ç¼ééè¨­å® Every8d / Resend API éé°`)
+    if(error){alert('建立失敗：'+error.message);return}
+    alert(`✅ 行銷活動已建立！共 ${count} 位收件人\n\n注意：實際簡訊/Email 發送需設定 Every8d / Resend API 金鑰`)
     setForm({title:'',type:'sms',subject:'',content:'',target_tier:'all'})
     setTab('history')
   }
@@ -76,73 +76,73 @@ export default function MarketingPage() {
 
   return(
     <div style={S.page}>
-      <div style={S.title}>ð£ è¡é·ç¼éä¸­å¿</div>
-      <div style={S.sub}>ç°¡è¨ + Email è¡é·ç®¡ç</div>
+      <div style={S.title}>📣 行銷發送中心</div>
+      <div style={S.sub}>簡訊 + Email 行銷管理</div>
       <div style={S.tabs}>
-        <button style={S.tab(tab==='compose')} onClick={()=>setTab('compose')}>âï¸ æ°å¯«ç¼é</button>
-        <button style={S.tab(tab==='history')} onClick={()=>setTab('history')}>ð ç¼éç´é</button>
+        <button style={S.tab(tab==='compose')} onClick={()=>setTab('compose')}>✉️ 撰寫發送</button>
+        <button style={S.tab(tab==='history')} onClick={()=>setTab('history')}>📊 發送紀錄</button>
       </div>
 
       {tab==='compose'&&(
         <div>
-          <label style={S.label}>æ´»ååç¨±</label>
-          <input value={form.title} onChange={e=>set('title',e.target.value)} placeholder="å¦ï¼4ææ°åå°è²¨éç¥" style={S.input}/>
+          <label style={S.label}>活動名稱</label>
+          <input value={form.title} onChange={e=>set('title',e.target.value)} placeholder="如：4月新品到貨通知" style={S.input}/>
 
-          <label style={S.label}>ç¼éç®¡é</label>
+          <label style={S.label}>發送管道</label>
           <div style={{display:'flex',gap:8}}>
             {['sms','email','both'].map(t=>(
               <button key={t} onClick={()=>set('type',t)} style={{flex:1,padding:'10px 0',borderRadius:10,border:'none',
                 cursor:'pointer',background:form.type===t?'#c9a84c':'#1a1714',
                 color:form.type===t?'#1a1410':'#888',fontWeight:form.type===t?700:400,fontSize:13}}>
-                {{sms:'ð± ç°¡è¨',email:'ð§ Email',both:'ð±+ð§ å¨è'}[t]}
+                {{sms:'📱 簡訊',email:'📧 Email',both:'📱+📧 全者'}[t]}
               </button>
             ))}
           </div>
 
           {(form.type==='email'||form.type==='both')&&(
-            <><label style={S.label}>Email ä¸»æ¨</label>
-            <input value={form.subject} onChange={e=>set('subject',e.target.value)} placeholder="W Cigar Bar æå¡å°å±¬éç¥" style={S.input}/></>
+            <><label style={S.label}>Email 主旨</label>
+            <input value={form.subject} onChange={e=>set('subject',e.target.value)} placeholder="W Cigar Bar 會員專屬通知" style={S.input}/></>
           )}
 
-          <label style={S.label}>ç®æ¨å®¢ç¾¤</label>
+          <label style={S.label}>目標客群</label>
           <select value={form.target_tier} onChange={e=>set('target_tier',e.target.value)} style={S.input}>
-            {['all','éæå¡','ç´³å£«ä¿±æ¨é¨','é²éæå¡','å°æ¦®æå¡'].map(v=>(
-              <option key={v} value={v}>{v==='all'?'å¨é¨æå¡':v}</option>
+            {['all','非會員','紳士俱樂部','進階會員','尊榮會員'].map(v=>(
+              <option key={v} value={v}>{v==='all'?'全部會員':v}</option>
             ))}
           </select>
 
           <div style={{background:'#111',borderRadius:10,padding:'10px 14px',marginTop:8}}>
             <span style={{color:'#c9a84c',fontSize:15,fontWeight:700}}>{count}</span>
-            <span style={{color:'#555',fontSize:12}}>ãä½ç¬¦åæ¢ä»¶ï¼å·²åæè¡é·ï¼</span>
-            {preview.length>0&&<div style={{marginTop:4,fontSize:11,color:'#444'}}>é è¦½ï¼{preview.map(c=>c.name).join('ã')}{count>5?`â¦ç­${count}äºº`:''}</div>}
+            <span style={{color:'#555',fontSize:12}}>　位符合條件（已同意行銷）</span>
+            {preview.length>0&&<div style={{marginTop:4,fontSize:11,color:'#444'}}>預覽：{preview.map(c=>c.name).join('、')}{count>5?`…等${count}人`:''}</div>}
           </div>
 
-          <label style={S.label}>å¿«éç¯æ¬</label>
+          <label style={S.label}>快速範本</label>
           <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
             {Object.entries(TEMPLATES).map(([k,v])=>(
               <button key={k} onClick={()=>set('content',v)} style={{padding:'5px 12px',borderRadius:8,
                 fontSize:11,cursor:'pointer',border:'1px solid #2a2218',background:'#111',color:'#888'}}>
-                {{birthday:'ðçæ¥ç¥ç¦',newItem:'ð¬æ°åå°è²¨',event:'ðªæ´»åéè«',vip:'ðVIPå°å±¬'}[k]}
+                {{birthday:'🎂生日祝福',newItem:'🚬新品到貨',event:'🎪活動還請',vip:'👑VIP專屬'}[k]}
               </button>
             ))}
           </div>
 
-          <label style={S.label}>è¨æ¯å§å®¹ <span style={{color:'#555',fontSize:11}}>å¯ç¨ {'{{name}}'} ä»£å¥å§å</span></label>
-          <textarea value={form.content} onChange={e=>set('content',e.target.value)} placeholder="è¦ªæç {{name}}ï¼..." style={S.textarea}/>
-          <div style={{color:'#444',fontSize:11,marginTop:4}}>å­æ¼ï¼{form.content.length} å­
-            {form.type!=='email'&&form.content.length>70&&<span style={{color:'#ffd700',marginLeft:8}}>â ï¸ è¶é70å­å°è¨2åç°¡è¨è²»ç¨</span>}
+          <label style={S.label}>訊息內容 <span style={{color:'#555',fontSize:11}}>可用 {'{{name}}'} 代入姓名</span></label>
+          <textarea value={form.content} onChange={e=>set('content',e.target.value)} placeholder="親愛的 {{name}}，..." style={S.textarea}/>
+          <div style={{color:'#444',fontSize:11,marginTop:4}}>字敼：{form.content.length} 字
+            {form.type!=='email'&&form.content.length>70&&<span style={{color:'#ffd700',marginLeft:8}}>⚠️ 超過70字將計2則簡訊費用</span>}
           </div>
 
           <button onClick={send} disabled={sending||!count} style={{...S.btn,opacity:(sending||!count)?0.5:1}}>
-            {sending?'èçä¸­...':`ð¤ ç¼éçµ¦ ${count} ä½å®¢æ¶`}
+            {sending?'處理中...':`📤 發送給 ${count} 位客戶`}
           </button>
         </div>
       )}
 
       {tab==='history'&&(
         <div>
-          {loading?<div style={{textAlign:'center',color:'#555',padding:40}}>è¼å¥ä¸­...</div>
-          :history.length===0?<div style={{textAlign:'center',color:'#444',padding:40}}>å°ç¡ç¼éç´é</div>
+          {loading?<div style={{textAlign:'center',color:'#555',padding:40}}>載入中...</div>
+          :history.length===0?<div style={{textAlign:'center',color:'#444',padding:40}}>尚無發送紀錄</div>
           :history.map(msg=>(
             <div key={msg.id} style={S.card}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
@@ -151,8 +151,8 @@ export default function MarketingPage() {
                   background:'rgba(90,180,100,.1)',color:'#5a9'}}>{msg.status}</span>
               </div>
               <div style={{color:'#555',fontSize:12,marginTop:4,lineHeight:1.8}}>
-                {{sms:'ð±ç°¡è¨',email:'ð§Email',both:'ð±+ð§'}[msg.type]}ã{msg.target_tier==='all'?'å¨é¨æå¡':msg.target_tier}ã
-                {msg.sent_count}/{msg.total_count} å°
+                {{sms:'📱簡訊',email:'📧Email',both:'📱+📧'}[msg.type]}　{msg.target_tier==='all'?'全部會員':msg.target_tier}　
+                {msg.sent_count}/{msg.total_count} 封
               </div>
               <div style={{color:'#333',fontSize:11,marginTop:2}}>
                 {new Date(msg.created_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'})}
