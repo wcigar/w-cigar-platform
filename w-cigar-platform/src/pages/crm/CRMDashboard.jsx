@@ -142,7 +142,7 @@ export default function CRMDashboard({ navigate }) {
                 { lbl:'可發簡訊',  val:stats.has_phone, icon:'📱' },
                 { lbl:'可發Email', val:stats.has_email, icon:'📧' },
                 { lbl:'已同意行銷',val:stats.marketing_consent, icon:'✅' },
-                { lbl:'累計発點數',val:fmt(stats.total_points_issued)+'點', icon:'💰' },
+                { lbl:'累計發點數',val:fmt(stats.total_points_issued)+'點', icon:'💰' },
               ].map(r=>(
                 <div key={r.lbl} style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
                   <span style={{ color:'#666', fontSize:12 }}>{r.icon} {r.lbl}</span>

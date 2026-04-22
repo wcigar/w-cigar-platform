@@ -5,7 +5,7 @@ const STORE_ID = import.meta.env.VITE_STORE_ID || 'DA_AN'
 const TEMPLATES = {
   birthday:'親愛的 {{name}}，本月是您的生日！W Cigar Bar 敬獻生日專屬禮遇，憑此訊息至門市享 9 折優惠 🎂🥃',
   newItem:'親愛的 {{name}}，W Cigar Bar 新品到貨通知，限量珍藏，歡迎蒞臨品鑑 🚬',
-  event:'親愛的 {{name}}，W Cigar Bar 誠摯還請您參加品鑑活動，詳情請洽镠市 🔑',
+  event:'親愛的 {{name}}，W Cigar Bar 誠摯邀請您參加品鑑活動，詳情請洽門市 🔑',
   vip:'親愛的 {{name}}，感謝您長期的支持。尊榮會員專屬優惠即日起生效，期待您的蒞臨 👑',
 }
 
@@ -94,7 +94,7 @@ export default function MarketingPage() {
               <button key={t} onClick={()=>set('type',t)} style={{flex:1,padding:'10px 0',borderRadius:10,border:'none',
                 cursor:'pointer',background:form.type===t?'#c9a84c':'#1a1714',
                 color:form.type===t?'#1a1410':'#888',fontWeight:form.type===t?700:400,fontSize:13}}>
-                {{sms:'📱 簡訊',email:'📧 Email',both:'📱+📧 全者'}[t]}
+                {{sms:'📱 簡訊',email:'📧 Email',both:'📱+📧 兩者'}[t]}
               </button>
             ))}
           </div>
@@ -122,14 +122,14 @@ export default function MarketingPage() {
             {Object.entries(TEMPLATES).map(([k,v])=>(
               <button key={k} onClick={()=>set('content',v)} style={{padding:'5px 12px',borderRadius:8,
                 fontSize:11,cursor:'pointer',border:'1px solid #2a2218',background:'#111',color:'#888'}}>
-                {{birthday:'🎂生日祝福',newItem:'🚬新品到貨',event:'🎪活動還請',vip:'👑VIP專屬'}[k]}
+                {{birthday:'🎂生日祝福',newItem:'🚬新品到貨',event:'🎪活動邀請',vip:'👑VIP專屬'}[k]}
               </button>
             ))}
           </div>
 
           <label style={S.label}>訊息內容 <span style={{color:'#555',fontSize:11}}>可用 {'{{name}}'} 代入姓名</span></label>
           <textarea value={form.content} onChange={e=>set('content',e.target.value)} placeholder="親愛的 {{name}}，..." style={S.textarea}/>
-          <div style={{color:'#444',fontSize:11,marginTop:4}}>字敼：{form.content.length} 字
+          <div style={{color:'#444',fontSize:11,marginTop:4}}>字數：{form.content.length} 字
             {form.type!=='email'&&form.content.length>70&&<span style={{color:'#ffd700',marginLeft:8}}>⚠️ 超過70字將計2則簡訊費用</span>}
           </div>
 

@@ -315,7 +315,6 @@ export default function PosCheckout({ session, shift, onShiftChange, onCartCount
         if (error?.code === '42883') throw new Error('v3_not_found')
       } catch (e) {
         if (e.message === 'v3_not_found' || e.message?.includes('42883')) {
-          // Fallback to v2
           try {
             const v2 = await supabase.rpc('pos_checkout_v2', {
               ...checkoutParams,

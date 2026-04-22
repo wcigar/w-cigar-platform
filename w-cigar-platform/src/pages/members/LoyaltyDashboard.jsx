@@ -2,19 +2,19 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 
 const REDEEM_OPTIONS=[
-  {points:100, label:'NT$100 ææµå¸',   icon:'ð´'},
-  {points:500, label:'ç²¾åéªèéä»¶',    icon:'âï¸'},
-  {points:1000,label:'æå®éªèç¦®ç',    icon:'ð'},
-  {points:2000,label:'ç§äººåéæå¸­ä½',  icon:'ð¥'},
+  {points:100, label:'NT$100 折抵券',   icon:'💴'},
+  {points:500, label:'精品雪茄配件',    icon:'✂️'},
+  {points:1000,label:'指定雪茄禮盒',    icon:'🎁'},
+  {points:2000,label:'私人品鑑會席位',  icon:'🥃'},
 ]
 const MILESTONES=[
-  {count:1, gift:'æ¨è¦çåµ +200é»',       icon:'ð¯'},
-  {count:3, gift:'ç²¾åæç«æ©',             icon:'ð¥'},
-  {count:5, gift:'æå®éªèç¦®ç',           icon:'ð'},
-  {count:10,gift:'å°æ¦®æå¡åç­ï¼åå¹´è²»ï¼', icon:'ð'},
+  {count:1, gift:'推薦獎勵 +200點',       icon:'🎯'},
+  {count:3, gift:'精品打火機',             icon:'🔥'},
+  {count:5, gift:'指定雪茄禮盒',           icon:'🎁'},
+  {count:10,gift:'尊榮會員升等（免年費）', icon:'👑'},
 ]
-const TIER_COLOR={'éæå¡':'#555','ç´¬å£«ä¿±æ¨é¨':'#c9a84c','é²éæå¡':'#a0c4ff','å°æ¦®æå¡':'#ffd700'}
-const EARN_RATE={'éæå¡':1,'ç´³å£«ä¿±æ¨é¨':1.5,'é²éæå¡':2,'å°æ¦®æå¡':3}
+const TIER_COLOR={'非會員':'#555','紳士俱樂部':'#c9a84c','進階會員':'#a0c4ff','尊榮會員':'#ffd700'}
+const EARN_RATE={'非會員':1,'紳士俱樂部':1.5,'進階會員':2,'尊榮會員':3}
 
 export default function LoyaltyDashboard({customer,onClose}){
   const [tab,setTab]=useState('points')
@@ -43,7 +43,7 @@ export default function LoyaltyDashboard({customer,onClose}){
     setCopying(true); setTimeout(()=>setCopying(false),2000)
   }
 
-  const tier=customer.membership_tier||'éæå¡'
+  const tier=customer.membership_tier||'非會員'
   const points=customer.total_points||0
   const refCount=customer.referral_count||0
   const nextM=MILESTONES.find(m=>m.count>refCount)
@@ -70,36 +70,36 @@ export default function LoyaltyDashboard({customer,onClose}){
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
           <div>
             <div style={{color:'#e8e0d0',fontSize:17,fontWeight:700}}>{customer.name}</div>
-            <div style={{color:TIER_COLOR[tier],fontSize:13,marginTop:3}}>{tier} Â· {customer.phone}</div>
+            <div style={{color:TIER_COLOR[tier],fontSize:13,marginTop:3}}>{tier} · {customer.phone}</div>
           </div>
           <div style={{textAlign:'right'}}>
             <div style={{color:'#c9a84c',fontSize:24,fontWeight:700}}>{points.toLocaleString()}</div>
-            <div style={{color:'#555',fontSize:11}}>ç´¯ç©é»æ¸</div>
+            <div style={{color:'#555',fontSize:11}}>累積點數</div>
           </div>
         </div>
 
         <div style={S.tabs}>
-          <button style={S.tab(tab==='points')}   onClick={()=>setTab('points')}>ð° é»æ¸</button>
-          <button style={S.tab(tab==='referral')} onClick={()=>setTab('referral')}>ð æ¨è¦</button>
-          <button style={S.tab(tab==='redeem')}   onClick={()=>setTab('redeem')}>ð åæ</button>
+          <button style={S.tab(tab==='points')}   onClick={()=>setTab('points')}>💰 點數</button>
+          <button style={S.tab(tab==='referral')} onClick={()=>setTab('referral')}>🔗 推薦</button>
+          <button style={S.tab(tab==='redeem')}   onClick={()=>setTab('redeem')}>🎁 兌換</button>
         </div>
 
         {tab==='points'&&(
           <div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:16}}>
               <div style={S.card}>
-                <div style={{color:'#555',fontSize:11,marginBottom:4}}>ç´¯ç©åç</div>
-                <div style={{color:TIER_COLOR[tier],fontSize:20,fontWeight:700}}>Ã{EARN_RATE[tier]}</div>
-                <div style={{color:'#444',fontSize:11}}>æ¯NT$100={EARN_RATE[tier]}é»</div>
+                <div style={{color:'#555',fontSize:11,marginBottom:4}}>累積倍率</div>
+                <div style={{color:TIER_COLOR[tier],fontSize:20,fontWeight:700}}>×{EARN_RATE[tier]}</div>
+                <div style={{color:'#444',fontSize:11}}>每NT$100={EARN_RATE[tier]}點</div>
               </div>
               <div style={S.card}>
-                <div style={{color:'#555',fontSize:11,marginBottom:4}}>é»æ¸ææ</div>
-                <div style={{color:'#e8e0d0',fontSize:13,fontWeight:600}}>{customer.points_expire_at||'â'}</div>
-                <div style={{color:'#444',fontSize:11}}>æ¶è²»å¾éç½®12åæ</div>
+                <div style={{color:'#555',fontSize:11,marginBottom:4}}>點數效期</div>
+                <div style={{color:'#e8e0d0',fontSize:13,fontWeight:600}}>{customer.points_expire_at||'—'}</div>
+                <div style={{color:'#444',fontSize:11}}>消費後重置12個月</div>
               </div>
             </div>
-            {loading?<div style={{textAlign:'center',color:'#555',padding:20}}>è¼å¥ä¸­...</div>
-            :txList.length===0?<div style={{textAlign:'center',color:'#444',padding:20}}>å°ç¡é»æ¸ç´é</div>
+            {loading?<div style={{textAlign:'center',color:'#555',padding:20}}>載入中...</div>
+            :txList.length===0?<div style={{textAlign:'center',color:'#444',padding:20}}>尚無點數紀錄</div>
             :txList.map(tx=>(
               <div key={tx.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',
                 padding:'10px 0',borderBottom:'1px solid #111'}}>
@@ -118,26 +118,26 @@ export default function LoyaltyDashboard({customer,onClose}){
         {tab==='referral'&&(
           <div>
             <div style={S.card}>
-              <div style={{color:'#555',fontSize:11,marginBottom:4}}>æ¨çå°å±¬æ¨è§ç¢¼</div>
+              <div style={{color:'#555',fontSize:11,marginBottom:4}}>您的專屬推薦碼</div>
               <div style={{color:'#c9a84c',fontSize:28,fontWeight:700,letterSpacing:6,fontFamily:'monospace',marginBottom:10}}>
-                {customer.referral_code||'â'}
+                {customer.referral_code||'—'}
               </div>
               <button onClick={copyRefCode} style={S.btnGold}>
-                {copying?'â å·²è¤è£½é£çµï¼':'ð è¤è£½æ¨è¦é£çµ'}
+                {copying?'✅ 已複製連結！':'🔗 複製推薦連結'}
               </button>
             </div>
             <div style={S.card}>
               <div style={{display:'flex',justifyContent:'space-between',marginBottom:12}}>
-                <div style={{color:'#555',fontSize:11}}>æ¨è¦é²åº¦</div>
-                <div style={{color:'#c9a84c',fontSize:16,fontWeight:700}}>{refCount} ä½</div>
+                <div style={{color:'#555',fontSize:11}}>推薦進度</div>
+                <div style={{color:'#c9a84c',fontSize:16,fontWeight:700}}>{refCount} 位</div>
               </div>
               {MILESTONES.map(m=>(
                 <div key={m.count} style={{display:'flex',gap:10,marginBottom:8,alignItems:'center',opacity:refCount>=m.count?1:0.4}}>
-                  <span style={{fontSize:18}}>{refCount>=m.count?'â':m.icon}</span>
-                  <div style={{color:refCount>=m.count?'#5a9':'#888',fontSize:13}}>æ¨è¦{m.count}ä½ â {m.gift}</div>
+                  <span style={{fontSize:18}}>{refCount>=m.count?'✅':m.icon}</span>
+                  <div style={{color:refCount>=m.count?'#5a9':'#888',fontSize:13}}>推薦{m.count}位 → {m.gift}</div>
                 </div>
               ))}
-              {nextM&&<div style={{marginTop:8,color:'#555',fontSize:12}}>è·ä¸ä¸éç¨ç¢éå·® {nextM.count-refCount} ä½</div>}
+              {nextM&&<div style={{marginTop:8,color:'#555',fontSize:12}}>距下一里程碑還差 {nextM.count-refCount} 位</div>}
             </div>
           </div>
         )}
@@ -145,7 +145,7 @@ export default function LoyaltyDashboard({customer,onClose}){
         {tab==='redeem'&&(
           <div>
             <div style={{color:'#555',fontSize:12,marginBottom:16}}>
-              ç®åé»æ¸ï¼<span style={{color:'#c9a84c',fontSize:18,fontWeight:700}}>{points.toLocaleString()}</span> é»
+              目前點數：<span style={{color:'#c9a84c',fontSize:18,fontWeight:700}}>{points.toLocaleString()}</span> 點
             </div>
             {REDEEM_OPTIONS.map(opt=>(
               <div key={opt.points} style={{...S.card,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
@@ -153,13 +153,13 @@ export default function LoyaltyDashboard({customer,onClose}){
                   <span style={{fontSize:24}}>{opt.icon}</span>
                   <div>
                     <div style={{color:'#e8e0d0',fontSize:14}}>{opt.label}</div>
-                    <div style={{color:'#c9a84c',fontSize:13,fontWeight:700}}>{opt.points.toLocaleString()} é»</div>
+                    <div style={{color:'#c9a84c',fontSize:13,fontWeight:700}}>{opt.points.toLocaleString()} 點</div>
                   </div>
                 </div>
-                <button disabled={points<opt.points} style={{...S.btnGray,opacity:points>=opt.points?1:0.35,cursor:points>=opt.points?'pointer':'not-allowed'}}>åæ</button>
+                <button disabled={points<opt.points} style={{...S.btnGray,opacity:points>=opt.points?1:0.35,cursor:points>=opt.points?'pointer':'not-allowed'}}>兌換</button>
               </div>
             ))}
-            <div style={{color:'#333',fontSize:11,textAlign:'center',marginTop:16}}>é»æ¸åæéç±å¡å·¥åå©ç¢ºèª</div>
+            <div style={{color:'#333',fontSize:11,textAlign:'center',marginTop:16}}>點數兌換需由員工協助確認</div>
           </div>
         )}
       </div>

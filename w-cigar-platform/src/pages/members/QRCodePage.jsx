@@ -11,7 +11,7 @@ export default function QRCodePage() {
   const joinUrl = `${BASE_URL}/join`
   const refUrl  = refCode ? `${BASE_URL}/join?ref=${refCode}` : ''
 
-  // QR Code 用 api.qrserver.com 免賻生成
+  // QR Code 用 api.qrserver.com 免費生成
   const joinQR = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(joinUrl)}&bgcolor=1a1714&color=c9a84c&format=png`
   const refQR  = refUrl ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(refUrl)}&bgcolor=1a1714&color=c9a84c&format=png` : ''
 
