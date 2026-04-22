@@ -89,7 +89,7 @@ export default function BossHome() {
       dangerList.push({
         type: 'stock', severity: ratio === 0 ? 60 : 40, icon: '📦',
         label: item.name, detail: (item.current_stock ?? 0) + '/' + item.safe_stock + item.unit,
-        color: ratio === 0 ? 'var(--red)' : '#f59e0b', action: '/operations'
+        color: ratio === 0 ? 'var(--red)' : '#f59e0b', action: '/oprations'
       })
     })
 
@@ -137,10 +137,6 @@ export default function BossHome() {
     { icon: Users, label: '人事排班', sub: '今日 ' + stats.working + ' 人・假單 ' + stats.leavePending, path: '/hr', color: '#4da86c' },
     { icon: DollarSign, label: '薪資財務', sub: '薪資・支出・勞健保', path: '/payroll', color: '#4d8ac4' },
     { icon: Settings, label: '系統設定', sub: '員工・SOP定義・KPI考核', path: '/settings', color: '#c44d4d' },
-    { icon: BarChart3, label: 'CRM 儀表板', sub: '客戶分析・RFM・生命週期', path: '/crm', color: '#e67e22' },
-    { icon: UserCheck, label: '會員申請審核', sub: '入會申請・資格審核', path: '/members/registrations', color: '#1abc9c' },
-    { icon: Megaphone, label: '行銷發送', sub: 'SMS・推播・優惠券', path: '/marketing', color: '#9b59b6' },
-    { icon: QrCode, label: 'QR Code 入會', sub: '掃碼加入・推薦碼', path: '/qrcode', color: '#3498db' },
     { icon: BarChart3, label: 'CRM 儀表板', sub: '客戶分析・RFM・生命週期', path: '/crm', color: '#e67e22' },
     { icon: UserCheck, label: '會員申請審核', sub: '入會申請・資格審核', path: '/members/registrations', color: '#1abc9c' },
     { icon: Megaphone, label: '行銷發送', sub: 'SMS・推播・優惠券', path: '/marketing', color: '#9b59b6' },
