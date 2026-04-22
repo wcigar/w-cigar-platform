@@ -24,15 +24,15 @@ export default function MemberRegistrations() {
         name:reg.name,phone:reg.phone,birthday:reg.birthday,gender:reg.gender,
         email:reg.email,preferred_cigar:reg.preferred_cigar,
         marketing_consent:reg.marketing_consent,source:reg.source,
-        enabled:true,membership_tier:'éæå¡',home_store_id:reg.store_id,
+        enabled:true,membership_tier:'非會員',home_store_id:reg.store_id,
       }).select('id').single()
-      if(error){alert('å»ºç«å®¢æ¶å¤±æï¼'+error.message);return}
+      if(error){alert('建立客戶失敗：'+error.message);return}
       cid=nc.id
     }
     await supabase.from('member_registrations').update({
       status:'approved',customer_id:cid,approved_at:new Date().toISOString()
     }).eq('id',reg.id)
-    alert(`â å¯©æ ¸ééï¼${existing?'å·²æ´æ°ç¾æå®¢æ¶ï¼'+existing.name:'å·²å»ºç«æ°å®¢æ¶ï¼'+reg.name}`)
+    alert(`✅ 審核通過！${existing?'已更新現有客戶：'+existing.name:'已建立新客戶：'+reg.name}`)
     load()
   }
   async function reject(id){
@@ -50,18 +50,18 @@ export default function MemberRegistrations() {
     btnOK:{padding:'7px 16px',borderRadius:8,border:'none',background:'#c9a84c',color:'#1a1410',fontWeight:700,cursor:'pointer',fontSize:13},
     btnNG:{padding:'7px 16px',borderRadius:8,border:'1px solid #444',background:'transparent',color:'#888',cursor:'pointer',fontSize:13},
   }
-  const LABELS={pending:'å¾å¯©æ ¸',approved:'å·²éé',rejected:'å·²æçµ'}
+  const LABELS={pending:'待審核',approved:'已通過',rejected:'已拒絕'}
 
   return(
     <div style={S.page}>
-      <div style={S.title}>ð æå¡ç³è«å¯©æ ¸</div>
+      <div style={S.title}>📋 會員申請審核</div>
       <div style={S.tabs}>
         {['pending','approved','rejected'].map(s=>(
           <button key={s} onClick={()=>setFilter(s)} style={S.tab(filter===s)}>{LABELS[s]}</button>
         ))}
       </div>
-      {loading?<div style={{color:'#555',textAlign:'center',padding:40}}>è¼å¥ä¸­...</div>
-      :list.length===0?<div style={{color:'#444',textAlign:'center',padding:40}}>æ²æ{LABELS[filter]}çç³è«</div>
+      {loading?<div style={{color:'#555',textAlign:'center',padding:40}}>載入中...</div>
+      :list.length===0?<div style={{color:'#444',textAlign:'center',padding:40}}>沒有{LABELS[filter]}的申請</div>
       :list.map(reg=>(
         <div key={reg.id} style={S.card}>
           <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
@@ -69,12 +69,12 @@ export default function MemberRegistrations() {
             <span style={{color:'#c9a84c',fontSize:14,fontFamily:'monospace'}}>{reg.phone}</span>
           </div>
           <div style={{color:'#666',fontSize:12,lineHeight:1.9}}>
-            {reg.email&&<span>âï¸ {reg.email}ã</span>}
-            {reg.birthday&&<span>ð {reg.birthday}ã</span>}
-            {reg.preferred_cigar&&<span>ð¬ {reg.preferred_cigar}ã</span>}
-            {reg.source&&<span>ð {reg.source}ã</span>}
+            {reg.email&&<span>✉️ {reg.email}　</span>}
+            {reg.birthday&&<span>🎂 {reg.birthday}　</span>}
+            {reg.preferred_cigar&&<span>🚬 {reg.preferred_cigar}　</span>}
+            {reg.source&&<span>📍 {reg.source}　</span>}
             <span style={{color:reg.marketing_consent?'#5a9':'#e06060'}}>
-              {reg.marketing_consent?'â åæè¡é·':'â ä¸åæè¡é·'}
+              {reg.marketing_consent?'✅ 同意行銷':'❌ 不同意行銷'}
             </span>
           </div>
           <div style={{color:'#333',fontSize:11,marginTop:4}}>
@@ -82,8 +82,8 @@ export default function MemberRegistrations() {
           </div>
           {filter==='pending'&&(
             <div style={{display:'flex',gap:8,marginTop:10}}>
-              <button onClick={()=>approve(reg)} style={S.btnOK}>â éé</button>
-              <button onClick={()=>reject(reg.id)} style={S.btnNG}>â æçµ</button>
+              <button onClick={()=>approve(reg)} style={S.btnOK}>✅ 通過</button>
+              <button onClick={()=>reject(reg.id)} style={S.btnNG}>❌ 拒絕</button>
             </div>
           )}
         </div>
