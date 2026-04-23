@@ -90,7 +90,9 @@ export default function JoinPage() {
       birthday:form.birthday||null, gender:form.gender||null,
       email:form.email.trim()||null, preferred_cigar:form.preferred_cigar||null,
       marketing_consent:form.marketing_consent, source:form.customer_source,
-      store_id:STORE_ID, referral_code:code, tier:'非會員',
+      home_store_id:STORE_ID, referral_code:code,
+      customer_type:'會員', membership_tier:'非會員',
+      total_spent:0, enabled:true,
     })
     if(error){ setLoading(false); setErrMsg('提交失敗：'+error.message); return }
 
