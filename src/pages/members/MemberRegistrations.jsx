@@ -12,14 +12,16 @@ export default function MemberRegistrations() {
     setLoading(true)
     if(filter==='approved'){
       // 已通過：直接讀 customers（含自動通過與歷史審核通過者）
-      const {data}=await supabase.from('customers').select('*')
-        .eq('home_store_id',STORE_ID).eq('enabled',true)
+      // 不過濾 store 與 enabled，確保所有會員都顯示
+      const {data,error}=await supabase.from('customers').select('*')
         .order('created_at',{ascending:false}).limit(200)
+      if(error) console.error('load customers error:',error)
       setList((data||[]).map(c=>({
         id:c.id, name:c.name, phone:c.phone, birthday:c.birthday, gender:c.gender,
         email:c.email, preferred_cigar:c.preferred_cigar, source:c.source,
         marketing_consent:c.marketing_consent, created_at:c.created_at,
         referral_code:c.referral_code, membership_tier:c.membership_tier,
+        enabled:c.enabled, home_store_id:c.home_store_id,
       })))
     } else {
       const {data}=await supabase.from('member_registrations').select('*')
