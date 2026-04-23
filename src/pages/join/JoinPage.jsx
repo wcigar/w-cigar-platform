@@ -85,7 +85,7 @@ export default function JoinPage() {
     }
 
     // 3. 直接寫入 customers（自動通過，不需審核）
-    const {error} = await supabase.from('customers').insert({
+    const {data:newCust, error} = await supabase.from('customers').insert({
       name:form.name.trim(), phone:form.phone.trim(),
       birthday:form.birthday||null, gender:form.gender||null,
       email:form.email.trim()||null, preferred_cigar:form.preferred_cigar||null,
@@ -93,10 +93,20 @@ export default function JoinPage() {
       home_store_id:STORE_ID, referral_code:code,
       customer_type:'會員', membership_tier:'非會員',
       total_spent:0, enabled:true,
-    })
+    }).select('id').single()
     if(error){ setLoading(false); setErrMsg('提交失敗：'+error.message); return }
 
-    // 4. 推薦碼裂變紀錄
+    // 4. 後台審核頁可見：同步寫入 member_registrations 為 approved
+    await supabase.from('member_registrations').insert({
+      store_id:STORE_ID, name:form.name.trim(), phone:form.phone.trim(),
+      birthday:form.birthday||null, gender:form.gender||null,
+      email:form.email.trim()||null, preferred_cigar:form.preferred_cigar||null,
+      marketing_consent:form.marketing_consent, source:form.customer_source,
+      status:'approved', customer_id:newCust?.id||null,
+      approved_at:new Date().toISOString(),
+    })
+
+    // 5. 推薦碼裂變紀錄
     if(form.referral_code && refValid){
       const {data:referrer} = await supabase.from('customers')
         .select('id,name').eq('referral_code',form.referral_code).maybeSingle()
