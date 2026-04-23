@@ -10,9 +10,22 @@ export default function MemberRegistrations() {
 
   async function load(){
     setLoading(true)
-    const {data}=await supabase.from('member_registrations').select('*')
-      .eq('store_id',STORE_ID).eq('status',filter).order('created_at',{ascending:false}).limit(100)
-    setList(data||[])
+    if(filter==='approved'){
+      // 已通過：直接讀 customers（含自動通過與歷史審核通過者）
+      const {data}=await supabase.from('customers').select('*')
+        .eq('home_store_id',STORE_ID).eq('enabled',true)
+        .order('created_at',{ascending:false}).limit(200)
+      setList((data||[]).map(c=>({
+        id:c.id, name:c.name, phone:c.phone, birthday:c.birthday, gender:c.gender,
+        email:c.email, preferred_cigar:c.preferred_cigar, source:c.source,
+        marketing_consent:c.marketing_consent, created_at:c.created_at,
+        referral_code:c.referral_code, membership_tier:c.membership_tier,
+      })))
+    } else {
+      const {data}=await supabase.from('member_registrations').select('*')
+        .eq('store_id',STORE_ID).eq('status',filter).order('created_at',{ascending:false}).limit(100)
+      setList(data||[])
+    }
     setLoading(false)
   }
 
