@@ -4,6 +4,8 @@ import { supabase } from '../../lib/supabase'
 const STORE_ID   = import.meta.env.VITE_STORE_ID   || 'DA_AN'
 const STORE_NAME = import.meta.env.VITE_STORE_NAME || '大安總店'
 
+const GOOGLE_REVIEW_URL = 'https://maps.app.goo.gl/iuZMjWKWUKzk5hEb9?g_st=ic'
+
 const SOURCE_OPTIONS = [
   { value:'wilson_friend',   label:'Wilson 朋友介紹' },
   { value:'shanshan_friend', label:'珊珊 朋友介紹'  },
@@ -16,11 +18,21 @@ const SOURCE_OPTIONS = [
 ]
 
 const TIERS_INFO = [
-  { tier:'非會員',    icon:'👤', desc:'歡迎首次蒞臨',           color:'#555'    },
-  { tier:'紳士俱樂部',icon:'🥃', desc:'單筆消費 ≥ NT$10,000',   color:'#c9a84c' },
-  { tier:'進階會員',  icon:'⭐', desc:'累計消費 ≥ NT$30,000',   color:'#a0c4ff' },
-  { tier:'尊榮會員',  icon:'👑', desc:'年消費 ≥ NT$168,000',    color:'#ffd700' },
+  { tier:'非會員',               icon:'👤', desc:'歡迎首次蒞臨',        color:'#888'    },
+  { tier:'紳士俱樂部',           icon:'🥃', desc:'累計消費 ≥ NT$50,000',  color:'#c9a84c' },
+  { tier:'進階會員',             icon:'⭐', desc:'累計消費 ≥ NT$100,000', color:'#a0c4ff' },
+  { tier:'尊榮 VIP 開櫃會員',     icon:'👑', desc:'單次消費 ≥ NT$168,000', color:'#ffd700' },
 ]
+
+const REFERRAL_REWARDS = [
+  { count:1,  icon:'💵', reward:'$200 消費折抵' },
+  { count:3,  icon:'🚬', reward:'精選雪茄 1 支' },
+  { count:5,  icon:'🛋️', reward:'包廂使用 2 小時' },
+  { count:10, icon:'👑', reward:'直升 VIP 會員' },
+]
+
+const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+function genCode(){ return Array.from({length:6},()=>CODE_CHARS[Math.floor(Math.random()*CODE_CHARS.length)]).join('') }
 
 export default function JoinPage() {
   const [step,     setStep]     = useState('form')
@@ -29,9 +41,11 @@ export default function JoinPage() {
     preferred_cigar:'', marketing_consent:true,
     customer_source:'walk_in', referral_code:''
   })
-  const [loading,  setLoading]  = useState(false)
-  const [errMsg,   setErrMsg]   = useState('')
-  const [refValid, setRefValid] = useState(null)
+  const [loading,     setLoading]     = useState(false)
+  const [errMsg,      setErrMsg]      = useState('')
+  const [refValid,    setRefValid]    = useState(null)
+  const [myCode,      setMyCode]      = useState('')
+  const [copyMsg,     setCopyMsg]     = useState('')
   const set = (k,v) => setForm(p=>({...p,[k]:v}))
 
   useEffect(()=>{
@@ -51,23 +65,75 @@ export default function JoinPage() {
     if(!/^09\d{8}$/.test(form.phone)){setErrMsg('請輸入正確手機號碼（09xxxxxxxx）');return}
     if(!form.customer_source){setErrMsg('請選擇從哪裡認識我們');return}
     setLoading(true); setErrMsg('')
-    const {error} = await supabase.from('member_registrations').insert({
-      store_id:form.name,name:form.name.trim(),phone:form.phone.trim(),
-      birthday:form.birthday||null,gender:form.gender||null,
-      email:form.email.trim()||null,preferred_cigar:form.preferred_cigar||null,
-      marketing_consent:form.marketing_consent,source:form.customer_source,
-      store_id:STORE_ID,
+
+    // 1. 檢查手機是否已註冊 → 直接回傳既有推薦碼
+    const {data:existing} = await supabase.from('customers')
+      .select('referral_code,name').eq('phone',form.phone.trim()).maybeSingle()
+    if(existing?.referral_code){
+      setMyCode(existing.referral_code)
+      setLoading(false)
+      setStep('exists')
+      return
+    }
+
+    // 2. 產生不重複推薦碼
+    let code = genCode()
+    for(let i=0;i<5;i++){
+      const {data:dup} = await supabase.from('customers').select('id').eq('referral_code',code).maybeSingle()
+      if(!dup) break
+      code = genCode()
+    }
+
+    // 3. 直接寫入 customers（自動通過，不需審核）
+    const {error} = await supabase.from('customers').insert({
+      name:form.name.trim(), phone:form.phone.trim(),
+      birthday:form.birthday||null, gender:form.gender||null,
+      email:form.email.trim()||null, preferred_cigar:form.preferred_cigar||null,
+      marketing_consent:form.marketing_consent, source:form.customer_source,
+      store_id:STORE_ID, referral_code:code, tier:'非會員',
     })
-    if(!error&&form.referral_code&&refValid){
-      const {data:referrer} = await supabase.from('customers').select('id,name').eq('referral_code',form.referral_code).maybeSingle()
+    if(error){ setLoading(false); setErrMsg('提交失敗：'+error.message); return }
+
+    // 4. 推薦碼裂變紀錄
+    if(form.referral_code && refValid){
+      const {data:referrer} = await supabase.from('customers')
+        .select('id,name').eq('referral_code',form.referral_code).maybeSingle()
       if(referrer) await supabase.from('referral_records').insert({
-        referrer_id:referrer.id,referrer_name:referrer.name,referrer_code:form.referral_code,
-        referee_name:form.name,referee_phone:form.phone,store_id:STORE_ID,
+        referrer_id:referrer.id, referrer_name:referrer.name, referrer_code:form.referral_code,
+        referee_name:form.name.trim(), referee_phone:form.phone.trim(), store_id:STORE_ID,
       })
     }
+
+    setMyCode(code)
     setLoading(false)
-    if(error){setErrMsg('提交失敗：'+error.message);return}
     setStep('success')
+  }
+
+  function shareLink(){
+    return `${window.location.origin}/join?ref=${myCode}`
+  }
+  async function copyLink(){
+    const link = shareLink()
+    try {
+      await navigator.clipboard.writeText(link)
+      setCopyMsg('✅ 連結已複製')
+    } catch {
+      const ta = document.createElement('textarea')
+      ta.value = link; document.body.appendChild(ta); ta.select()
+      try{ document.execCommand('copy'); setCopyMsg('✅ 連結已複製') }catch{ setCopyMsg('請手動複製：'+link) }
+      document.body.removeChild(ta)
+    }
+    setTimeout(()=>setCopyMsg(''),2500)
+  }
+  function shareLine(){
+    const txt = `🔥 W Cigar Bar 紳士雪茄館 入會禮等您領取！\n使用推薦碼 ${myCode} 加入，雙方都有好禮 🎁\n${shareLink()}`
+    window.open('https://line.me/R/share?text='+encodeURIComponent(txt),'_blank')
+  }
+  async function shareIG(){
+    await copyLink()
+    setCopyMsg('✅ 連結已複製，請打開 IG 貼到限時動態')
+    setTimeout(()=>setCopyMsg(''),3500)
+    window.open('https://www.instagram.com/','_blank')
   }
 
   const S = {
@@ -81,34 +147,86 @@ export default function JoinPage() {
            border:'1px solid #2a2218',color:'#e8e0d0',fontSize:15,outline:'none',boxSizing:'border-box'},
     btn:{width:'100%',padding:'15px 0',borderRadius:12,border:'none',background:'#c9a84c',
          color:'#1a1410',fontSize:16,fontWeight:700,cursor:'pointer',marginTop:20},
+    btnSub:{width:'100%',padding:'12px 0',borderRadius:10,border:'1px solid #2a2218',background:'#111',
+            color:'#e8e0d0',fontSize:14,fontWeight:600,cursor:'pointer',marginTop:8,display:'flex',
+            alignItems:'center',justifyContent:'center',gap:8},
     err:{color:'#e06060',fontSize:13,marginTop:10,textAlign:'center'},
+    sectionTitle:{color:'#c9a84c',fontSize:13,fontWeight:700,marginBottom:10,letterSpacing:1},
   }
 
-  if(step==='success') return(
-    <div style={S.page}><div style={{...S.card,textAlign:'center',padding:'40px 28px'}}>
-      <div style={{fontSize:56,marginBottom:16}}>🎉</div>
-      <div style={{color:'#c9a84c',fontSize:22,fontWeight:700,marginBottom:10}}>申請已送出！</div>
-      <div style={{color:'#888',fontSize:14,lineHeight:1.9}}>
-        感謝您申請加入 W Cigar Bar<br/>我們將盡快審核您的會員資格<br/>審核通過後將以簡訊通知 📱
-      </div>
-      <div style={{marginTop:24,background:'#111',borderRadius:14,padding:20}}>
-        <div style={{color:'#c9a84c',fontSize:13,fontWeight:600,marginBottom:12}}>✨ 會員專屬福利</div>
-        {[['🎂','生日當月全面 9 折優惠'],['🥂','生日當天軟飲、餐飲免費'],
-          ['💰','消費即點，等級加乘倍率'],['🎁','推薦好友，雙方皆有好禮']].map(([i,t])=>(
-          <div key={t} style={{display:'flex',gap:10,marginBottom:8,color:'#888',fontSize:13}}>
-            <span>{i}</span><span>{t}</span>
-          </div>
-        ))}
-      </div>
-    </div></div>
-  )
+  // ========== 成功頁（新入會 or 已存在）==========
+  if(step==='success' || step==='exists') {
+    const title = step==='exists' ? '您已是會員 👋' : '🎉 入會成功！'
+    const subtitle = step==='exists'
+      ? '此手機已完成註冊，這是您的專屬推薦碼'
+      : '歡迎加入 W Cigar Bar，這是您的專屬推薦碼'
 
+    return (
+      <div style={S.page}><div style={{...S.card,padding:'36px 24px'}}>
+        <div style={{textAlign:'center',marginBottom:18}}>
+          <div style={{color:'#c9a84c',fontSize:22,fontWeight:700,marginBottom:8}}>{title}</div>
+          <div style={{color:'#888',fontSize:13,lineHeight:1.7}}>{subtitle}</div>
+        </div>
+
+        {/* 推薦碼方塊 */}
+        <div style={{background:'linear-gradient(135deg,#1a1410 0%,#2a1f14 100%)',border:'1px solid rgba(201,168,76,.4)',borderRadius:14,padding:'22px 20px',textAlign:'center',marginBottom:18}}>
+          <div style={{color:'#888',fontSize:11,marginBottom:8,letterSpacing:2}}>MY REFERRAL CODE</div>
+          <div style={{color:'#ffd700',fontSize:34,fontWeight:800,letterSpacing:6,fontFamily:'monospace'}}>{myCode}</div>
+        </div>
+
+        {/* 分享按鈕 */}
+        <div style={S.sectionTitle}>📣 分享給好友</div>
+        <button onClick={copyLink}  style={S.btnSub}>🔗 複製推薦連結</button>
+        <button onClick={shareLine} style={{...S.btnSub,background:'#06c755',color:'#fff',border:'none'}}>💚 LINE 分享</button>
+        <button onClick={shareIG}   style={{...S.btnSub,background:'linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)',color:'#fff',border:'none'}}>📸 IG 限動</button>
+        {copyMsg && <div style={{color:'#5a9',fontSize:12,textAlign:'center',marginTop:8}}>{copyMsg}</div>}
+
+        {/* 推薦獎勵 */}
+        <div style={{marginTop:24,background:'#111',borderRadius:14,padding:18}}>
+          <div style={S.sectionTitle}>🎁 推薦獎勵（好友成功入會並消費）</div>
+          {REFERRAL_REWARDS.map(r=>(
+            <div key={r.count} style={{display:'flex',alignItems:'center',gap:12,padding:'8px 0',borderTop:r.count===1?'none':'1px solid #2a2218'}}>
+              <div style={{width:34,height:34,borderRadius:'50%',background:'rgba(201,168,76,.15)',color:'#c9a84c',fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,flexShrink:0}}>{r.count}位</div>
+              <div style={{flex:1,fontSize:13,color:'#e8e0d0'}}>{r.icon} {r.reward}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Google 五星好評 */}
+        <div style={{marginTop:20,background:'linear-gradient(135deg,#1a1410 0%,#251a10 100%)',border:'1px solid rgba(255,215,0,.3)',borderRadius:14,padding:18}}>
+          <div style={{color:'#ffd700',fontSize:14,fontWeight:700,marginBottom:6}}>⭐⭐⭐⭐⭐ 給我們五星好評</div>
+          <div style={{color:'#c8b88a',fontSize:12,lineHeight:1.7,marginBottom:12}}>
+            完成 Google 五星好評即可獲得 <b style={{color:'#ffd700'}}>雪茄單人煙灰缸 一只</b>
+            <br/><span style={{color:'#888',fontSize:11}}>⚠️ 評價完成後請出示畫面給店員領取</span>
+          </div>
+          <button onClick={()=>window.open(GOOGLE_REVIEW_URL,'_blank')}
+            style={{...S.btnSub,background:'#ffd700',color:'#1a1410',border:'none',marginTop:0}}>
+            ⭐ 前往 Google 評論
+          </button>
+        </div>
+
+        {/* 會員等級 */}
+        <div style={{marginTop:20,background:'#111',borderRadius:12,padding:16}}>
+          <div style={{color:'#555',fontSize:11,marginBottom:10}}>— 會員等級 —</div>
+          {TIERS_INFO.map(t=>(
+            <div key={t.tier} style={{display:'flex',justifyContent:'space-between',fontSize:12,marginBottom:7,color:'#888'}}>
+              <span>{t.icon} <span style={{color:t.color}}>{t.tier}</span></span>
+              <span style={{color:'#444'}}>{t.desc}</span>
+            </div>
+          ))}
+        </div>
+      </div></div>
+    )
+  }
+
+  // ========== 申請表單 ==========
   return(
     <div style={S.page}><div style={S.card}>
       <div style={{textAlign:'center',marginBottom:24,paddingBottom:20,borderBottom:'1px solid rgba(201,168,76,.1)'}}>
         <div style={{color:'#c9a84c',fontSize:22,fontWeight:700,letterSpacing:3}}>W CIGAR BAR</div>
         <div style={{color:'#6b5a3a',fontSize:12,marginTop:4}}>紳士雪茄館 {STORE_NAME}</div>
         <div style={{color:'#c9a84c',fontSize:15,fontWeight:600,marginTop:12}}>🔑 申請加入會員</div>
+        <div style={{color:'#5a9',fontSize:11,marginTop:6}}>✨ 填表即自動通過，立即獲得專屬推薦碼</div>
       </div>
 
       <label style={S.label}>姓名 *</label>
@@ -158,10 +276,22 @@ export default function JoinPage() {
 
       {errMsg&&<div style={S.err}>{errMsg}</div>}
       <button onClick={submit} disabled={loading} style={{...S.btn,opacity:loading?0.6:1}}>
-        {loading?'提交中...':'🎉 立即申請加入'}
+        {loading?'處理中...':'🎉 立即入會（自動通過）'}
       </button>
 
+      {/* 推薦獎勵預覽 */}
       <div style={{marginTop:20,background:'#111',borderRadius:12,padding:16}}>
+        <div style={{color:'#c9a84c',fontSize:12,fontWeight:700,marginBottom:10}}>🎁 推薦好友福利</div>
+        {REFERRAL_REWARDS.map(r=>(
+          <div key={r.count} style={{display:'flex',justifyContent:'space-between',fontSize:12,marginBottom:6,color:'#888'}}>
+            <span style={{color:'#c9a84c'}}>推薦 {r.count} 位</span>
+            <span>{r.icon} {r.reward}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* 會員等級 */}
+      <div style={{marginTop:14,background:'#111',borderRadius:12,padding:16}}>
         <div style={{color:'#555',fontSize:11,marginBottom:10}}>— 會員等級 —</div>
         {TIERS_INFO.map(t=>(
           <div key={t.tier} style={{display:'flex',justifyContent:'space-between',fontSize:12,marginBottom:7,color:'#888'}}>
