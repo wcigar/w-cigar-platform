@@ -173,3 +173,148 @@ export const SOURCE_TYPES = {
   messenger_order: 'LINE / 通訊軟體',
   other: '其他',
 }
+
+// ============ Matrix 模式 ============
+// 對應你現有 Excel 2026雪茄銷量.xlsx 的作業邏輯：
+//   每個 sheet = 月份 + 地區，每個地區有固定店家，每個店家有固定商品與單價
+// 此 template 為 mock，未來改從 venue_profit_rules / venue_products / products 讀取
+
+export const REGIONS = {
+  taipei: '台北',
+  taichung: '台中',
+}
+
+const matrixTemplates = {
+  taipei: {
+    region: 'taipei',
+    region_name: '台北',
+    venues: [
+      {
+        id: 'westin', name: '威士登',
+        products: [
+          { key: 'capadura',     name: 'capadura',             price: 1000, category: 'non_cuban_cigar' },
+          { key: 'romeo',        name: '羅密歐',                price: 1500, category: 'cuban_cigar' },
+          { key: 'mixed_2000',   name: '三T/D4/蒙特/寬丘',      price: 2000, category: 'cuban_cigar' },
+          { key: 'robusto',      name: '羅布圖',                price: 2500, category: 'cuban_cigar' },
+          { key: 'siglo6_tube',  name: '六號鋁管',              price: 2800, category: 'cuban_cigar' },
+          { key: 'pre_shift',    name: '上班前店家銷售',         price: null, category: 'manual' },
+        ],
+      },
+      {
+        id: 'royal', name: '皇家',
+        products: [
+          { key: 'capadura',     name: 'capadura',             price: 1000, category: 'non_cuban_cigar' },
+          { key: 'romeo',        name: '羅密歐',                price: 1500, category: 'cuban_cigar' },
+          { key: 'mixed_2000',   name: '三T/D4/蒙特/寬丘',      price: 2000, category: 'cuban_cigar' },
+          { key: 'robusto',      name: '羅布圖',                price: 2500, category: 'cuban_cigar' },
+          { key: 'siglo6_tube',  name: '六號鋁管',              price: 2800, category: 'cuban_cigar' },
+          { key: 'pre_shift',    name: '上班前店家銷售',         price: null, category: 'manual' },
+        ],
+      },
+      {
+        id: 'hongxin', name: '鴻欣',
+        products: [
+          { key: 'capadura',     name: 'capadura',             price: 1000, category: 'non_cuban_cigar' },
+          { key: 'romeo',        name: '羅密歐',                price: 1500, category: 'cuban_cigar' },
+          { key: 'mixed_2000',   name: '三T/D4/蒙特/寬丘',      price: 2000, category: 'cuban_cigar' },
+          { key: 'robusto',      name: '羅布圖',                price: 2500, category: 'cuban_cigar' },
+          { key: 'siglo6_tube',  name: '六號鋁管',              price: 2800, category: 'cuban_cigar' },
+          { key: 'pre_shift',    name: '上班前店家銷售',         price: null, category: 'manual' },
+        ],
+      },
+    ],
+  },
+  taichung: {
+    region: 'taichung',
+    region_name: '台中',
+    venues: [
+      {
+        id: 'purple', name: '紫爵',
+        products: [
+          { key: 'capadura',     name: 'capadura',             price: 1000, category: 'non_cuban_cigar' },
+          { key: '3t_d4',        name: '3T/蒙特 D4',            price: 2000, category: 'cuban_cigar' },
+          { key: 'robusto',      name: '羅布圖',                price: 3000, category: 'cuban_cigar' },
+          { key: 'robusto_tube', name: '羅布圖/六號鋁管',        price: 3000, category: 'cuban_cigar' },
+          { key: 'pre_shift',    name: '上班前店家銷售',         price: null, category: 'manual' },
+        ],
+      },
+      {
+        id: 'gold', name: '金麗都',
+        products: [
+          { key: 'capadura',     name: 'capadura',             price: 1000, category: 'non_cuban_cigar' },
+          { key: 'romeo',        name: '羅密歐',                price: 1500, category: 'cuban_cigar' },
+          { key: '3t_d4',        name: '3T/蒙特 D4',            price: 2000, category: 'cuban_cigar' },
+          { key: 'tube_robusto', name: '六號鋁管/羅布圖',        price: 2500, category: 'cuban_cigar' },
+          { key: 'pre_shift',    name: '上班前店家銷售',         price: null, category: 'manual' },
+        ],
+      },
+      {
+        id: 'soak', name: 'soak',
+        products: [
+          { key: 'capadura',     name: 'capadura',             price: 1100, category: 'non_cuban_cigar' },
+          { key: 'pre_shift',    name: '上班前店家銷售',         price: null, category: 'manual' },
+        ],
+      },
+    ],
+  },
+}
+
+export async function getVenueSalesMatrixTemplate(region = 'taipei') {
+  return matrixTemplates[region] || matrixTemplates.taipei
+}
+
+/**
+ * 送出 matrix 模式的銷售（一次多家店）
+ * payload 結構見 VenueSalesMatrix.jsx 的 buildPayload()
+ * 未來對應 hq_submit_venue_sales_matrix RPC（Phase 2），
+ * MVP 先用現有 hq_submit_venue_sales 拆成多筆 fallback。
+ */
+export async function submitVenueSalesMatrix(payload) {
+  const withKey = {
+    ...payload,
+    idempotency_key: payload.idempotency_key || newIdempotencyKey(),
+  }
+
+  if (USE_MOCK) {
+    const createdIds = []
+    const salesWithData = (withKey.venues || []).filter(v => v.has_sales && v.venue_total > 0)
+    const totalSales = withKey.total_sales_amount || 0
+
+    // 依 venue_total 比例分攤收款
+    const p = withKey.payment || {}
+    const ratio = totalSales > 0 ? {
+      cash: (p.cash_amount || 0) / totalSales,
+      transfer: (p.bank_transfer_amount || 0) / totalSales,
+      monthly: (p.monthly_settlement_amount || 0) / totalSales,
+      unpaid: (p.unpaid_amount || 0) / totalSales,
+    } : { cash: 0, transfer: 0, monthly: 0, unpaid: 0 }
+
+    for (const v of salesWithData) {
+      const id = `mock-mtx-${Date.now()}-${v.venue_id}`
+      mockSales.unshift({
+        id,
+        sale_date: withKey.sale_date,
+        venue_name: v.venue_name,
+        ambassador_name: v.ambassador_name || '—',
+        total_amount: v.venue_total,
+        cash_amount: Math.round(v.venue_total * ratio.cash),
+        transfer_amount: Math.round(v.venue_total * ratio.transfer),
+        monthly_amount: Math.round(v.venue_total * ratio.monthly),
+        unpaid_amount: Math.round(v.venue_total * ratio.unpaid),
+        payment_status: p.payment_status || 'paid',
+        note: v.note || withKey.note || null,
+        created_at: new Date().toISOString(),
+        source: 'matrix_entry',
+      })
+      createdIds.push(id)
+    }
+    return { success: true, sales_count: createdIds.length, sale_ids: createdIds, mock: true }
+  }
+
+  const { data, error } = await supabase.rpc('hq_submit_venue_sales_matrix', {
+    payload: withKey,
+    p_idempotency_key: withKey.idempotency_key,
+  })
+  if (error) throw error
+  return data
+}
