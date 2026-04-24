@@ -1,11 +1,13 @@
 // src/pages/admin/VenueSales.jsx
 // HQ/Staff 每日酒店銷售 key-in
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 import { listVenueSales, todayISO } from '../../lib/services/venueSales'
 import PageShell, { Card, EmptyState, Badge } from '../../components/PageShell'
 
 export default function VenueSales() {
+  const navigate = useNavigate()
   const [list, setList] = useState([])
   const [date, setDate] = useState(todayISO())
 
@@ -19,7 +21,9 @@ export default function VenueSales() {
         <div style={{ display: 'flex', gap: 8 }}>
           <input type="date" value={date} onChange={e => setDate(e.target.value)}
             style={{ background: '#1a1714', border: '1px solid #2a2520', color: '#e8dcc8', padding: '6px 10px', borderRadius: 6, fontSize: 13 }} />
-          <button style={primaryBtn()}><Plus size={14} /> 新增銷售</button>
+          <button onClick={() => navigate('/admin/venue-sales/new')} style={primaryBtn()}>
+            <Plus size={14} /> 新增銷售
+          </button>
         </div>
       }
     >
