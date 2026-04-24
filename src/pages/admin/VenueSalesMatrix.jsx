@@ -1,12 +1,21 @@
 // src/pages/admin/VenueSalesMatrix.jsx
-// 快速矩陣模式：依地區展開店家、商品單價預填，員工只填數量
-// 對應現有 Excel（2026雪茄銷量.xlsx）作業邏輯
+// 快速矩陣模式 — 對齊 Excel「2026雪茄銷量.xlsx」人工 Key-in 格式
+// 特性：
+//  - 地區切換：台北（22 家）/ 台中（5 家）
+//  - 搜尋店家、只看有銷售、一鍵展開 / 收合
+//  - 每家店卡片預設「收合」，點擊標頭展開
+//  - 每家店統一支援「上班前店家銷售」（所有店，不限台中）
+//  - payload / validation / builder 全部從 service 讀取
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, Check, Trash2, Copy, Store, Minus } from 'lucide-react'
 import {
-  getVenueSalesMatrixTemplate, getAmbassadors, submitVenueSalesMatrix, todayISO,
-  PAYMENT_STATUSES, SOURCE_TYPES, REGIONS,
+  AlertTriangle, Check, Trash2, Copy, Store, Minus, Search,
+  ChevronDown, ChevronUp, Eye, EyeOff,
+} from 'lucide-react'
+import {
+  getVenueSalesMatrixTemplate, getVenueSalesAmbassadors, submitVenueSalesMatrix,
+  buildVenueSalesMatrixPayload, validateVenueSalesMatrix,
+  todayISO, PAYMENT_STATUSES, SOURCE_TYPES, REGIONS,
 } from '../../lib/services/venueSales'
 import { newIdempotencyKey, createOneShot } from '../../lib/services/idempotency'
 import { Card } from '../../components/PageShell'
@@ -22,13 +31,13 @@ export default function VenueSalesMatrix() {
   const [region, setRegion] = useState(() => {
     try { return localStorage.getItem(LAST_REGION_KEY) || 'taipei' } catch { return 'taipei' }
   })
-  const [sourceType, setSourceType] = useState('hotel_manual_matrix')
+  const [sourceType, setSourceType] = useState('hotel_excel_matrix')
   const [topNote, setTopNote] = useState('')
 
   // ---- template & state ----
-  const [template, setTemplate] = useState(null)   // { region, venues: [{ id, name, products: [...] }] }
+  const [template, setTemplate] = useState(null)
   const [ambassadors, setAmbassadors] = useState([])
-  const [venueState, setVenueState] = useState({}) // { [venueId]: { hasSales, ambassadorId, quantities:{}, preShiftAmount, preShiftNote, note } }
+  const [venueState, setVenueState] = useState({})
 
   // ---- payment ----
   const [cash, setCash] = useState(0)
@@ -38,30 +47,53 @@ export default function VenueSalesMatrix() {
   const [paymentStatus, setPaymentStatus] = useState('paid')
 
   // ---- UI ----
+  const [searchQuery, setSearchQuery] = useState('')
+  const [onlyWithSales, setOnlyWithSales] = useState(false)
+  const [collapsed, setCollapsed] = useState({})     // { venueId: true/false }
   const [submitting, setSubmitting] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [errors, setErrors] = useState([])
-  const [idempotencyKey] = useState(() => newIdempotencyKey())
+  const [idempotencyKey, setIdempotencyKey] = useState(() => newIdempotencyKey())
 
-  useEffect(() => { getAmbassadors().then(setAmbassadors).catch(console.error) }, [])
+  useEffect(() => { getVenueSalesAmbassadors(region).then(setAmbassadors).catch(console.error) }, [region])
 
-  // 切換地區 → 重讀 template + 重置 venueState
+  // 切換地區：若當前已有輸入資料，先 confirm
+  function changeRegion(newRegion) {
+    if (newRegion === region) return
+    const hasData = Object.values(venueState).some(s => {
+      if (!s) return false
+      if (Object.values(s.quantities || {}).some(q => Number(q) > 0)) return true
+      if (Number(s.preShiftAmount || 0) > 0) return true
+      if (s.ambassadorId || s.note || s.preShiftNote) return true
+      return false
+    }) || cash || transfer || monthly || unpaid
+    if (hasData && !window.confirm(`切換到「${REGIONS[newRegion]}」會清空當前輸入的資料，確定繼續？`)) return
+    setRegion(newRegion)
+  }
+
   useEffect(() => {
     try { localStorage.setItem(LAST_REGION_KEY, region) } catch {}
     getVenueSalesMatrixTemplate(region).then(tpl => {
       setTemplate(tpl)
-      const init = {}
+      const initState = {}
+      const initCollapsed = {}
       tpl.venues.forEach(v => {
-        init[v.id] = {
+        initState[v.id] = {
           hasSales: true,
           ambassadorId: '',
-          quantities: Object.fromEntries(v.products.filter(p => p.price !== null).map(p => [p.key, 0])),
+          ambassadorRawName: '',
+          quantities: Object.fromEntries(v.products.map(p => [p.key, 0])),
           preShiftAmount: 0,
           preShiftNote: '',
           note: '',
         }
+        initCollapsed[v.id] = tpl.venues.length > 6   // 超過 6 家預設收合
       })
-      setVenueState(init)
+      setVenueState(initState)
+      setCollapsed(initCollapsed)
+      setCash(0); setTransfer(0); setMonthly(0); setUnpaid(0)
+      setPaymentStatus('paid'); setErrors([]); setTopNote('')
+      setIdempotencyKey(newIdempotencyKey())
     })
   }, [region])
 
@@ -72,10 +104,8 @@ export default function VenueSalesMatrix() {
     const s = venueState[vid]
     if (!v || !s || !s.hasSales) return 0
     let total = 0
-    for (const p of v.products) {
-      if (p.price === null) total += Number(s.preShiftAmount || 0)
-      else total += (Number(s.quantities[p.key]) || 0) * p.price
-    }
+    for (const p of v.products) total += (Number(s.quantities[p.key]) || 0) * p.price
+    total += Number(s.preShiftAmount || 0)
     return total
   }, [template, venueState])
 
@@ -85,9 +115,7 @@ export default function VenueSalesMatrix() {
     const s = venueState[vid]
     if (!v || !s || !s.hasSales) return 0
     let qty = 0
-    for (const p of v.products) {
-      if (p.price !== null) qty += Number(s.quantities[p.key]) || 0
-    }
+    for (const p of v.products) qty += Number(s.quantities[p.key]) || 0
     return qty
   }, [template, venueState])
 
@@ -99,11 +127,19 @@ export default function VenueSalesMatrix() {
     () => (template?.venues || []).reduce((sum, v) => sum + venueQty(v.id), 0),
     [template, venueQty]
   )
-  const venuesWithSalesCount = useMemo(
-    () => (template?.venues || []).filter(v => (venueState[v.id]?.hasSales) && venueTotal(v.id) > 0).length,
+
+  const activeVenues = useMemo(
+    () => (template?.venues || []).filter(v => (venueState[v.id]?.hasSales) && venueTotal(v.id) > 0),
     [template, venueState, venueTotal]
   )
-  const venuesEmptyCount = (template?.venues.length || 0) - venuesWithSalesCount
+  const noSalesVenues = useMemo(
+    () => (template?.venues || []).filter(v => venueState[v.id]?.hasSales === false),
+    [template, venueState]
+  )
+  const blankVenues = useMemo(
+    () => (template?.venues || []).length - activeVenues.length - noSalesVenues.length,
+    [template, activeVenues, noSalesVenues]
+  )
 
   const paymentTotal = Number(cash || 0) + Number(transfer || 0) + Number(monthly || 0) + Number(unpaid || 0)
   const difference = totalSalesAmount - paymentTotal
@@ -118,6 +154,25 @@ export default function VenueSalesMatrix() {
     return 'unpaid'
   }, [cash, transfer, monthly, unpaid, totalSalesAmount])
 
+  // 可見店家（搜尋 + 只看有銷售）
+  const visibleVenues = useMemo(() => {
+    if (!template) return []
+    let list = template.venues
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase()
+      list = list.filter(v => v.name.toLowerCase().includes(q))
+    }
+    if (onlyWithSales) {
+      list = list.filter(v => {
+        const s = venueState[v.id]
+        if (!s || !s.hasSales) return false
+        const hasQty = Object.values(s.quantities || {}).some(q => Number(q) > 0)
+        return hasQty || Number(s.preShiftAmount || 0) > 0
+      })
+    }
+    return list
+  }, [template, searchQuery, onlyWithSales, venueState])
+
   // ---- state mutators ----
   function updateVenue(vid, patch) {
     setVenueState(prev => ({ ...prev, [vid]: { ...prev[vid], ...patch } }))
@@ -128,123 +183,58 @@ export default function VenueSalesMatrix() {
       [vid]: { ...prev[vid], quantities: { ...prev[vid].quantities, [key]: value } },
     }))
   }
+  function toggleCollapse(vid) {
+    setCollapsed(prev => ({ ...prev, [vid]: !prev[vid] }))
+  }
+  function expandAll() {
+    const next = {}; template.venues.forEach(v => { next[v.id] = false }); setCollapsed(next)
+  }
+  function collapseAll() {
+    const next = {}; template.venues.forEach(v => { next[v.id] = true }); setCollapsed(next)
+  }
   function clearDay() {
-    if (!window.confirm('清空本日所有店家的數量與收款？')) return
+    if (!window.confirm('清空本日所有店家的數量、收款與備註？')) return
     const init = {}
     template.venues.forEach(v => {
       init[v.id] = {
-        hasSales: true, ambassadorId: '',
-        quantities: Object.fromEntries(v.products.filter(p => p.price !== null).map(p => [p.key, 0])),
+        hasSales: true, ambassadorId: '', ambassadorRawName: '',
+        quantities: Object.fromEntries(v.products.map(p => [p.key, 0])),
         preShiftAmount: 0, preShiftNote: '', note: '',
       }
     })
     setVenueState(init)
     setCash(0); setTransfer(0); setMonthly(0); setUnpaid(0)
     setPaymentStatus('paid'); setErrors([]); setTopNote('')
+    setIdempotencyKey(newIdempotencyKey())
   }
   function copyYesterday() {
-    alert('🗂️ 複製昨天模板（Phase 2）：\n\n目前此功能為占位，未來會從昨天同地區的 venue_sales_daily 讀取最後一筆，\n自動填入大使與數量。\n\n現階段 MVP 請手動輸入。')
+    alert('🗂️ 複製昨天模板（Phase 2）\n\n目前為占位，未來會從昨天同地區最後一筆自動帶入大使與數量。')
   }
 
-  // ---- validation ----
-  function validate() {
-    const errs = []
-    if (!saleDate) errs.push('銷售日期必填')
-    if (!template) return errs
-
-    const salesVenues = template.venues.filter(v => {
-      const s = venueState[v.id]
-      return s?.hasSales && venueTotal(v.id) > 0
+  // ---- build / submit ----
+  function buildCurrentPayload() {
+    return buildVenueSalesMatrixPayload({
+      saleDate, region, topNote, template, ambassadors, venueState,
+      payment: { cash, transfer, monthly, unpaid, paymentStatus },
+      idempotencyKey,
     })
-    if (salesVenues.length === 0) errs.push('至少一家店家要有銷售（請輸入數量或上班前店家銷售金額）')
-
-    for (const v of salesVenues) {
-      const s = venueState[v.id]
-      if (!s.ambassadorId) errs.push(`${v.name}: 未選大使`)
-    }
-
-    if (Number(cash) < 0 || Number(transfer) < 0 || Number(monthly) < 0 || Number(unpaid) < 0) {
-      errs.push('收款金額不可為負數')
-    }
-    if (paymentTotal > totalSalesAmount + 0.01) {
-      errs.push(`收款總額 (NT$ ${paymentTotal.toLocaleString()}) 不可超過銷售總額 (NT$ ${totalSalesAmount.toLocaleString()})`)
-    }
-    if (totalSalesAmount > 0 && paymentTotal === 0) {
-      errs.push('有銷售但尚未填任何收款方式（現金/匯款/月結/未收請至少填一種）')
-    }
-    return errs
   }
 
   function handleTrySubmit() {
-    const errs = validate()
+    const errs = validateVenueSalesMatrix({
+      saleDate, region, template, venueState,
+      payment: { cash, transfer, monthly, unpaid },
+    })
     setErrors(errs)
     if (errs.length === 0) setConfirming(true)
-  }
-
-  // ---- build payload ----
-  function buildPayload() {
-    const venuesArr = template.venues.map(v => {
-      const s = venueState[v.id] || {}
-      const amb = ambassadors.find(a => a.id === s.ambassadorId)
-      const items = []
-      let vt = 0
-      for (const p of v.products) {
-        if (p.price === null) {
-          const amt = Number(s.preShiftAmount || 0)
-          if (amt > 0) {
-            items.push({
-              product_key: p.key, product_name: p.name, category: p.category,
-              quantity: 1, unit_price: amt, subtotal: amt,
-              source_type: 'pre_shift_venue_sales',
-              note: s.preShiftNote || null,
-            })
-            vt += amt
-          }
-        } else {
-          const qty = Number(s.quantities[p.key]) || 0
-          if (qty > 0) {
-            const sub = qty * p.price
-            items.push({
-              product_key: p.key, product_name: p.name, category: p.category,
-              quantity: qty, unit_price: p.price, subtotal: sub,
-              source_type: 'hotel_manual',
-            })
-            vt += sub
-          }
-        }
-      }
-      return {
-        venue_id: v.id, venue_name: v.name,
-        ambassador_id: s.ambassadorId || null,
-        ambassador_name: amb?.name || null,
-        has_sales: !!s.hasSales && items.length > 0,
-        items, venue_total: vt,
-        note: s.note || null,
-      }
-    })
-    return {
-      sale_date: saleDate,
-      region, source_type: sourceType,
-      venues: venuesArr,
-      payment: {
-        cash_amount: Number(cash) || 0,
-        bank_transfer_amount: Number(transfer) || 0,
-        monthly_settlement_amount: Number(monthly) || 0,
-        unpaid_amount: Number(unpaid) || 0,
-        payment_status: paymentStatus,
-      },
-      total_sales_amount: totalSalesAmount,
-      total_quantity: totalQty,
-      idempotency_key: idempotencyKey,
-      note: topNote || null,
-    }
   }
 
   async function doSubmit() {
     if (submitting) return
     setSubmitting(true)
     try {
-      const res = await oneShot.run(() => submitVenueSalesMatrix(buildPayload()))
+      const payload = buildCurrentPayload()
+      const res = await oneShot.run(() => submitVenueSalesMatrix(payload))
       alert(`✓ 已送出（MVP mock）\n\n寫入 ${res.sales_count} 家店的銷售單`)
       navigate('/admin/venue-sales')
     } catch (e) {
@@ -271,13 +261,13 @@ export default function VenueSalesMatrix() {
           <Field label="地區 *">
             <div style={{ display: 'flex', gap: 6 }}>
               {Object.entries(REGIONS).map(([k, v]) => (
-                <RadioTile key={k} active={region === k} onClick={() => setRegion(k)} color="#c9a84c" size="sm">{v}</RadioTile>
+                <RadioTile key={k} active={region === k} onClick={() => changeRegion(k)} color="#c9a84c" size="sm">{v}</RadioTile>
               ))}
             </div>
           </Field>
           <Field label="來源">
             <select value={sourceType} onChange={e => setSourceType(e.target.value)} style={input()}>
-              <option value="hotel_manual_matrix">酒店快速矩陣</option>
+              <option value="hotel_excel_matrix">Excel 矩陣</option>
               {Object.entries(SOURCE_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
           </Field>
@@ -285,22 +275,50 @@ export default function VenueSalesMatrix() {
         <Field label="整日備註（可選）" style={{ marginTop: 10 }}>
           <textarea value={topNote} onChange={e => setTopNote(e.target.value)} rows={1} style={{ ...input(), resize: 'vertical' }} />
         </Field>
-        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+        <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
           <button onClick={copyYesterday} style={smallBtn('#3b82f6')}><Copy size={12} /> 複製昨天模板</button>
           <button onClick={clearDay} style={smallBtn('#f87171')}><Trash2 size={12} /> 清空本日</button>
         </div>
       </Card>
 
+      {/* 店家控制列：搜尋 / 篩選 / 展開收合 */}
+      <Card style={{ marginBottom: 12, padding: '10px 16px' }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: '1 1 200px', minWidth: 180 }}>
+            <Search size={14} color="#8a8278" />
+            <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+              placeholder={`搜尋店家（共 ${template.venues.length} 家）`}
+              style={{ ...input(), padding: '6px 8px', fontSize: 13 }} />
+          </div>
+          <button onClick={() => setOnlyWithSales(!onlyWithSales)}
+            style={smallBtn(onlyWithSales ? '#10b981' : '#6b7280')}>
+            {onlyWithSales ? <Eye size={12} /> : <EyeOff size={12} />} {onlyWithSales ? '只看有銷售' : '全部顯示'}
+          </button>
+          <button onClick={expandAll} style={smallBtn('#c9a84c')}><ChevronDown size={12} /> 展開全部</button>
+          <button onClick={collapseAll} style={smallBtn('#8a8278')}><ChevronUp size={12} /> 收合全部</button>
+          <span style={{ fontSize: 11, color: '#8a8278', marginLeft: 'auto' }}>
+            顯示 {visibleVenues.length} / {template.venues.length} 家
+          </span>
+        </div>
+      </Card>
+
       {/* 店家矩陣 */}
-      {template.venues.map(v => {
+      {visibleVenues.length === 0 ? (
+        <Card style={{ padding: 24, textAlign: 'center', color: '#6a655c', fontSize: 13 }}>
+          沒有符合條件的店家 — 請調整搜尋或篩選
+        </Card>
+      ) : visibleVenues.map(v => {
         const s = venueState[v.id] || {}
+        const isCollapsed = !!collapsed[v.id]
         return (
           <VenueMatrixCard
             key={v.id} venue={v} state={s}
             ambassadors={ambassadors}
             vtotal={venueTotal(v.id)} vqty={venueQty(v.id)}
+            isCollapsed={isCollapsed}
+            onToggleCollapse={() => toggleCollapse(v.id)}
             onToggleHasSales={(has) => updateVenue(v.id, { hasSales: has })}
-            onChangeAmb={(id) => updateVenue(v.id, { ambassadorId: id })}
+            onChangeAmb={(id, displayName) => updateVenue(v.id, { ambassadorId: id, ambassadorRawName: displayName })}
             onChangeQty={(key, val) => updateQty(v.id, key, val)}
             onChangePreShift={(val) => updateVenue(v.id, { preShiftAmount: val })}
             onChangePreShiftNote={(val) => updateVenue(v.id, { preShiftNote: val })}
@@ -338,7 +356,6 @@ export default function VenueSalesMatrix() {
         </div>
       </Card>
 
-      {/* Errors */}
       {errors.length > 0 && (
         <Card style={{ marginBottom: 12, borderColor: 'rgba(248,113,113,0.35)', background: 'rgba(248,113,113,0.06)' }}>
           <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
@@ -351,10 +368,10 @@ export default function VenueSalesMatrix() {
         </Card>
       )}
 
-      {/* 留底部空間給 sticky summary */}
+      {/* 留底部空間給 sticky */}
       <div style={{ height: 100 }} />
 
-      {/* Sticky summary bar */}
+      {/* Sticky summary */}
       <div style={{
         position: 'fixed', left: 0, right: 0, bottom: 0,
         background: 'linear-gradient(180deg, rgba(10,10,10,0.6) 0%, rgba(10,10,10,0.95) 40%)',
@@ -364,8 +381,9 @@ export default function VenueSalesMatrix() {
         <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <Summary label="今日總額" value={`NT$ ${totalSalesAmount.toLocaleString()}`} big color="#c9a84c" />
           <Summary label="總支數" value={`${totalQty} 支`} />
-          <Summary label="有銷售" value={`${venuesWithSalesCount} 家`} color="#10b981" />
-          <Summary label="未填" value={`${venuesEmptyCount} 家`} color={venuesEmptyCount > 0 ? '#f59e0b' : '#6a655c'} />
+          <Summary label="有銷售" value={`${activeVenues.length} 家`} color="#10b981" />
+          <Summary label="無銷售" value={`${noSalesVenues.length} 家`} color="#6b7280" />
+          <Summary label="未填" value={`${blankVenues} 家`} color={blankVenues > 0 ? '#f59e0b' : '#6a655c'} />
           <Summary label="狀態" value={PAYMENT_STATUSES[paymentStatus]} />
           <button onClick={handleTrySubmit} disabled={submitting}
             style={{
@@ -381,7 +399,7 @@ export default function VenueSalesMatrix() {
 
       {confirming && (
         <ConfirmModal
-          payload={buildPayload()}
+          payload={buildCurrentPayload()}
           onCancel={() => setConfirming(false)}
           onConfirm={doSubmit}
           submitting={submitting}
@@ -394,127 +412,148 @@ export default function VenueSalesMatrix() {
 // =============== VenueMatrixCard ===============
 
 function VenueMatrixCard({
-  venue, state, ambassadors,
-  vtotal, vqty,
+  venue, state, ambassadors, vtotal, vqty,
+  isCollapsed, onToggleCollapse,
   onToggleHasSales, onChangeAmb, onChangeQty,
   onChangePreShift, onChangePreShiftNote, onChangeNote,
 }) {
   const hasSales = state.hasSales !== false
+
   return (
-    <Card style={{ marginBottom: 12, borderLeft: `3px solid ${hasSales ? '#c9a84c' : '#3a332a'}` }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Store size={18} color={hasSales ? '#c9a84c' : '#5a554e'} />
-          <span style={{ fontSize: 16, color: '#e8e0d0', fontWeight: 600 }}>{venue.name}</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <RadioTile size="sm" active={hasSales} onClick={() => onToggleHasSales(true)} color="#10b981">有銷售</RadioTile>
-          <RadioTile size="sm" active={!hasSales} onClick={() => onToggleHasSales(false)} color="#6b7280"><Minus size={10} /> 今日無銷售</RadioTile>
-        </div>
+    <Card style={{ marginBottom: 10, borderLeft: `3px solid ${hasSales ? (vtotal > 0 ? '#c9a84c' : '#3a332a') : '#6b7280'}` }}>
+      {/* Header: 可點擊收合 */}
+      <div
+        onClick={onToggleCollapse}
+        style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', flexWrap: 'wrap', padding: '2px 0' }}>
+        <Store size={18} color={hasSales ? (vtotal > 0 ? '#c9a84c' : '#6a655c') : '#5a554e'} />
+        <span style={{ fontSize: 16, color: '#e8e0d0', fontWeight: 600 }}>{venue.name}</span>
+        {venue.note && <span style={{ fontSize: 10, color: '#8a8278' }}>· {venue.note}</span>}
+        {venue.settlement_hint && <span style={{ fontSize: 10, color: '#fbbf24', background: 'rgba(251,191,36,0.1)', padding: '1px 6px', borderRadius: 4 }}>{venue.settlement_hint}</span>}
+        {vtotal > 0 && (
+          <span style={{ marginLeft: 'auto', fontSize: 14, color: '#c9a84c', fontWeight: 600 }}>
+            NT$ {vtotal.toLocaleString()} <span style={{ fontSize: 11, color: '#8a8278', marginLeft: 4 }}>· {vqty} 支</span>
+          </span>
+        )}
+        {!hasSales && <span style={{ marginLeft: 'auto', fontSize: 11, color: '#6a655c' }}>今日無銷售</span>}
+        <span style={{ color: '#8a8278', marginLeft: vtotal > 0 || !hasSales ? 8 : 'auto' }}>
+          {isCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+        </span>
       </div>
 
-      {hasSales ? (
-        <>
-          <div style={{ marginBottom: 10 }}>
-            <Field label="大使 *">
-              <select value={state.ambassadorId || ''} onChange={e => onChangeAmb(e.target.value)} style={input()}>
-                <option value="">— 請選擇 —</option>
-                {ambassadors.map(a => <option key={a.id} value={a.id}>{a.name} ({a.ambassador_code})</option>)}
-              </select>
-            </Field>
+      {!isCollapsed && (
+        <div style={{ marginTop: 10 }}>
+          {/* 有/無銷售 toggle */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+            <RadioTile size="sm" active={hasSales} onClick={() => onToggleHasSales(true)} color="#10b981">有銷售</RadioTile>
+            <RadioTile size="sm" active={!hasSales} onClick={() => onToggleHasSales(false)} color="#6b7280"><Minus size={10} /> 今日無銷售</RadioTile>
           </div>
 
-          {/* 商品矩陣 */}
-          <div style={{ overflowX: 'auto', marginBottom: 10 }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: 600 }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid rgba(201,168,76,0.2)' }}>
-                  <th style={cellHead()}>商品</th>
-                  {venue.products.map(p => (
-                    <th key={p.key} style={cellHead(true)}>
-                      <div style={{ color: '#e8e0d0', fontWeight: 500 }}>{p.name}</div>
-                      <div style={{ color: '#c9a84c', fontSize: 10, marginTop: 2 }}>
-                        {p.price === null ? '手填金額' : `NT$ ${p.price.toLocaleString()}`}
-                      </div>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td style={cellLabel()}>數量</td>
-                  {venue.products.map(p => {
-                    if (p.price === null) {
-                      return (
-                        <td key={p.key} style={cellBody()}>
-                          <input type="number" min="0" value={state.preShiftAmount || ''}
-                            onChange={e => onChangePreShift(e.target.value)}
-                            placeholder="金額"
-                            style={numInput()}
-                          />
-                        </td>
-                      )
-                    }
-                    const qty = state.quantities?.[p.key] ?? 0
-                    return (
-                      <td key={p.key} style={cellBody()}>
-                        <input type="number" min="0" value={qty || ''}
-                          onChange={e => onChangeQty(p.key, e.target.value)}
-                          style={numInput()}
-                        />
-                      </td>
-                    )
-                  })}
-                </tr>
-                <tr>
-                  <td style={cellLabel('#8a8278')}>小計</td>
-                  {venue.products.map(p => {
-                    const subtotal = p.price === null
-                      ? Number(state.preShiftAmount || 0)
-                      : (Number(state.quantities?.[p.key]) || 0) * p.price
-                    return (
-                      <td key={p.key} style={{ ...cellBody(), color: subtotal > 0 ? '#c9a84c' : '#5a554e', fontSize: 12 }}>
-                        NT$ {subtotal.toLocaleString()}
-                      </td>
-                    )
-                  })}
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          {hasSales ? (
+            <>
+              {/* 大使 */}
+              <Field label="大使 *">
+                <select value={state.ambassadorId || ''}
+                  onChange={e => {
+                    const amb = ambassadors.find(a => a.id === e.target.value)
+                    onChangeAmb(e.target.value, amb?.displayName || '')
+                  }}
+                  style={input()}>
+                  <option value="">— 請選擇 —</option>
+                  {ambassadors.map(a => <option key={a.id} value={a.id}>{a.displayName}</option>)}
+                </select>
+              </Field>
 
-          {/* 上班前店家銷售備註 */}
-          {Number(state.preShiftAmount || 0) > 0 && (
-            <Field label="上班前銷售備註（選填）" style={{ marginTop: 8 }}>
-              <input value={state.preShiftNote || ''} onChange={e => onChangePreShiftNote(e.target.value)}
-                placeholder="例：店家原本已銷售、交接前銷售、訂桌..."
-                style={input()} />
-            </Field>
+              {/* 商品矩陣 */}
+              {venue.products.length > 0 && (
+                <div style={{ overflowX: 'auto', margin: '10px 0' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: 600 }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid rgba(201,168,76,0.2)' }}>
+                        <th style={cellHead()}>商品</th>
+                        {venue.products.map(p => (
+                          <th key={p.key} style={cellHead(true)}>
+                            <div style={{ color: '#e8e0d0', fontWeight: 500 }}>{p.name}</div>
+                            <div style={{ color: '#c9a84c', fontSize: 10, marginTop: 2 }}>NT$ {p.price.toLocaleString()}</div>
+                            {p.note && <div style={{ color: '#8a8278', fontSize: 9, marginTop: 2 }}>{p.note}</div>}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td style={cellLabel()}>數量</td>
+                        {venue.products.map(p => {
+                          const qty = state.quantities?.[p.key] ?? 0
+                          return (
+                            <td key={p.key} style={cellBody()}>
+                              <input type="number" min="0" value={qty || ''}
+                                onChange={e => onChangeQty(p.key, e.target.value)}
+                                style={numInput()}
+                              />
+                            </td>
+                          )
+                        })}
+                      </tr>
+                      <tr>
+                        <td style={cellLabel('#8a8278')}>小計</td>
+                        {venue.products.map(p => {
+                          const subtotal = (Number(state.quantities?.[p.key]) || 0) * p.price
+                          return (
+                            <td key={p.key} style={{ ...cellBody(), color: subtotal > 0 ? '#c9a84c' : '#5a554e', fontSize: 12 }}>
+                              NT$ {subtotal.toLocaleString()}
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* 上班前店家銷售（統一獨立區塊） */}
+              <div style={{
+                marginTop: 10, padding: 10,
+                background: 'rgba(59,130,246,0.04)',
+                border: '1px dashed rgba(59,130,246,0.3)', borderRadius: 6,
+              }}>
+                <div style={{ fontSize: 10, color: '#8a8278', marginBottom: 6, letterSpacing: 1 }}>上班前店家銷售（選填）</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: 8 }}>
+                  <input type="number" min="0" value={state.preShiftAmount || ''}
+                    onChange={e => onChangePreShift(e.target.value)}
+                    placeholder="金額 NT$"
+                    style={input()}
+                  />
+                  <input value={state.preShiftNote || ''} onChange={e => onChangePreShiftNote(e.target.value)}
+                    placeholder="備註（例：店家原有銷售、交接前...）"
+                    style={input()} />
+                </div>
+              </div>
+
+              {/* 店家備註 */}
+              <Field label="店家備註（選填）" style={{ marginTop: 10 }}>
+                <input value={state.note || ''} onChange={e => onChangeNote(e.target.value)} style={input()} />
+              </Field>
+
+              {/* 店家合計 */}
+              <div style={{
+                marginTop: 10, padding: '8px 12px',
+                background: 'rgba(201,168,76,0.06)',
+                border: '1px solid rgba(201,168,76,0.2)', borderRadius: 6,
+                display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+              }}>
+                <span style={{ fontSize: 11, color: '#8a8278' }}>店家合計 · {vqty} 支（不含上班前）</span>
+                <span style={{ fontSize: 16, color: '#c9a84c', fontWeight: 700 }}>NT$ {vtotal.toLocaleString()}</span>
+              </div>
+            </>
+          ) : (
+            <div style={{ padding: 16, textAlign: 'center', color: '#6a655c', fontSize: 13, background: 'rgba(255,255,255,0.02)', borderRadius: 6 }}>
+              今日無銷售（不計入總額）
+              <Field label="備註（選填）" style={{ marginTop: 10, maxWidth: 400, marginLeft: 'auto', marginRight: 'auto', textAlign: 'left' }}>
+                <input value={state.note || ''} onChange={e => onChangeNote(e.target.value)} placeholder="例：店家休息 / 大使請假"
+                  style={input()} />
+              </Field>
+            </div>
           )}
-
-          {/* 店家備註 */}
-          <Field label="店家備註（選填）" style={{ marginTop: 8 }}>
-            <input value={state.note || ''} onChange={e => onChangeNote(e.target.value)} style={input()} />
-          </Field>
-
-          {/* 店家合計 */}
-          <div style={{
-            marginTop: 10, padding: '8px 12px',
-            background: 'rgba(201,168,76,0.06)',
-            border: '1px solid rgba(201,168,76,0.2)', borderRadius: 6,
-            display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
-          }}>
-            <span style={{ fontSize: 11, color: '#8a8278' }}>店家合計 · {vqty} 支</span>
-            <span style={{ fontSize: 16, color: '#c9a84c', fontWeight: 700 }}>NT$ {vtotal.toLocaleString()}</span>
-          </div>
-        </>
-      ) : (
-        <div style={{ padding: 16, textAlign: 'center', color: '#6a655c', fontSize: 13, background: 'rgba(255,255,255,0.02)', borderRadius: 6 }}>
-          今日無銷售（數量將不計入）
-          <Field label="備註（選填）" style={{ marginTop: 10, maxWidth: 400, marginLeft: 'auto', marginRight: 'auto', textAlign: 'left' }}>
-            <input value={state.note || ''} onChange={e => onChangeNote(e.target.value)} placeholder="例：店家休息 / 大使請假"
-              style={input()} />
-          </Field>
         </div>
       )}
     </Card>
@@ -529,20 +568,30 @@ function ConfirmModal({ payload, onCancel, onConfirm, submitting }) {
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
       <div style={{ background: '#111', border: '1px solid #c9a84c44', borderRadius: 12, maxWidth: 600, width: '100%', maxHeight: '90vh', overflow: 'auto', padding: 20 }}>
         <div style={{ fontSize: 11, color: '#c9a84c', letterSpacing: 3, marginBottom: 4 }}>確認送出</div>
-        <h2 style={{ fontSize: 18, color: '#e8e0d0', margin: 0, marginBottom: 14 }}>{payload.sale_date} · {REGIONS[payload.region]}</h2>
+        <h2 style={{ fontSize: 18, color: '#e8e0d0', margin: 0, marginBottom: 14 }}>
+          {payload.sale_date} · {REGIONS[payload.region]} · 模板 v{payload.template_version}
+        </h2>
 
         {withSales.map(v => (
           <div key={v.venue_id} style={{ marginBottom: 14, paddingBottom: 10, borderBottom: '1px solid #2a2520' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
               <span style={{ color: '#e8e0d0', fontWeight: 500 }}>{v.venue_name}</span>
-              <span style={{ color: '#8a8278', fontSize: 11 }}>{v.ambassador_name || '—'}</span>
+              <span style={{ color: '#8a8278', fontSize: 11 }}>
+                {v.ambassador_name || '—'}{v.performance_note ? ` · ${v.performance_note}` : ''}
+              </span>
             </div>
-            {v.items.map((it, i) => (
+            {v.products.map((it, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', fontSize: 11, color: '#8a8278' }}>
                 <span>{it.product_name} × {it.quantity}</span>
                 <span style={{ color: '#e8e0d0' }}>NT$ {it.subtotal.toLocaleString()}</span>
               </div>
             ))}
+            {v.pre_shift_sales && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', fontSize: 11, color: '#93c5fd' }}>
+                <span>上班前店家銷售{v.pre_shift_sales.note ? `（${v.pre_shift_sales.note}）` : ''}</span>
+                <span>NT$ {v.pre_shift_sales.amount.toLocaleString()}</span>
+              </div>
+            )}
             <div style={{ marginTop: 4, display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
               <span style={{ color: '#8a8278' }}>店家合計</span>
               <span style={{ color: '#c9a84c', fontWeight: 600 }}>NT$ {v.venue_total.toLocaleString()}</span>
@@ -556,7 +605,7 @@ function ConfirmModal({ payload, onCancel, onConfirm, submitting }) {
             <span style={{ color: '#c9a84c', fontSize: 18, fontWeight: 700 }}>NT$ {payload.total_sales_amount.toLocaleString()}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 11, color: '#8a8278' }}>
-            <span>共 {withSales.length} 家 · {payload.total_quantity} 支</span>
+            <span>{payload.active_venue_count} 家有銷售 · {payload.no_sales_venue_count} 家無銷售 · {payload.blank_venue_count} 家未填 · 共 {payload.total_quantity} 支</span>
             <span>狀態：{PAYMENT_STATUSES[payload.payment.payment_status]}</span>
           </div>
         </div>
@@ -582,7 +631,7 @@ function ConfirmModal({ payload, onCancel, onConfirm, submitting }) {
   )
 }
 
-// =============== 共用小組件與 styles ===============
+// =============== 共用小組件 ===============
 
 function SectionTitle({ children }) {
   return <div style={{ fontSize: 11, color: '#8a8278', letterSpacing: 2, marginBottom: 10 }}>{children}</div>
