@@ -96,24 +96,17 @@ export default function JoinPage() {
     }).select('id').single()
     if(error){ setLoading(false); setErrMsg('提交失敗：'+error.message); return }
 
-    // 4. 後台審核頁可見：同步寫入 member_registrations 為 approved
-    await supabase.from('member_registrations').insert({
-      store_id:STORE_ID, name:form.name.trim(), phone:form.phone.trim(),
-      birthday:form.birthday||null, gender:form.gender||null,
-      email:form.email.trim()||null, preferred_cigar:form.preferred_cigar||null,
-      marketing_consent:form.marketing_consent, source:form.customer_source,
-      status:'approved', customer_id:newCust?.id||null,
-      approved_at:new Date().toISOString(),
-    })
-
-    // 5. 推薦碼裂變紀錄
+    // 4. 推薦碼裂變紀錄 + 計數
     if(form.referral_code && refValid){
       const {data:referrer} = await supabase.from('customers')
         .select('id,name').eq('referral_code',form.referral_code).maybeSingle()
-      if(referrer) await supabase.from('referral_records').insert({
-        referrer_id:referrer.id, referrer_name:referrer.name, referrer_code:form.referral_code,
-        referee_name:form.name.trim(), referee_phone:form.phone.trim(), store_id:STORE_ID,
-      })
+      if(referrer){
+        await supabase.from('referral_records').insert({
+          referrer_id:referrer.id, referrer_name:referrer.name, referrer_code:form.referral_code,
+          referee_name:form.name.trim(), referee_phone:form.phone.trim(), store_id:STORE_ID,
+        })
+        await supabase.rpc('increment_referral', { ref_code: form.referral_code }).catch(()=>{})
+      }
     }
 
     setMyCode(code)
@@ -142,10 +135,14 @@ export default function JoinPage() {
     window.open('https://line.me/R/share?text='+encodeURIComponent(txt),'_blank')
   }
   async function shareIG(){
-    await copyLink()
-    setCopyMsg('✅ 連結已複製，請打開 IG 貼到限時動態')
+    const link = shareLink()
+    try { await navigator.clipboard.writeText(link) } catch {
+      const ta = document.createElement('textarea'); ta.value = link; document.body.appendChild(ta); ta.select()
+      try{ document.execCommand('copy') }catch{}; document.body.removeChild(ta)
+    }
+    setCopyMsg('✅ 連結已複製，貼到限動即可分享')
     setTimeout(()=>setCopyMsg(''),3500)
-    window.open('https://www.instagram.com/','_blank')
+    window.location.href = 'instagram://story-camera'
   }
 
   const S = {
@@ -205,17 +202,14 @@ export default function JoinPage() {
         </div>
 
         {/* Google 五星好評 */}
-        <div style={{marginTop:20,background:'linear-gradient(135deg,#1a1410 0%,#251a10 100%)',border:'1px solid rgba(255,215,0,.3)',borderRadius:14,padding:18}}>
-          <div style={{color:'#ffd700',fontSize:14,fontWeight:700,marginBottom:6}}>⭐⭐⭐⭐⭐ 給我們五星好評</div>
-          <div style={{color:'#c8b88a',fontSize:12,lineHeight:1.7,marginBottom:12}}>
-            完成 Google 五星好評即可獲得 <b style={{color:'#ffd700'}}>雪茄單人煙灰缸 一只</b>
-            <br/><span style={{color:'#888',fontSize:11}}>⚠️ 評價完成後請出示畫面給店員領取</span>
-          </div>
-          <button onClick={()=>window.open(GOOGLE_REVIEW_URL,'_blank')}
-            style={{...S.btnSub,background:'#ffd700',color:'#1a1410',border:'none',marginTop:0}}>
-            ⭐ 前往 Google 評論
-          </button>
-        </div>
+        <a href={GOOGLE_REVIEW_URL} target="_blank" rel="noopener noreferrer"
+          style={{display:'block',marginTop:20,background:'linear-gradient(135deg,#1a1410 0%,#251a10 100%)',border:'1px solid rgba(255,215,0,.3)',borderRadius:14,padding:20,textDecoration:'none',textAlign:'center'}}>
+          <div style={{fontSize:28,marginBottom:8}}>⭐⭐⭐⭐⭐</div>
+          <div style={{color:'#34a853',fontSize:16,fontWeight:800,marginBottom:6}}>打卡五星好評</div>
+          <div style={{color:'#ffd700',fontSize:14,fontWeight:700,marginBottom:14}}>🎁 即送雪茄單人煙灰缸一只！</div>
+          <div style={{display:'inline-block',padding:'12px 28px',borderRadius:10,background:'#34a853',color:'#fff',fontSize:15,fontWeight:700}}>📍 立即前往評價</div>
+          <div style={{color:'#e68a00',fontSize:12,marginTop:12,lineHeight:1.6}}>📱 評價完成後，請出示畫面給店員即可領取！</div>
+        </a>
 
         {/* 會員等級 */}
         <div style={{marginTop:20,background:'#111',borderRadius:12,padding:16}}>
