@@ -111,7 +111,9 @@ export const REGIONS = {
 const TAIPEI_VENUE_TEMPLATE = [
   { id: 'westin',           name: '威士登',      region: 'taipei',
     products: [
-      { key: 'capadura',          name: 'capadura',         price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_888_898',  name: 'Capadura 888/898 Robusto', price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_toro',     name: 'Capadura TORO',    price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_torpedo',  name: 'Capadura Torpedo', price: 1000, category: 'non_cuban_cigar' },
       { key: 'romeo',             name: '羅密歐',            price: 1500, category: 'cuban_cigar' },
       { key: 'mixed_2000',        name: '三T/D4/蒙特/寬丘',  price: 2000, category: 'cuban_cigar' },
       { key: 'robusto',           name: '羅布圖',            price: 2500, category: 'cuban_cigar' },
@@ -120,7 +122,9 @@ const TAIPEI_VENUE_TEMPLATE = [
   },
   { id: 'royal',            name: '皇家',        region: 'taipei',
     products: [
-      { key: 'capadura',          name: 'capadura',         price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_888_898',  name: 'Capadura 888/898 Robusto', price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_toro',     name: 'Capadura TORO',    price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_torpedo',  name: 'Capadura Torpedo', price: 1000, category: 'non_cuban_cigar' },
       { key: 'romeo',             name: '羅密歐',            price: 1500, category: 'cuban_cigar' },
       { key: 'mixed_2000',        name: '三T/D4/蒙特/寬丘',  price: 2000, category: 'cuban_cigar' },
       { key: 'robusto',           name: '羅布圖',            price: 2500, category: 'cuban_cigar' },
@@ -129,7 +133,9 @@ const TAIPEI_VENUE_TEMPLATE = [
   },
   { id: 'hongxin',          name: '鴻欣',        region: 'taipei',
     products: [
-      { key: 'capadura',          name: 'capadura',         price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_888_898',  name: 'Capadura 888/898 Robusto', price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_toro',     name: 'Capadura TORO',    price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_torpedo',  name: 'Capadura Torpedo', price: 1000, category: 'non_cuban_cigar' },
       { key: 'romeo',             name: '羅密歐',            price: 1500, category: 'cuban_cigar' },
       { key: 'mixed_2000',        name: '三T/D4/蒙特/寬丘',  price: 2000, category: 'cuban_cigar' },
       { key: 'robusto',           name: '羅布圖',            price: 2500, category: 'cuban_cigar' },
@@ -138,7 +144,9 @@ const TAIPEI_VENUE_TEMPLATE = [
   },
   { id: 'focus',            name: 'Focus',       region: 'taipei', note: 'Excel 原表有標示無古巴雪茄',
     products: [
-      { key: 'capadura',          name: 'capadura',         price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_888_898',  name: 'Capadura 888/898 Robusto', price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_toro',     name: 'Capadura TORO',    price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_torpedo',  name: 'Capadura Torpedo', price: 1000, category: 'non_cuban_cigar' },
       { key: 'romeo',             name: '羅密歐',            price: 1500, category: 'cuban_cigar' },
       { key: 'mixed_2000',        name: '三T/D4/蒙特/寬丘',  price: 2000, category: 'cuban_cigar' },
       { key: 'robusto',           name: '羅布圖',            price: 2500, category: 'cuban_cigar' },
@@ -147,7 +155,9 @@ const TAIPEI_VENUE_TEMPLATE = [
   },
   { id: 'haosheng',         name: '豪昇',        region: 'taipei',
     products: [
-      { key: 'capadura',          name: 'capadura',         price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_888_898',  name: 'Capadura 888/898 Robusto', price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_toro',     name: 'Capadura TORO',    price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_torpedo',  name: 'Capadura Torpedo', price: 1000, category: 'non_cuban_cigar' },
       { key: 'romeo',             name: '羅密歐',            price: 1500, category: 'cuban_cigar' },
       { key: 'mixed_2000',        name: '三T/D4/蒙特/寬丘',  price: 2000, category: 'cuban_cigar' },
       { key: 'robusto',           name: '羅布圖',            price: 2500, category: 'cuban_cigar' },
@@ -156,7 +166,9 @@ const TAIPEI_VENUE_TEMPLATE = [
   },
   { id: 'weijing',          name: '威晶',        region: 'taipei',
     products: [
-      { key: 'capadura',          name: 'capadura',         price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_888_898',  name: 'Capadura 888/898 Robusto', price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_toro',     name: 'Capadura TORO',    price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_torpedo',  name: 'Capadura Torpedo', price: 1000, category: 'non_cuban_cigar' },
       { key: 'romeo',             name: '羅密歐',            price: 1500, category: 'cuban_cigar' },
       { key: 'mixed_2000',        name: '三T/D4/蒙特/寬丘',  price: 2000, category: 'cuban_cigar' },
       { key: 'robusto',           name: '羅布圖',            price: 2500, category: 'cuban_cigar' },
@@ -165,7 +177,9 @@ const TAIPEI_VENUE_TEMPLATE = [
   },
   { id: 'haowei',           name: '豪威',        region: 'taipei',
     products: [
-      { key: 'capadura',          name: 'capadura',         price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_888_898',  name: 'Capadura 888/898 Robusto', price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_toro',     name: 'Capadura TORO',    price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_torpedo',  name: 'Capadura Torpedo', price: 1000, category: 'non_cuban_cigar' },
       { key: 'romeo',             name: '羅密歐',            price: 1500, category: 'cuban_cigar' },
       { key: 'mixed_2000',        name: '三T/D4/蒙特/寬丘',  price: 2000, category: 'cuban_cigar' },
       { key: 'robusto',           name: '羅布圖',            price: 2500, category: 'cuban_cigar' },
@@ -174,7 +188,9 @@ const TAIPEI_VENUE_TEMPLATE = [
   },
   { id: 'ziteng',           name: '紫藤',        region: 'taipei',
     products: [
-      { key: 'capadura',          name: 'capadura',         price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_888_898',  name: 'Capadura 888/898 Robusto', price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_toro',     name: 'Capadura TORO',    price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_torpedo',  name: 'Capadura Torpedo', price: 1000, category: 'non_cuban_cigar' },
       { key: 'romeo',             name: '羅密歐',            price: 1500, category: 'cuban_cigar' },
       { key: 'mixed_2000',        name: '三T/D4/蒙特/寬丘',  price: 2000, category: 'cuban_cigar' },
       { key: 'robusto',           name: '羅布圖',            price: 2500, category: 'cuban_cigar' },
@@ -255,7 +271,9 @@ const TAIPEI_VENUE_TEMPLATE = [
   },
   { id: 'xin_hao_marriott', name: '新濠(萬豪)',  region: 'taipei',
     products: [
-      { key: 'capadura',          name: 'capadura',         price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_888_898',  name: 'Capadura 888/898 Robusto', price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_toro',     name: 'Capadura TORO',    price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_torpedo',  name: 'Capadura Torpedo', price: 1000, category: 'non_cuban_cigar' },
       { key: 'romeo',             name: '羅密歐',            price: 1500, category: 'cuban_cigar' },
       { key: 'mixed_2000',        name: '三T/D4/蒙特/寬丘',  price: 2000, category: 'cuban_cigar' },
       { key: 'robusto',           name: '羅布圖',            price: 2500, category: 'cuban_cigar' },
@@ -264,7 +282,9 @@ const TAIPEI_VENUE_TEMPLATE = [
   },
   { id: 'nanmo_502',        name: '502男模',     region: 'taipei',
     products: [
-      { key: 'capadura',          name: 'capadura',         price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_888_898',  name: 'Capadura 888/898 Robusto', price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_toro',     name: 'Capadura TORO',    price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_torpedo',  name: 'Capadura Torpedo', price: 1000, category: 'non_cuban_cigar' },
       { key: 'romeo',             name: '羅密歐',            price: 1500, category: 'cuban_cigar' },
       { key: 'mixed_2000',        name: '三T/D4/蒙特/寬丘',  price: 2000, category: 'cuban_cigar' },
       { key: 'robusto',           name: '羅布圖',            price: 2500, category: 'cuban_cigar' },
@@ -273,7 +293,9 @@ const TAIPEI_VENUE_TEMPLATE = [
   },
   { id: 'longsheng',        name: '龍昇',        region: 'taipei',
     products: [
-      { key: 'capadura',          name: 'capadura',         price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_888_898',  name: 'Capadura 888/898 Robusto', price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_toro',     name: 'Capadura TORO',    price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_torpedo',  name: 'Capadura Torpedo', price: 1000, category: 'non_cuban_cigar' },
       { key: 'romeo',             name: '羅密歐',            price: 1500, category: 'cuban_cigar' },
       { key: 'mixed_2000',        name: '三T/D4/蒙特/寬丘',  price: 2000, category: 'cuban_cigar' },
       { key: 'robusto',           name: '羅布圖',            price: 2500, category: 'cuban_cigar' },
@@ -316,7 +338,9 @@ const TAIPEI_VENUE_TEMPLATE = [
 const TAICHUNG_VENUE_TEMPLATE = [
   { id: 'zijue',    name: '紫爵',    region: 'taichung',
     products: [
-      { key: 'capadura',       name: 'capadura',       price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_888_898',  name: 'Capadura 888/898 Robusto', price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_toro',     name: 'Capadura TORO',    price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_torpedo',  name: 'Capadura Torpedo', price: 1000, category: 'non_cuban_cigar' },
       { key: 'mixed_2000',     name: '3T/蒙特 D4',      price: 2000, category: 'cuban_cigar' },
       { key: 'robusto',        name: '羅布圖',          price: 3000, category: 'cuban_cigar' },
       { key: 'robusto_siglo6', name: '羅布圖/六號鋁管', price: 3000, category: 'cuban_cigar' },
@@ -324,7 +348,9 @@ const TAICHUNG_VENUE_TEMPLATE = [
   },
   { id: 'jinlidu',  name: '金麗都',  region: 'taichung',
     products: [
-      { key: 'capadura',       name: 'capadura',       price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_888_898',  name: 'Capadura 888/898 Robusto', price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_toro',     name: 'Capadura TORO',    price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_torpedo',  name: 'Capadura Torpedo', price: 1000, category: 'non_cuban_cigar' },
       { key: 'romeo',          name: '羅密歐',          price: 1500, category: 'cuban_cigar' },
       { key: 'mixed_2000',     name: '3T/蒙特 D4',      price: 2000, category: 'cuban_cigar' },
       { key: 'siglo6_robusto', name: '六號鋁管/羅布圖', price: 2500, category: 'cuban_cigar' },
@@ -340,7 +366,9 @@ const TAICHUNG_VENUE_TEMPLATE = [
   },
   { id: 'shenhua',  name: '神話',    region: 'taichung',
     products: [
-      { key: 'capadura',       name: 'capadura',       price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_888_898',  name: 'Capadura 888/898 Robusto', price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_toro',     name: 'Capadura TORO',    price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_torpedo',  name: 'Capadura Torpedo', price: 1000, category: 'non_cuban_cigar' },
       { key: 'romeo',          name: '羅密歐',          price: 1600, category: 'cuban_cigar' },
       { key: 'mixed_2200',     name: '3T/蒙特 D4',      price: 2200, category: 'cuban_cigar' },
       { key: 'siglo6_tube',    name: '六號鋁管',        price: 3000, category: 'cuban_cigar' },
