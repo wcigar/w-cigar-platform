@@ -36,6 +36,7 @@ import CRMDashboard from './pages/crm/CRMDashboard'
 // ========== feat/ambassador-supply-chain ==========
 import AdminVenueSales from './pages/admin/VenueSales'
 import AdminVenueSalesNew from './pages/admin/VenueSalesNew'
+import AdminVenues from './pages/admin/Venues'
 import AdminReplenishment from './pages/admin/Replenishment'
 import AdminReplenishmentDetail from './pages/admin/ReplenishmentDetail'
 import AdminSupplyRequests from './pages/admin/SupplyRequests'
@@ -141,6 +142,7 @@ function AppInner() {
         {/* HQ / Staff 後台（boss + staff 都可進；供應鏈業務） */}
         <Route path="/admin/venue-sales" element={<AdminGuard scope="admin"><AdminVenueSales /></AdminGuard>} />
         <Route path="/admin/venue-sales/new" element={<AdminGuard scope="admin"><AdminVenueSalesNew /></AdminGuard>} />
+        <Route path="/admin/venues" element={<AdminGuard scope="admin"><AdminVenues /></AdminGuard>} />
         <Route path="/admin/replenishment" element={<AdminGuard scope="admin"><AdminReplenishment /></AdminGuard>} />
         <Route path="/admin/replenishment/:id" element={<AdminGuard scope="admin"><AdminReplenishmentDetail /></AdminGuard>} />
         <Route path="/admin/supply-requests" element={<AdminGuard scope="admin"><AdminSupplyRequests /></AdminGuard>} />

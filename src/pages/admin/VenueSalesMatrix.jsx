@@ -450,17 +450,14 @@ function VenueMatrixCard({
 
           {hasSales ? (
             <>
-              {/* 大使 */}
+              {/* 大使（按店家綁定過濾；點「顯示全部」可 admin override） */}
               <Field label="大使 *">
-                <select value={state.ambassadorId || ''}
-                  onChange={e => {
-                    const amb = ambassadors.find(a => a.id === e.target.value)
-                    onChangeAmb(e.target.value, amb?.displayName || '')
-                  }}
-                  style={input()}>
-                  <option value="">— 請選擇 —</option>
-                  {ambassadors.map(a => <option key={a.id} value={a.id}>{a.displayName}</option>)}
-                </select>
+                <VenueAmbassadorPicker
+                  venue={venue}
+                  ambassadors={ambassadors}
+                  selectedId={state.ambassadorId || ''}
+                  onChange={onChangeAmb}
+                />
               </Field>
 
               {/* 商品矩陣 */}
@@ -700,4 +697,59 @@ function cellLabel(color = '#c9a84c') {
 }
 function cellBody() {
   return { padding: '8px 6px', textAlign: 'center' }
+}
+
+
+// =============== VenueAmbassadorPicker ===============
+// 依 venue.assigned_ambassador_codes 過濾大使下拉。
+//   - 已綁定（codes 非空）→ 只列綁定的；右側「全部」按鈕可 admin override
+//   - 未綁定（codes 為空）→ 顯示全部 + 黃色提示「此店尚未綁定大使，請至『店家管理』設定」
+function VenueAmbassadorPicker({ venue, ambassadors, selectedId, onChange }) {
+  const [showAll, setShowAll] = useState(false)
+  const codes = (venue && venue.assigned_ambassador_codes) || []
+  const hasBinding = codes.length > 0
+  const list = (!hasBinding || showAll)
+    ? ambassadors
+    : ambassadors.filter(a => codes.includes(a.id))
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+        <select
+          value={selectedId}
+          onChange={e => {
+            const amb = ambassadors.find(a => a.id === e.target.value)
+            onChange(e.target.value, amb?.displayName || '')
+          }}
+          style={{ ...input(), flex: 1 }}>
+          <option value="">— 請選擇 —</option>
+          {list.map(a => <option key={a.id} value={a.id}>{a.displayName}</option>)}
+        </select>
+        {hasBinding && (
+          <button
+            type="button"
+            onClick={() => setShowAll(s => !s)}
+            title={showAll ? '只顯示綁定大使' : '顯示全部大使（admin override）'}
+            style={{
+              padding: '6px 10px', fontSize: 11, borderRadius: 6,
+              border: '1px solid ' + (showAll ? '#f59e0b' : '#2a2520'),
+              background: showAll ? 'rgba(245,158,11,0.15)' : 'transparent',
+              color: showAll ? '#f59e0b' : '#8a8278', cursor: 'pointer', whiteSpace: 'nowrap',
+            }}>
+            {showAll ? '全部 ✓' : '全部'}
+          </button>
+        )}
+      </div>
+      {!hasBinding && (
+        <div style={{ marginTop: 4, fontSize: 11, color: '#f59e0b', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <AlertTriangle size={11} /> 此店尚未綁定大使 — 請至「店家管理」設定，避免每天重複過濾全部 20 位
+        </div>
+      )}
+      {hasBinding && showAll && (
+        <div style={{ marginTop: 4, fontSize: 11, color: '#f59e0b' }}>
+          ⚠ 已展開全部大使（admin override）— 提交後系統會記錄此選擇
+        </div>
+      )}
+    </div>
+  )
 }

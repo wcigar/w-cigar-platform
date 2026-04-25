@@ -4,6 +4,7 @@
 // MVP 使用 mock，USE_MOCK=false 前需部署 hq_submit_venue_sales_matrix RPC
 import { supabase } from '../supabase'
 import { newIdempotencyKey } from './idempotency'
+import { listVenues, getAssignedAmbassadorCodes } from './venues'
 
 const USE_MOCK = true
 const TEMPLATE_VERSION = '2026-04'
@@ -491,19 +492,63 @@ const TAICHUNG_VENUE_TEMPLATE = [
 ]
 
 export async function getVenueSalesMatrixTemplate(region = 'taipei') {
-  const src = region === 'taichung' ? TAICHUNG_VENUE_TEMPLATE : TAIPEI_VENUE_TEMPLATE
+  const baseTpl = region === 'taichung' ? TAICHUNG_VENUE_TEMPLATE : TAIPEI_VENUE_TEMPLATE
+  // 取一次 admin 後台 venues（含 localStorage 覆寫的 active 狀態 + 大使綁定 + 自訂新增的店）
+  let adminVenues = []
+  try { adminVenues = await listVenues() } catch { adminVenues = [] }
+  const adminVenueMap = Object.fromEntries(adminVenues.map(v => [v.id, v]))
+
+  // 1) base template 過濾 inactive
+  const baseList = baseTpl
+    .filter(v => {
+      const av = adminVenueMap[v.id]
+      return !av || av.is_active !== false
+    })
+    .map(v => {
+      const av = adminVenueMap[v.id]
+      return {
+        ...v,
+        products: v.products.filter(p => p.price !== null && p.key !== 'pre_shift_venue_sales'),
+        supports_pre_shift: true,
+        assigned_ambassador_codes: av?.assigned_ambassador_codes || [],
+        is_admin_overridden: !!av?.is_overridden,
+      }
+    })
+
+  // 2) custom 新增的店（不在 base template）— 沒有 products，先 fallback 到一個通用商品列
+  const customList = adminVenues
+    .filter(v => v.source === 'custom' && v.region === region && v.is_active !== false)
+    .map(v => ({
+      id: v.id,
+      name: v.name,
+      region: v.region,
+      products: defaultProductsForCustomVenue(),
+      supports_pre_shift: true,
+      assigned_ambassador_codes: v.assigned_ambassador_codes || [],
+      is_admin_overridden: true,
+      is_custom: true,
+    }))
+
   return {
     region,
     region_name: REGIONS[region] || region,
     template_version: TEMPLATE_VERSION,
-    // 所有店家統一支援 pre_shift（台北未來可能需要）
-    venues: src.map(v => ({
-      ...v,
-      // 過濾掉 price=null 的 pre_shift entry（原在 Taichung template 裡）
-      products: v.products.filter(p => p.price !== null && p.key !== 'pre_shift_venue_sales'),
-      supports_pre_shift: true,
-    })),
+    venues: [...baseList, ...customList],
   }
+}
+
+// 新增的 custom 店家暫時用通用 fallback 商品列；之後可改成「複製其他店」或獨立設定。
+function defaultProductsForCustomVenue() {
+  return [
+    { key: 'capadura_888_robusto', name: 'Capadura 888 Robusto', price: 1000, category: 'non_cuban_cigar' },
+    { key: 'capadura_898_robusto', name: 'Capadura 898 Robusto', price: 1000, category: 'non_cuban_cigar' },
+    { key: 'capadura_888_toro',    name: 'Capadura 888 TORO',    price: 1000, category: 'non_cuban_cigar' },
+    { key: 'capadura_898_toro',    name: 'Capadura 898 TORO',    price: 1000, category: 'non_cuban_cigar' },
+    { key: 'romeo',                name: '羅密歐',               price: 1500, category: 'cuban_cigar' },
+    { key: 'monte_no2',             name: '蒙特二號',             price: 2000, category: 'cuban_cigar' },
+    { key: 'partagas_d4',           name: '帕特加斯D4號',         price: 2000, category: 'cuban_cigar' },
+    { key: 'trinidad_emerald',      name: '3T翡翠',               price: 2000, category: 'cuban_cigar' },
+  ]
 }
 
 // ============================================================
@@ -533,10 +578,24 @@ const AMBASSADOR_OPTIONS = [
   { id: 'angela',    displayName: 'Angela', aliases: ['Angela'] },
 ]
 
-export async function getVenueSalesAmbassadors(region) {
-  // MVP: 全部回傳（未來可依地區過濾：台北 vs 台中）
-  // region 已接收備用
+export async function getVenueSalesAmbassadors(region, venueId) {
+  // MVP: 預設全部回傳。
+  // 若有指定 venueId，且該 venue 在 admin 後台「店家管理」已綁定大使 → 只回傳綁定的。
+  // 若 venueId 無綁定（assigned_ambassador_codes 為空）→ 回傳全部 + warning flag = false（UI 自行判斷）。
   void region
+  const all = AMBASSADOR_OPTIONS.map(a => ({
+    id: a.id, displayName: a.displayName, aliases: a.aliases,
+  }))
+  if (!venueId) return all
+  const codes = getAssignedAmbassadorCodes(venueId)
+  if (!codes || codes.length === 0) return all
+  return all.filter(a => codes.includes(a.id))
+}
+
+/**
+ * 取得「不分店」全部大使（給後台 venues 編輯頁用作 multi-select 選項）
+ */
+export async function getAllAmbassadors() {
   return AMBASSADOR_OPTIONS.map(a => ({
     id: a.id, displayName: a.displayName, aliases: a.aliases,
   }))
