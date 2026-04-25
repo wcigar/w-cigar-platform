@@ -9,6 +9,7 @@ import { zhTW } from 'date-fns/locale'
 import AbnormalReport from '../../components/AbnormalReport'
 import { markNoticesRead } from '../../lib/noticeUtils'
 import { toTaipei } from '../../lib/timezone'
+import { StaffCigarReward } from '../../components/CigarRewardCard'
 
 export default function StaffHome() {
   const navigate = useNavigate()
@@ -348,6 +349,9 @@ export default function StaffHome() {
           </>
         )}
       </div>
+
+      {/* 每月雪茄獎勵 */}
+      <StaffCigarReward user={user} />
 
       <div className="card" style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
