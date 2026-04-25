@@ -187,9 +187,9 @@ function ClaimModal({ reward, user, month, onClose, onDone }) {
         <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="其他說明…" rows={2} style={{ ...is, resize: 'none', marginBottom: 12 }} />
         </div>
 
-        <div style={{ flexShrink: 0, padding: '12px 20px', borderTop: '1px solid var(--border)', display: 'flex', gap: 8 }} className="safe-bottom">
+        <div style={{ flexShrink: 0, padding: '12px 20px', paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 0px) + 60px)', borderTop: '1px solid var(--border)', display: 'flex', gap: 8 }}>
           <button onClick={onClose} style={{ flex: 1, padding: 12, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--black-card)', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 14 }}>取消</button>
-          <button onClick={submit} disabled={submitting} style={{ flex: 1, padding: 12, borderRadius: 10, border: 'none', background: 'var(--gold)', color: 'var(--black)', fontWeight: 700, cursor: 'pointer', fontSize: 14, opacity: submitting ? 0.5 : 1, paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
+          <button onClick={submit} disabled={submitting} style={{ flex: 1, padding: 12, borderRadius: 10, border: 'none', background: 'var(--gold)', color: 'var(--black)', fontWeight: 700, cursor: 'pointer', fontSize: 14, opacity: submitting ? 0.5 : 1 }}>
             {submitting ? '提交中…' : '✅ 確認領取'}
           </button>
         </div>
