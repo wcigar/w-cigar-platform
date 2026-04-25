@@ -80,7 +80,7 @@ export function StaffCigarReward({ user }) {
       {showModal && <ClaimModal reward={reward} user={user} month={month} onClose={() => setShowModal(false)} onDone={() => { setShowModal(false); load() }} />}
 
       {showHistory && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setShowHistory(false)}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setShowHistory(false)}>
           <div style={{ background: '#1a1714', border: '1px solid var(--border-gold)', borderRadius: 16, padding: 20, width: '100%', maxWidth: 400, maxHeight: '80vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
             <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--gold)', marginBottom: 12 }}>🚬 歷史領取紀錄</div>
             {history.length === 0 ? <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 20 }}>尚無紀錄</div> :
@@ -153,7 +153,7 @@ function ClaimModal({ reward, user, month, onClose, onDone }) {
   const is = { width: '100%', fontSize: 13, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text)', boxSizing: 'border-box' }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: 0 }} onClick={onClose}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', zIndex: 9999, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: 0 }} onClick={onClose}>
       <div style={{ background: '#1a1714', border: '1px solid var(--border-gold)', borderRadius: '16px 16px 0 0', width: '100%', maxWidth: 420, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
         <div style={{ padding: '20px 20px 0', flexShrink: 0 }}>
           <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--gold)', marginBottom: 4 }}>🚬 本月雪茄獎勵領取</div>
