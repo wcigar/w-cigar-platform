@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { SHIFTS } from '../../lib/constants'
 import { useNavigate } from 'react-router-dom'
-import { Clock, CheckCircle2, Circle, AlertCircle, MapPin, AlertTriangle, Trophy, FileText } from 'lucide-react'
+import { Clock, CheckCircle2, Circle, AlertCircle, MapPin, AlertTriangle, Trophy, FileText, BarChart3 } from 'lucide-react'
 import { format, endOfMonth } from 'date-fns'
 import { zhTW } from 'date-fns/locale'
 import AbnormalReport from '../../components/AbnormalReport'
@@ -240,6 +240,11 @@ export default function StaffHome() {
           <button onClick={() => navigate('/inventory')} style={{ width: '100%', marginTop: 8, padding: 10, fontSize: 13, fontWeight: 700, borderRadius: 8, border: '1px solid rgba(245,158,11,.3)', background: 'rgba(245,158,11,.1)', color: '#f59e0b', cursor: 'pointer' }}>📋 前往盤點</button>
         </div>
       )}
+
+      {/* KEY 銷量入口（每天最高頻使用） */}
+      <button onClick={() => navigate('/admin/venue-sales/new')} style={{ width: '100%', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 16, background: 'rgba(201,168,76,0.12)', border: '1px solid rgba(201,168,76,0.4)', borderRadius: 'var(--radius-sm)', color: 'var(--gold)', fontSize: 16, fontWeight: 700, cursor: 'pointer' }}>
+        <BarChart3 size={18} /> KEY 昨日銷量
+      </button>
 
       {/* 突發異常 */}
       <button style={{ width: '100%', marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, background: 'rgba(196,77,77,.1)', border: '1px solid rgba(196,77,77,.25)', borderRadius: 'var(--radius-sm)', color: 'var(--red)', fontSize: 15, fontWeight: 700, cursor: 'pointer' }} onClick={() => setShowAbnormal(true)}>
