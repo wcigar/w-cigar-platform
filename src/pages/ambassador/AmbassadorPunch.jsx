@@ -1,3 +1,7 @@
+// DEPRECATED 2026-04-25: 大使系統取消打卡，本檔保留避免影響歷史與員工打卡資料（punch_records 留給內場員工）
+// - /ambassador/punch 路由已由 AmbassadorApp.jsx 重導至 /ambassador/home
+// - 底部導航已移除「打卡」入口
+// - 請勿在任何新頁引用本檔
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { MapPin, Clock, Camera, CheckCircle2, AlertTriangle } from 'lucide-react'
