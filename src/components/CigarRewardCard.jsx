@@ -153,11 +153,14 @@ function ClaimModal({ reward, user, month, onClose, onDone }) {
   const is = { width: '100%', fontSize: 13, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text)', boxSizing: 'border-box' }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={onClose}>
-      <div style={{ background: '#1a1714', border: '1px solid var(--border-gold)', borderRadius: 16, padding: 20, width: '100%', maxWidth: 420, maxHeight: '85vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
-        <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--gold)', marginBottom: 4 }}>🚬 本月雪茄獎勵領取</div>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: 0 }} onClick={onClose}>
+      <div style={{ background: '#1a1714', border: '1px solid var(--border-gold)', borderRadius: '16px 16px 0 0', width: '100%', maxWidth: 420, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+        <div style={{ padding: '20px 20px 0', flexShrink: 0 }}>
+          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--gold)', marginBottom: 4 }}>🚬 本月雪茄獎勵領取</div>
         <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>非古巴 ×{reward.non_cuban_count} + 古巴 ×{reward.cuban_count}</div>
 
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px' }}>
         <div style={{ fontSize: 12, color: 'var(--gold)', fontWeight: 600, marginBottom: 6 }}>非古巴雪茄品名（選填）</div>
         {nc.map((v, i) => <input key={i} value={v} onChange={e => { const a = [...nc]; a[i] = e.target.value; setNc(a) }} placeholder={`非古巴雪茄 ${i + 1}`} style={{ ...is, marginBottom: 6 }} />)}
 
@@ -182,10 +185,11 @@ function ClaimModal({ reward, user, month, onClose, onDone }) {
 
         <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4, marginTop: 6 }}>備註（選填）</div>
         <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="其他說明…" rows={2} style={{ ...is, resize: 'none', marginBottom: 12 }} />
+        </div>
 
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ flexShrink: 0, padding: '12px 20px', borderTop: '1px solid var(--border)', display: 'flex', gap: 8 }} className="safe-bottom">
           <button onClick={onClose} style={{ flex: 1, padding: 12, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--black-card)', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 14 }}>取消</button>
-          <button onClick={submit} disabled={submitting} style={{ flex: 1, padding: 12, borderRadius: 10, border: 'none', background: 'var(--gold)', color: 'var(--black)', fontWeight: 700, cursor: 'pointer', fontSize: 14, opacity: submitting ? 0.5 : 1 }}>
+          <button onClick={submit} disabled={submitting} style={{ flex: 1, padding: 12, borderRadius: 10, border: 'none', background: 'var(--gold)', color: 'var(--black)', fontWeight: 700, cursor: 'pointer', fontSize: 14, opacity: submitting ? 0.5 : 1, paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
             {submitting ? '提交中…' : '✅ 確認領取'}
           </button>
         </div>
