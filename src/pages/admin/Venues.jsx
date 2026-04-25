@@ -159,6 +159,7 @@ function VenueRow({ venue, ambassadors, onEdit, onToggleActive }) {
               {REGION_OPTIONS[venue.region] || venue.region}
             </Badge>
             {venue.source === 'custom' && <Badge color="#10b981">自訂</Badge>}
+            {venue.has_self_sale && <Badge color="#f97316">店家自賣</Badge>}
             {inactive && <Badge color="#6a655c">已停用</Badge>}
           </div>
           {venue.address && (
@@ -190,6 +191,7 @@ function VenueEditModal({ venue, ambassadors, busy, onClose, onSave }) {
   const [address, setAddress] = useState(venue?.address || '')
   const [isActive, setIsActive] = useState(venue?.is_active !== false)
   const [codes, setCodes] = useState(() => new Set(venue?.assigned_ambassador_codes || []))
+  const [hasSelfSale, setHasSelfSale] = useState(venue?.has_self_sale === true)
   const isNew = !venue
 
   function toggleCode(id) {
@@ -209,6 +211,7 @@ function VenueEditModal({ venue, ambassadors, busy, onClose, onSave }) {
       address: address.trim(),
       is_active: isActive,
       assigned_ambassador_codes: [...codes],
+      has_self_sale: hasSelfSale,
     })
   }
 
@@ -245,6 +248,16 @@ function VenueEditModal({ venue, ambassadors, busy, onClose, onSave }) {
             <input type="checkbox" checked={isActive} onChange={e => setIsActive(e.target.checked)} />
             啟用中（取消勾選則停用，KEY-in 頁不會出現）
           </label>
+        </Field>
+
+        <Field label="店家自賣">
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', color: '#e8e0d0', fontSize: 13 }}>
+            <input type="checkbox" checked={hasSelfSale} onChange={e => setHasSelfSale(e.target.checked)} />
+            此店有「店家少爺自賣」（場域定價會多一欄自賣抽成）
+          </label>
+          <div style={{ marginTop: 4, fontSize: 11, color: '#8a8278' }}>
+            勾選後：場域定價頁會多一欄「店家自賣抽成」；督導結帳時會分兩段（大使賣 vs 店家自賣）
+          </div>
         </Field>
 
         <div style={{ marginTop: 14, marginBottom: 6, fontSize: 12, color: '#8a8278', letterSpacing: 1 }}>

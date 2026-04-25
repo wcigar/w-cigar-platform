@@ -117,6 +117,9 @@ export async function upsertVenue(payload) {
       default_alert_threshold: payload.default_alert_threshold != null
         ? Math.max(0, Number(payload.default_alert_threshold))
         : (overrides[id]?.default_alert_threshold ?? 3),
+      has_self_sale: payload.has_self_sale != null
+        ? !!payload.has_self_sale
+        : (overrides[id]?.has_self_sale ?? false),
       updated_at: new Date().toISOString(),
     }
     writeOverrides(overrides)
@@ -192,7 +195,7 @@ function mergeVenues() {
   // 1. base + override
   const merged = base.map(v => {
     const o = overrides[v.id]
-    if (!o) return { ...v, assigned_ambassador_codes: [], default_alert_threshold: 3, is_overridden: false }
+    if (!o) return { ...v, assigned_ambassador_codes: [], default_alert_threshold: 3, has_self_sale: false, is_overridden: false }
     return {
       id: v.id,
       name: o.name || v.name,
@@ -201,6 +204,7 @@ function mergeVenues() {
       is_active: o.is_active !== false,
       assigned_ambassador_codes: o.assigned_ambassador_codes || [],
       default_alert_threshold: o.default_alert_threshold ?? 3,
+      has_self_sale: o.has_self_sale === true,
       source: 'template',
       is_overridden: true,
     }
@@ -217,6 +221,7 @@ function mergeVenues() {
         is_active: o.is_active !== false,
         assigned_ambassador_codes: o.assigned_ambassador_codes || [],
         default_alert_threshold: o.default_alert_threshold ?? 3,
+        has_self_sale: o.has_self_sale === true,
         source: 'custom',
         is_overridden: true,
       })

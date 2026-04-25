@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useNavigate } from 'react-router-dom'
-import { Briefcase, Users, DollarSign, Settings, AlertTriangle, Trophy, Clock, Package, FileText, CheckCircle2, XCircle, Flame, BarChart3, UserCheck, Megaphone, QrCode } from 'lucide-react'
+import { Briefcase, Users, DollarSign, Settings, AlertTriangle, Trophy, Clock, Package, FileText, CheckCircle2, XCircle, Flame, BarChart3, UserCheck, Megaphone, QrCode, Wine, Building2, Truck, Receipt, Coins } from 'lucide-react'
 import { format, endOfMonth } from 'date-fns'
 import { zhTW } from 'date-fns/locale'
 import { getTaskUrgency } from '../../lib/taskUtils'
@@ -244,6 +244,21 @@ export default function BossHome() {
         ))}
       </div>
 
+      {/* 🏨 酒店銷售管理（6 個快捷入口） */}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--gold)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Wine size={16} /> 酒店銷售管理
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+          <HubBtn icon={BarChart3} label="KEY 銷量" sub="員工每天輸入"      color="#c9a84c" path="/admin/venue-sales/new" navigate={navigate} />
+          <HubBtn icon={Building2} label="店家管理" sub="27 家店 + 大使綁定" color="#3b82f6" path="/admin/venues" navigate={navigate} />
+          <HubBtn icon={Coins}     label="場域定價" sub="每店每品成本/利潤" color="#10b981" path="/admin/venue-profit-rules" navigate={navigate} />
+          <HubBtn icon={Package}   label="庫存矩陣" sub="警示 + 一鍵補貨"   color="#f59e0b" path="/admin/inventory" navigate={navigate} />
+          <HubBtn icon={Truck}     label="補貨單"   sub="雙人確認 + 列印"   color="#a855f7" path="/admin/replenishment" navigate={navigate} />
+          <HubBtn icon={Users}     label="大使薪酬" sub="時薪 + 門檻獎金"   color="#ef4444" path="/admin/compensation-rules" navigate={navigate} />
+        </div>
+      </div>
+
       {/* Today schedule + punch */}
       <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--gold)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}><Clock size={15} /> 今日出勤狀態</div>
       {scheds.length === 0 && <div style={{ fontSize: 13, color: 'var(--text-dim)', textAlign: 'center', padding: 16 }}>今日無排班</div>}
@@ -335,3 +350,19 @@ function SB({ label, value, color, tap }) {
     </div>
   )
 }
+
+
+function HubBtn({ icon: Icon, label, sub, color, path, navigate }) {
+  return (
+    <div className="card" onClick={() => navigate(path)} style={{ padding: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+      <div style={{ width: 36, height: 36, borderRadius: 10, background: color + '15', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <Icon size={18} color={color} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</div>
+        <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub}</div>
+      </div>
+    </div>
+  )
+}
+

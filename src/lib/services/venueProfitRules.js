@@ -68,11 +68,16 @@ export function upsertVenuePricing(venueId, productKey, patch, actor) {
     venue_id: venueId,
     product_key: productKey,
   }
-  // 自動重算 company_profit_per_unit
+  // 自動重算 company_profit_per_unit (大使賣)
   merged.company_profit_per_unit = Math.max(0,
     Number(merged.sale_price || 0)
     - Number(merged.cost_price || 0)
     - Number(merged.venue_share_per_unit || 0))
+  // 自動重算 company_profit_self_per_unit (店家自賣)
+  merged.company_profit_self_per_unit = Math.max(0,
+    Number(merged.sale_price || 0)
+    - Number(merged.cost_price || 0)
+    - Number(merged.venue_share_self_per_unit || 0))
   merged.updated_at = new Date().toISOString()
   if (actor) merged.updated_by_name = actor.name || null
   store[key] = merged
@@ -92,13 +97,16 @@ export function bulkSetVenuePricing(payload, actor) {
     const sale = Number(p.sale_price) || 0
     const cost = Number(p.cost_price) || 0
     const share = Number(p.venue_share_per_unit) || 0
+    const shareSelf = Number(p.venue_share_self_per_unit) || 0
     store[key] = {
       venue_id: p.venue_id,
       product_key: p.product_key,
       sale_price: sale,
       cost_price: cost,
       venue_share_per_unit: share,
+      venue_share_self_per_unit: shareSelf,
       company_profit_per_unit: Math.max(0, sale - cost - share),
+      company_profit_self_per_unit: Math.max(0, sale - cost - shareSelf),
       note: p.note || '',
       updated_at: new Date().toISOString(),
       updated_by_name: actor?.name || null,
@@ -120,21 +128,28 @@ export function buildPricingMatrix(venues, templateByVenueId, session) {
     .filter(v => v.is_active !== false)
     .map(v => {
       const products = templateByVenueId[v.id]?.products || []
+      const hasSelfSale = v.has_self_sale === true
       const rows = products.map(p => {
         const entry = store[makeKey(v.id, p.key)]
         const sale = entry?.sale_price ?? p.price ?? 0
         const cost = entry?.cost_price ?? 0
         const share = entry?.venue_share_per_unit ?? 0
+        const shareSelf = entry?.venue_share_self_per_unit ?? 0
         const profit = Math.max(0, sale - cost - share)
+        const profitSelf = Math.max(0, sale - cost - shareSelf)
         return {
           venue_id: v.id, product_key: p.key,
           product_name: p.name, category: p.category || 'non_cuban_cigar',
           sale_price: sale,
-          cost_price: cost,                          // 實際值（畫面要不要顯示由 see_cost 控制）
-          cost_price_visible: seeCost,                // UI 用此 flag 決定渲染
+          cost_price: cost,
+          cost_price_visible: seeCost,
           venue_share_per_unit: share,
+          venue_share_self_per_unit: shareSelf,
           company_profit_per_unit: profit,
+          company_profit_self_per_unit: profitSelf,
           margin_rate: sale > 0 ? (profit / sale) : 0,
+          margin_rate_self: sale > 0 ? (profitSelf / sale) : 0,
+          has_self_sale: hasSelfSale,
           note: entry?.note || '',
           configured: !!entry,
           updated_at: entry?.updated_at || null,
@@ -144,6 +159,7 @@ export function buildPricingMatrix(venues, templateByVenueId, session) {
       const totalProfit = rows.reduce((s, r) => s + r.company_profit_per_unit, 0)
       return {
         venue_id: v.id, venue_name: v.name, region: v.region,
+        has_self_sale: hasSelfSale,
         rows,
         product_count: rows.length,
         set_count: setCount,
@@ -154,30 +170,53 @@ export function buildPricingMatrix(venues, templateByVenueId, session) {
 }
 
 /**
- * 結算試算：給定該店指定期間的銷售（按 product key 累計），算公司毛利、場域應付、毛利率
- *   salesByProduct: { product_key: qty }
+ * 結算試算：給定該店指定期間的銷售（按 product key 累計）
+ *   salesByProduct.ambassador: { product_key: qty }  (大使賣的)
+ *   salesByProduct.self_sale:   { product_key: qty }  (店家少爺自賣)
+ *
+ * 兩段獨立計算，因為抽成不同。回傳：
+ *   { ambassador: { revenue, venue_share_due, company_gross_profit, lines },
+ *     self_sale:  { ... } (only if has self) ,
+ *     total: { revenue, venue_share_due, company_gross_profit } }
  */
 export function settleVenueSales(venueId, salesByProduct) {
   const store = readStore()
-  let revenue = 0, totalCost = 0, totalVenueShare = 0, totalCompanyProfit = 0
-  const lines = []
-  Object.entries(salesByProduct || {}).forEach(([pk, qty]) => {
-    const entry = store[makeKey(venueId, pk)]
-    if (!entry) return
-    const q = Number(qty) || 0
-    const r = entry.sale_price * q
-    const c = entry.cost_price * q
-    const s = entry.venue_share_per_unit * q
-    const p = entry.company_profit_per_unit * q
-    revenue += r; totalCost += c; totalVenueShare += s; totalCompanyProfit += p
-    lines.push({ product_key: pk, qty: q, revenue: r, cost: c, venue_share: s, company_profit: p })
-  })
+  function calc(map, useSelf) {
+    let revenue = 0, totalCost = 0, totalShare = 0, totalProfit = 0
+    const lines = []
+    Object.entries(map || {}).forEach(([pk, qty]) => {
+      const entry = store[makeKey(venueId, pk)]
+      if (!entry) return
+      const q = Number(qty) || 0
+      const r = entry.sale_price * q
+      const c = entry.cost_price * q
+      const s = (useSelf ? (entry.venue_share_self_per_unit || 0) : entry.venue_share_per_unit) * q
+      const p = (useSelf ? (entry.company_profit_self_per_unit || 0) : entry.company_profit_per_unit) * q
+      revenue += r; totalCost += c; totalShare += s; totalProfit += p
+      lines.push({ product_key: pk, qty: q, revenue: r, cost: c, venue_share: s, company_profit: p })
+    })
+    return { revenue, total_cost: totalCost, venue_share_due: totalShare, company_gross_profit: totalProfit, lines }
+  }
+
+  // 兼容舊 API：若 salesByProduct 是 flat map，視為大使賣
+  let amb, self
+  if (salesByProduct && (salesByProduct.ambassador || salesByProduct.self_sale)) {
+    amb = calc(salesByProduct.ambassador, false)
+    self = calc(salesByProduct.self_sale, true)
+  } else {
+    amb = calc(salesByProduct, false)
+    self = { revenue: 0, total_cost: 0, venue_share_due: 0, company_gross_profit: 0, lines: [] }
+  }
   return {
     venue_id: venueId,
-    revenue, total_cost: totalCost,
-    venue_share_due: totalVenueShare,
-    company_gross_profit: totalCompanyProfit,
-    lines,
+    ambassador: amb,
+    self_sale: self,
+    total: {
+      revenue: amb.revenue + self.revenue,
+      total_cost: amb.total_cost + self.total_cost,
+      venue_share_due: amb.venue_share_due + self.venue_share_due,
+      company_gross_profit: amb.company_gross_profit + self.company_gross_profit,
+    },
   }
 }
 

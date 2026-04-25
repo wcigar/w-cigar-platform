@@ -140,6 +140,11 @@ function VenuePricingCard({ venue, seeCost, onEdit }) {
           <span style={{ marginLeft: 6, fontSize: 11, color: '#8a8278' }}>
             已設 {venue.set_count} / {venue.product_count}
           </span>
+          {venue.has_self_sale && (
+            <span style={{ marginLeft: 6, fontSize: 10, padding: '2px 6px', borderRadius: 4, background: '#f9731622', color: '#f97316' }}>
+              店家自賣
+            </span>
+          )}
         </div>
         {seeCost && venue.set_count > 0 && (
           <div style={{ fontSize: 11, color: '#10b981' }}>
@@ -159,14 +164,16 @@ function VenuePricingCard({ venue, seeCost, onEdit }) {
                 <th style={th('center', 60)}>類別</th>
                 <th style={th('center', 75)}>售價</th>
                 <th style={th('center', 75)}>{seeCost ? '進貨成本' : <span style={{ color: '#5a554e' }}><EyeOff size={10} style={{ verticalAlign: 'middle' }} /> 成本</span>}</th>
-                <th style={th('center', 75)}>場域抽</th>
-                {seeCost && <th style={th('center', 75)} title="公司毛利">公司毛利</th>}
+                <th style={th('center', 75)} title="大使賣時，每根給酒店多少">場域抽（大使）</th>
+                {venue.has_self_sale && <th style={th('center', 80)} title="店家少爺自賣時，每根給酒店多少（通常較高）">場域抽（自賣）</th>}
+                {seeCost && <th style={th('center', 75)} title="公司毛利（大使賣）">公司毛利</th>}
+                {seeCost && venue.has_self_sale && <th style={th('center', 80)} title="公司毛利（店家自賣）">毛利（自賣）</th>}
                 {seeCost && <th style={th('center', 50)}>毛利率</th>}
               </tr>
             </thead>
             <tbody>
               {venue.rows.map(r => (
-                <PricingRow key={r.product_key} row={r} seeCost={seeCost} onEdit={onEdit} venueId={venue.venue_id} />
+                <PricingRow key={r.product_key} row={r} seeCost={seeCost} onEdit={onEdit} venueId={venue.venue_id} hasSelfSale={venue.has_self_sale} />
               ))}
             </tbody>
           </table>
@@ -176,8 +183,8 @@ function VenuePricingCard({ venue, seeCost, onEdit }) {
   )
 }
 
-function PricingRow({ row, seeCost, onEdit, venueId }) {
-  const [editing, setEditing] = useState(null) // 'sale_price' | 'cost_price' | 'venue_share_per_unit' | null
+function PricingRow({ row, seeCost, onEdit, venueId, hasSelfSale }) {
+  const [editing, setEditing] = useState(null)
   const [draft, setDraft] = useState('')
 
   function startEdit(field, current) {
@@ -225,9 +232,21 @@ function PricingRow({ row, seeCost, onEdit, venueId }) {
           onStart={() => startEdit('venue_share_per_unit', row.venue_share_per_unit)} onCommit={commit}
           value={row.venue_share_per_unit} configured={row.configured} color="#a855f7" />
       </td>
+      {hasSelfSale && (
+        <td style={td('center')}>
+          <Editable editing={editing === 'venue_share_self_per_unit'} draft={draft} setDraft={setDraft}
+            onStart={() => startEdit('venue_share_self_per_unit', row.venue_share_self_per_unit)} onCommit={commit}
+            value={row.venue_share_self_per_unit} configured={row.configured && row.venue_share_self_per_unit > 0} color="#f97316" />
+        </td>
+      )}
       {seeCost && (
         <td style={{ ...td('center'), color: row.company_profit_per_unit > 0 ? '#10b981' : '#5a554e', fontWeight: 500 }}>
           {row.configured ? `${row.company_profit_per_unit.toLocaleString()}` : '—'}
+        </td>
+      )}
+      {seeCost && hasSelfSale && (
+        <td style={{ ...td('center'), color: row.company_profit_self_per_unit > 0 ? '#f97316' : '#5a554e', fontWeight: 500 }}>
+          {row.configured ? `${row.company_profit_self_per_unit.toLocaleString()}` : '—'}
         </td>
       )}
       {seeCost && (
