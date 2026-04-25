@@ -114,6 +114,9 @@ export async function upsertVenue(payload) {
       assigned_ambassador_codes: Array.isArray(payload.assigned_ambassador_codes)
         ? [...new Set(payload.assigned_ambassador_codes.filter(Boolean))]
         : [],
+      default_alert_threshold: payload.default_alert_threshold != null
+        ? Math.max(0, Number(payload.default_alert_threshold))
+        : (overrides[id]?.default_alert_threshold ?? 3),
       updated_at: new Date().toISOString(),
     }
     writeOverrides(overrides)
@@ -166,6 +169,17 @@ export function getAssignedAmbassadorCodes(venueId) {
   return v?.assigned_ambassador_codes || []
 }
 
+export function getDefaultAlertThreshold(venueId) {
+  const v = mergeVenues().find(x => x.id === venueId)
+  return v?.default_alert_threshold ?? 3
+}
+
+export function getDefaultAlertMap() {
+  const map = {}
+  mergeVenues().forEach(v => { map[v.id] = v.default_alert_threshold ?? 3 })
+  return map
+}
+
 export const REGION_OPTIONS = REGIONS
 
 // ---------- 內部 helper ----------
@@ -178,7 +192,7 @@ function mergeVenues() {
   // 1. base + override
   const merged = base.map(v => {
     const o = overrides[v.id]
-    if (!o) return { ...v, assigned_ambassador_codes: [], is_overridden: false }
+    if (!o) return { ...v, assigned_ambassador_codes: [], default_alert_threshold: 3, is_overridden: false }
     return {
       id: v.id,
       name: o.name || v.name,
@@ -186,6 +200,7 @@ function mergeVenues() {
       address: o.address || v.address || '',
       is_active: o.is_active !== false,
       assigned_ambassador_codes: o.assigned_ambassador_codes || [],
+      default_alert_threshold: o.default_alert_threshold ?? 3,
       source: 'template',
       is_overridden: true,
     }
@@ -201,6 +216,7 @@ function mergeVenues() {
         address: o.address || '',
         is_active: o.is_active !== false,
         assigned_ambassador_codes: o.assigned_ambassador_codes || [],
+        default_alert_threshold: o.default_alert_threshold ?? 3,
         source: 'custom',
         is_overridden: true,
       })

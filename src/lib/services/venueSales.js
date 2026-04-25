@@ -5,6 +5,8 @@
 import { supabase } from '../supabase'
 import { newIdempotencyKey } from './idempotency'
 import { listVenues, getAssignedAmbassadorCodes } from './venues'
+import { deductInventoryFromSales, buildInventoryMatrix, listAlertItems } from './inventory'
+import { getDefaultAlertMap } from './venues'
 
 const USE_MOCK = true
 const TEMPLATE_VERSION = '2026-04'
@@ -838,7 +840,42 @@ export async function submitVenueSalesMatrix(payload) {
       })
       createdIds.push(id)
     }
-    return { success: true, sales_count: createdIds.length, sale_ids: createdIds, mock: true }
+
+    // ===== 自動扣庫存（從 sales_with_data 抽 product 數量）=====
+    const itemsByVenue = {}
+    salesWithData.forEach(v => {
+      const items = (v.products || []).filter(it => it.quantity > 0)
+      if (items.length > 0) {
+        itemsByVenue[v.venue_id] = items.map(it => ({ product_key: it.product_key, quantity: it.quantity }))
+      }
+    })
+    let deductLog = []
+    if (Object.keys(itemsByVenue).length > 0) {
+      const res = deductInventoryFromSales(itemsByVenue)
+      deductLog = res.log || []
+    }
+
+    // ===== 計算扣完後的警示 =====
+    let postSubmitAlertCount = 0
+    try {
+      const venues = await listVenues()
+      const tplMap = {}
+      for (const region of ['taipei', 'taichung']) {
+        const tpl = await getVenueSalesMatrixTemplate(region)
+        tpl.venues.forEach(v => { tplMap[v.id] = v })
+      }
+      const matrix = buildInventoryMatrix(venues, tplMap, getDefaultAlertMap())
+      postSubmitAlertCount = listAlertItems(matrix).length
+    } catch { /* best-effort */ }
+
+    return {
+      success: true,
+      sales_count: createdIds.length,
+      sale_ids: createdIds,
+      mock: true,
+      inventory_deducted: deductLog.length,
+      alert_count_after: postSubmitAlertCount,
+    }
   }
 
   const { data, error } = await supabase.rpc('hq_submit_venue_sales_matrix', {
