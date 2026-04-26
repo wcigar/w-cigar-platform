@@ -65,12 +65,17 @@ export function getMonthlyCollection(period, venueId, ambassadorSalesByProduct =
     venue_share_due_total: settle.total.venue_share_due,
     company_gross_profit_total: settle.total.company_gross_profit,
     pending_amount: Math.max(0, settle.total.venue_share_due - (entry.paid_amount || 0)),
+    stocktake_qty_by_product: entry.stocktake_qty_by_product || {},
+    stocktake_discrepancies: entry.stocktake_discrepancies || [],
+    supervisor_signature: entry.supervisor_signature || null,
+    accountant_signature: entry.accountant_signature || null,
+    accountant_name: entry.accountant_name || '',
+    signed_at: entry.signed_at || null,
   }
 }
 
 /**
- * 補錄店家自賣量（督導現場盤點後填）
- *   selfSaleQtyByProduct: { product_key: qty }
+ * 補錄店家自賣量（督導現場盤點後填，舊 API 保留向後相容）
  */
 export function setSelfSaleQty(period, venueId, selfSaleQtyByProduct, actor) {
   const store = readStore()
@@ -79,6 +84,58 @@ export function setSelfSaleQty(period, venueId, selfSaleQtyByProduct, actor) {
   entry.self_sale_qty_by_product = selfSaleQtyByProduct || {}
   entry.updated_at = new Date().toISOString()
   entry.updated_by = actor?.id || actor?.name || null
+  store[key] = entry
+  writeStore(store)
+  return { success: true }
+}
+
+/**
+ * 督導現場盤點：填「實際剩餘」+ 系統反推自賣量
+ *   stocktakeQtyByProduct: { product_key: 實際剩餘根數 }
+ *   currentInventoryByProduct: { product_key: 系統當前庫存（已扣大使賣後）}
+ *
+ *   自賣量 = max(0, current - actual)
+ *   若 actual > current → 異常（系統內銷量比實際少，可能漏 KEY）
+ */
+export function setStocktake(period, venueId, stocktakeQtyByProduct, currentInventoryByProduct, actor) {
+  const store = readStore()
+  const key = makeKey(period, venueId)
+  const entry = store[key] || { period, venue_id: venueId, paid_amount: 0, note: '', status: 'pending' }
+  const stocktake = {}
+  const selfSale = {}
+  const discrepancies = []
+  Object.entries(stocktakeQtyByProduct || {}).forEach(([pk, actualStr]) => {
+    const actual = Math.max(0, Number(actualStr) || 0)
+    const current = Number(currentInventoryByProduct?.[pk]) || 0
+    stocktake[pk] = actual
+    if (current > actual) {
+      selfSale[pk] = current - actual  // 系統比實際多 → 差額 = 自賣
+    } else if (current < actual) {
+      discrepancies.push({ product_key: pk, current, actual, diff: actual - current })
+    }
+  })
+  entry.stocktake_qty_by_product = stocktake
+  entry.self_sale_qty_by_product = selfSale  // 自動覆寫
+  entry.stocktake_discrepancies = discrepancies
+  entry.stocktake_at = new Date().toISOString()
+  entry.stocktake_by = actor?.name || null
+  store[key] = entry
+  writeStore(store)
+  return { success: true, self_sale: selfSale, discrepancies }
+}
+
+/**
+ * 督導 + 酒店會計簽名（base64 PNG dataURL）
+ */
+export function setSignatures(period, venueId, { supervisor_signature, accountant_signature, accountant_name }, actor) {
+  const store = readStore()
+  const key = makeKey(period, venueId)
+  const entry = store[key] || { period, venue_id: venueId, paid_amount: 0, note: '', status: 'pending' }
+  if (supervisor_signature) entry.supervisor_signature = supervisor_signature
+  if (accountant_signature) entry.accountant_signature = accountant_signature
+  if (accountant_name) entry.accountant_name = accountant_name
+  entry.signed_at = new Date().toISOString()
+  entry.signed_by = actor?.name || null
   store[key] = entry
   writeStore(store)
   return { success: true }

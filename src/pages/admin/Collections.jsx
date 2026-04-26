@@ -4,8 +4,9 @@
 //   - 該督導負責的店家清單
 //   - 每店一行：大使賣 + 自賣 + 應付酒店 + 已收/差額
 //   - 點任一店 → 詳情 modal：補錄自賣量 + 標記收齊
-import { useEffect, useMemo, useState } from 'react'
-import { Calendar, UserCheck, AlertTriangle, Check, X, Edit3, ChevronRight, Coins } from 'lucide-react'
+import { useEffect, useMemo, useState, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Calendar, UserCheck, AlertTriangle, Check, X, Edit3, ChevronRight, Coins, Printer, FileText, Send, Eraser } from 'lucide-react'
 import { listVenues } from '../../lib/services/venues'
 import { getVenueSalesMatrixTemplate } from '../../lib/services/venueSales'
 import {
@@ -13,8 +14,10 @@ import {
 } from '../../lib/services/supervisors'
 import {
   COLLECTION_STATUSES, currentPeriod, getMonthlyCollection,
-  setSelfSaleQty, recordCollectionPayment,
+  setSelfSaleQty, recordCollectionPayment, setStocktake, setSignatures,
 } from '../../lib/services/collections'
+import { buildInventoryMatrix } from '../../lib/services/inventory'
+import { getDefaultAlertMap } from '../../lib/services/venues'
 import PageShell, { Card } from '../../components/PageShell'
 
 export default function Collections() {
@@ -241,35 +244,101 @@ function Mini({ label, value, color }) {
 }
 
 function CollectionEditModal({ collection, actor, period, onClose, onSaved }) {
-  const [selfSaleQty, setSelfSaleState] = useState(() => collection.self_sale_qty_by_product || {})
+  const navigate = useNavigate()
+  const [stage, setStage] = useState('stocktake')  // stocktake → confirm → sign → done
+  const [stocktake, setStocktakeState] = useState(() => collection.stocktake_qty_by_product || {})
   const [paid, setPaid] = useState(collection.paid_amount || 0)
   const [note, setNote] = useState(collection.note || '')
-  const [status, setStatus] = useState(collection.status || 'pending')
+  const [accountantName, setAccountantName] = useState(collection.accountant_name || '')
+  const [supSig, setSupSig] = useState(collection.supervisor_signature || null)
+  const [accSig, setAccSig] = useState(collection.accountant_signature || null)
   const [busy, setBusy] = useState(false)
 
-  // recompute self_sale settle preview from current draft
-  const dueTotal = collection.venue_share_due_total || 0
-  const paidNum = Number(paid) || 0
-  const remaining = Math.max(0, dueTotal - paidNum)
+  // 取每店每品的「系統當前庫存」(已扣大使賣)
+  const [inventoryMap, setInventoryMap] = useState({})
+  useEffect(() => {
+    (async () => {
+      try {
+        const venues = (await import('../../lib/services/venues')).then ? null : null
+      } catch {}
+      // 直接從 buildInventoryMatrix 拉，需要傳入 venues + tplMap，但這 modal 沒有
+      // 簡化：從 localStorage wcigar_inventory_v1 直接讀對應 venueId 的 entries
+      const inv = (() => {
+        try { return JSON.parse(localStorage.getItem('wcigar_inventory_v1') || '{}') } catch { return {} }
+      })()
+      const map = {}
+      collection.products.forEach(p => {
+        const e = inv[`${collection.venue_id}:${p.key}`]
+        map[p.key] = e?.current_qty ?? 0
+      })
+      setInventoryMap(map)
+    })()
+  }, [collection])
 
   function setQty(key, v) {
-    setSelfSaleState(s => {
-      const next = { ...s }
-      const num = Math.max(0, parseInt(v, 10) || 0)
-      if (num === 0) delete next[key]
-      else next[key] = num
-      return next
-    })
+    setStocktakeState(s => ({ ...s, [key]: v }))
   }
 
-  async function handleSubmit(closeAfter = true) {
+  // 計算自動推導的自賣量 + 應付金額
+  const computed = useMemo(() => {
+    const selfSale = {}
+    const discrepancies = []
+    let selfRevenue = 0, selfShareDue = 0
+    const pricing = (() => {
+      try { return JSON.parse(localStorage.getItem('wcigar_venue_pricing_v1') || '{}') } catch { return {} }
+    })()
+    Object.entries(stocktake).forEach(([pk, actualStr]) => {
+      if (actualStr === '' || actualStr == null) return
+      const actual = Math.max(0, Number(actualStr) || 0)
+      const current = inventoryMap[pk] || 0
+      if (current > actual) {
+        const qty = current - actual
+        selfSale[pk] = qty
+        const entry = pricing[`${collection.venue_id}:${pk}`]
+        if (entry) {
+          selfRevenue += entry.sale_price * qty
+          selfShareDue += (entry.venue_share_self_per_unit || 0) * qty
+        }
+      } else if (current < actual) {
+        discrepancies.push({ product_key: pk, current, actual })
+      }
+    })
+    const ambDue = collection.ambassador?.venue_share_due || 0
+    const totalDue = ambDue + selfShareDue
+    return { selfSale, discrepancies, selfRevenue, selfShareDue, ambDue, totalDue }
+  }, [stocktake, inventoryMap, collection])
+
+  async function handleSubmitStocktake() {
     setBusy(true)
-    if (collection.has_self_sale) {
-      setSelfSaleQty(period, collection.venue_id, selfSaleQty, actor)
-    }
-    recordCollectionPayment(period, collection.venue_id, { paid_amount: paidNum, note, status }, actor)
+    setStocktake(period, collection.venue_id, stocktake, inventoryMap, actor)
     setBusy(false)
-    if (closeAfter) onSaved()
+    setStage('confirm')
+  }
+
+  async function handleSubmitConfirm() {
+    setBusy(true)
+    recordCollectionPayment(period, collection.venue_id, {
+      paid_amount: Number(paid) || 0, note,
+      status: Number(paid) >= computed.totalDue ? 'collected' : (Number(paid) > 0 ? 'partial' : 'pending'),
+    }, actor)
+    setBusy(false)
+    setStage('sign')
+  }
+
+  async function handleSubmitSignatures() {
+    if (!supSig) return alert('請督導簽名')
+    if (!accSig) return alert('請酒店會計簽名')
+    if (!accountantName.trim()) return alert('請填酒店會計姓名')
+    setBusy(true)
+    setSignatures(period, collection.venue_id,
+      { supervisor_signature: supSig, accountant_signature: accSig, accountant_name: accountantName.trim() }, actor)
+    setBusy(false)
+    setStage('done')
+  }
+
+  function gotoReceiptPage() {
+    onClose()
+    navigate(`/admin/collections/receipt/${collection.venue_id}/${period}`)
   }
 
   return (
@@ -288,90 +357,279 @@ function CollectionEditModal({ collection, actor, period, onClose, onSaved }) {
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#8a8278', cursor: 'pointer' }}><X size={14} /></button>
         </div>
 
-        {/* 大使賣（read-only） */}
-        <div style={{ marginBottom: 12, padding: 10, background: '#1a1714', borderLeft: '3px solid #3b82f6', borderRadius: 6 }}>
-          <div style={{ fontSize: 12, color: '#3b82f6', fontWeight: 500, marginBottom: 4 }}>📊 大使賣（從 KEY-in 累計）</div>
-          <div style={{ fontSize: 11, color: '#8a8278' }}>
-            營業額 NT$ {Math.round(collection.ambassador?.revenue || 0).toLocaleString()}
-            ｜應付酒店 NT$ {Math.round(collection.ambassador?.venue_share_due || 0).toLocaleString()}
-          </div>
-          {(collection.ambassador?.lines?.length || 0) === 0 && (
-            <div style={{ fontSize: 11, color: '#5a554e', marginTop: 4, fontStyle: 'italic' }}>
-              （MVP：暫無從 sales 聚合，請先 KEY-in 銷售資料）
-            </div>
-          )}
+        {/* Stepper */}
+        <div style={{ display: 'flex', gap: 4, marginBottom: 14, fontSize: 11 }}>
+          {['stocktake', 'confirm', 'sign', 'done'].map((s, i) => {
+            const labels = { stocktake: '①盤點', confirm: '②確認金額', sign: '③簽名', done: '④完成' }
+            const active = stage === s
+            const passed = ['stocktake', 'confirm', 'sign', 'done'].indexOf(stage) > i
+            return (
+              <div key={s} style={{
+                flex: 1, padding: '6px 4px', textAlign: 'center', borderRadius: 6,
+                background: active ? '#c9a84c22' : passed ? '#10b98115' : '#1a1714',
+                border: '1px solid ' + (active ? '#c9a84c' : passed ? '#10b98155' : '#2a2520'),
+                color: active ? '#c9a84c' : passed ? '#10b981' : '#5a554e',
+              }}>{labels[s]}</div>
+            )
+          })}
         </div>
 
-        {/* 店家自賣（補錄） */}
-        {collection.has_self_sale && (
-          <div style={{ marginBottom: 12, padding: 10, background: '#1a1714', borderLeft: '3px solid #f97316', borderRadius: 6 }}>
-            <div style={{ fontSize: 12, color: '#f97316', fontWeight: 500, marginBottom: 6 }}>🏪 店家自賣（現場盤點補錄）</div>
-            <div style={{ fontSize: 11, color: '#8a8278', marginBottom: 8 }}>
-              到店現場盤點，把店家少爺自賣的根數逐品填入：
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6 }}>
-              {collection.products.map(p => (
-                <div key={p.key} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
-                  <span style={{ flex: 1, color: '#e8dcc8' }}>{p.name}</span>
-                  <input type="number" min="0" placeholder="0" value={selfSaleQty[p.key] || ''}
-                    onChange={e => setQty(p.key, e.target.value)}
-                    style={{ width: 60, padding: '4px 6px', background: '#0a0a0a', border: '1px solid #f9731666', borderRadius: 4, color: '#f97316', fontSize: 12, textAlign: 'center' }} />
-                </div>
-              ))}
-            </div>
-            <div style={{ marginTop: 8, padding: 6, background: '#0a0a0a', borderRadius: 4, fontSize: 11, color: '#f97316' }}>
-              自賣應付酒店：NT$ {Math.round(collection.self_sale?.venue_share_due || 0).toLocaleString()}
-            </div>
-          </div>
+        {stage === 'stocktake' && (
+          <StocktakeStage
+            collection={collection} stocktake={stocktake} setQty={setQty}
+            inventoryMap={inventoryMap} computed={computed}
+            onNext={handleSubmitStocktake} busy={busy} onClose={onClose}
+          />
         )}
 
-        {/* 收款區 */}
-        <div style={{ marginBottom: 12, padding: 10, background: '#1a1714', borderLeft: '3px solid #c9a84c', borderRadius: 6 }}>
-          <div style={{ fontSize: 12, color: '#c9a84c', fontWeight: 500, marginBottom: 6 }}>
-            <Coins size={11} style={{ verticalAlign: 'middle' }} /> 督導現場收款
-          </div>
-          <div style={{ display: 'flex', gap: 8, fontSize: 11, marginBottom: 8 }}>
-            <span style={{ color: '#8a8278' }}>應付總額</span>
-            <span style={{ color: '#a855f7', fontWeight: 500, marginLeft: 'auto' }}>NT$ {Math.round(dueTotal).toLocaleString()}</span>
-          </div>
-          <div style={{ marginBottom: 8 }}>
-            <div style={{ fontSize: 11, color: '#8a8278', marginBottom: 4 }}>實付/實收金額</div>
-            <input type="number" min="0" value={paid} onChange={e => setPaid(e.target.value)}
-              style={{ width: '100%', padding: '8px 10px', background: '#0a0a0a', border: '1px solid #c9a84c66', borderRadius: 6, color: '#c9a84c', fontSize: 14, textAlign: 'right', outline: 'none' }} />
-          </div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            {Object.entries(COLLECTION_STATUSES).map(([k, v]) => (
-              <button key={k} onClick={() => setStatus(k)} style={{
-                flex: 1, padding: '6px 8px', fontSize: 11,
-                background: status === k ? v.color + '22' : 'transparent',
-                border: '1px solid ' + (status === k ? v.color : '#2a2520'),
-                borderRadius: 4, color: status === k ? v.color : '#8a8278', cursor: 'pointer',
-              }}>{v.label}</button>
-            ))}
-          </div>
-          {remaining > 0 && status !== 'collected' && (
-            <div style={{ marginTop: 6, fontSize: 11, color: '#f59e0b' }}>
-              ⚠ 尚差 NT$ {Math.round(remaining).toLocaleString()}
-            </div>
-          )}
-          <div style={{ marginTop: 8 }}>
-            <div style={{ fontSize: 11, color: '#8a8278', marginBottom: 4 }}>備註（差額/異常說明）</div>
-            <input value={note} onChange={e => setNote(e.target.value)}
-              placeholder="例如：酒店少爺說下次補 / 收齊"
-              style={{ width: '100%', padding: '6px 10px', background: '#0a0a0a', border: '1px solid #2a2520', borderRadius: 4, color: '#e8dcc8', fontSize: 12, outline: 'none', boxSizing: 'border-box' }} />
-          </div>
-        </div>
+        {stage === 'confirm' && (
+          <ConfirmStage
+            collection={collection} computed={computed}
+            paid={paid} setPaid={setPaid} note={note} setNote={setNote}
+            onBack={() => setStage('stocktake')} onNext={handleSubmitConfirm} busy={busy}
+          />
+        )}
 
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={onClose} style={{ ...ghostBtn(), flex: 1, justifyContent: 'center', padding: 10 }}>取消</button>
-          <button onClick={() => handleSubmit(true)} disabled={busy} style={{ ...primaryBtn(), flex: 2, opacity: busy ? 0.5 : 1, padding: 10 }}>
-            <Check size={14} /> {busy ? '儲存中…' : '儲存結帳資料'}
-          </button>
-        </div>
+        {stage === 'sign' && (
+          <SignStage
+            accountantName={accountantName} setAccountantName={setAccountantName}
+            supSig={supSig} setSupSig={setSupSig}
+            accSig={accSig} setAccSig={setAccSig}
+            onBack={() => setStage('confirm')} onNext={handleSubmitSignatures} busy={busy}
+            actor={actor}
+          />
+        )}
+
+        {stage === 'done' && (
+          <div style={{ textAlign: 'center', padding: 20 }}>
+            <div style={{ fontSize: 40, marginBottom: 10 }}>✅</div>
+            <div style={{ fontSize: 16, color: '#10b981', fontWeight: 500, marginBottom: 6 }}>結帳完成！</div>
+            <div style={{ fontSize: 12, color: '#8a8278', marginBottom: 16 }}>
+              簽名已存入系統。可生成對帳單列印或 LINE 分享。
+            </div>
+            <button onClick={gotoReceiptPage} style={{ ...primaryBtn(), padding: '10px 20px' }}>
+              <FileText size={14} /> 開啟對帳單
+            </button>
+            <button onClick={() => { onSaved(); }} style={{ ...ghostBtn(), padding: '8px 16px', marginLeft: 8 }}>
+              關閉
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
 }
+
+// === Stage 1: Stocktake ===
+function StocktakeStage({ collection, stocktake, setQty, inventoryMap, computed, onNext, busy, onClose }) {
+  return (
+    <>
+      <div style={{ background: '#1a1714', borderLeft: '3px solid #3b82f6', padding: 10, marginBottom: 12, fontSize: 11, color: '#3b82f6', lineHeight: 1.5 }}>
+        現場盤點 — 逐品填「實際剩餘根數」。系統會自動算店家自賣量（= 系統應剩 − 實際剩）
+      </div>
+      <div style={{ maxHeight: 320, overflowY: 'auto', background: '#1a1714', borderRadius: 8, padding: 10 }}>
+        <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ borderBottom: '1px solid #2a2520' }}>
+              <th style={{ textAlign: 'left', padding: 4, color: '#8a8278', fontSize: 10 }}>商品</th>
+              <th style={{ textAlign: 'center', padding: 4, color: '#3b82f6', fontSize: 10 }}>應剩</th>
+              <th style={{ textAlign: 'center', padding: 4, color: '#f97316', fontSize: 10 }}>實際剩</th>
+              <th style={{ textAlign: 'center', padding: 4, color: '#a855f7', fontSize: 10 }}>店家自賣</th>
+            </tr>
+          </thead>
+          <tbody>
+            {collection.products.map(p => {
+              const should = inventoryMap[p.key] || 0
+              const actual = stocktake[p.key]
+              const actualNum = actual === '' || actual == null ? null : Number(actual)
+              const selfSale = computed.selfSale[p.key] || 0
+              const isOverShoot = actualNum != null && actualNum > should
+              return (
+                <tr key={p.key} style={{ borderBottom: '1px solid #1a1714' }}>
+                  <td style={{ padding: 4, color: '#e8dcc8' }}>{p.name}</td>
+                  <td style={{ textAlign: 'center', padding: 4, color: '#3b82f6', fontWeight: 500 }}>{should}</td>
+                  <td style={{ textAlign: 'center', padding: 4 }}>
+                    <input type="number" min="0" placeholder={String(should)} value={actual ?? ''}
+                      onChange={e => setQty(p.key, e.target.value)}
+                      style={{ width: 60, padding: '4px 6px', background: '#0a0a0a', border: `1px solid ${isOverShoot ? '#ef4444' : '#f9731666'}`, borderRadius: 4, color: isOverShoot ? '#ef4444' : '#f97316', fontSize: 12, textAlign: 'center', outline: 'none' }} />
+                  </td>
+                  <td style={{ textAlign: 'center', padding: 4, color: selfSale > 0 ? '#a855f7' : '#5a554e', fontWeight: 500 }}>
+                    {selfSale > 0 ? `+${selfSale}` : '—'}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+      {computed.discrepancies.length > 0 && (
+        <div style={{ marginTop: 8, padding: 8, background: '#ef444422', borderLeft: '3px solid #ef4444', fontSize: 11, color: '#ef4444' }}>
+          ⚠ 異常：{computed.discrepancies.length} 項實際剩多於系統 — 可能漏 KEY-in 或實際多送貨。檢查無誤再繼續
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+        <button onClick={onClose} style={{ ...ghostBtn(), flex: 1, justifyContent: 'center', padding: 10 }}>取消</button>
+        <button onClick={onNext} disabled={busy} style={{ ...primaryBtn(), flex: 2, justifyContent: 'center', padding: 10, opacity: busy ? 0.5 : 1 }}>
+          下一步：確認金額 →
+        </button>
+      </div>
+    </>
+  )
+}
+
+// === Stage 2: Confirm ===
+function ConfirmStage({ collection, computed, paid, setPaid, note, setNote, onBack, onNext, busy }) {
+  const dueTotal = computed.totalDue
+  const remaining = Math.max(0, dueTotal - (Number(paid) || 0))
+  return (
+    <>
+      <div style={{ background: '#1a1714', borderLeft: '3px solid #c9a84c', padding: 10, marginBottom: 12, borderRadius: 6 }}>
+        <div style={{ fontSize: 12, color: '#c9a84c', fontWeight: 500, marginBottom: 8 }}>應付酒店明細</div>
+        <table style={{ width: '100%', fontSize: 12 }}>
+          <tbody>
+            <tr><td style={{ padding: '4px 0', color: '#3b82f6' }}>大使賣</td><td style={{ textAlign: 'right', padding: '4px 0', color: '#3b82f6' }}>NT$ {Math.round(computed.ambDue).toLocaleString()}</td></tr>
+            {computed.selfShareDue > 0 && (
+              <tr><td style={{ padding: '4px 0', color: '#f97316' }}>店家自賣（盤點推算）</td><td style={{ textAlign: 'right', padding: '4px 0', color: '#f97316' }}>NT$ {Math.round(computed.selfShareDue).toLocaleString()}</td></tr>
+            )}
+            <tr style={{ borderTop: '1px solid #c9a84c' }}><td style={{ padding: '6px 0', color: '#c9a84c', fontWeight: 600 }}>應付總額</td><td style={{ textAlign: 'right', padding: '6px 0', color: '#c9a84c', fontWeight: 600, fontSize: 14 }}>NT$ {Math.round(dueTotal).toLocaleString()}</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ fontSize: 11, color: '#8a8278', marginBottom: 4 }}>實付/實收金額（NT$）</div>
+        <input type="number" min="0" value={paid} onChange={e => setPaid(e.target.value)}
+          style={{ width: '100%', padding: '8px 10px', background: '#0a0a0a', border: '1px solid #c9a84c66', borderRadius: 6, color: '#c9a84c', fontSize: 16, textAlign: 'right', outline: 'none' }} />
+      </div>
+      {remaining > 0 && (
+        <div style={{ fontSize: 11, color: '#f59e0b', marginBottom: 8 }}>⚠ 尚差 NT$ {Math.round(remaining).toLocaleString()}</div>
+      )}
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ fontSize: 11, color: '#8a8278', marginBottom: 4 }}>備註</div>
+        <input value={note} onChange={e => setNote(e.target.value)} placeholder="差額/異常/收款方式..."
+          style={{ width: '100%', padding: '6px 10px', background: '#0a0a0a', border: '1px solid #2a2520', borderRadius: 4, color: '#e8dcc8', fontSize: 12, outline: 'none', boxSizing: 'border-box' }} />
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+        <button onClick={onBack} style={{ ...ghostBtn(), flex: 1, justifyContent: 'center', padding: 10 }}>← 上一步</button>
+        <button onClick={onNext} disabled={busy} style={{ ...primaryBtn(), flex: 2, justifyContent: 'center', padding: 10, opacity: busy ? 0.5 : 1 }}>
+          下一步：簽名 →
+        </button>
+      </div>
+    </>
+  )
+}
+
+// === Stage 3: Sign ===
+function SignStage({ accountantName, setAccountantName, supSig, setSupSig, accSig, setAccSig, onBack, onNext, busy, actor }) {
+  return (
+    <>
+      <div style={{ background: '#1a1714', borderLeft: '3px solid #a855f7', padding: 10, marginBottom: 12, fontSize: 11, color: '#a855f7' }}>
+        雙方簽名後生效（手指/滑鼠在框內畫即可）
+      </div>
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ fontSize: 11, color: '#8a8278', marginBottom: 4 }}>督導簽名（{actor.name}）</div>
+        <SignaturePad value={supSig} onChange={setSupSig} />
+      </div>
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ fontSize: 11, color: '#8a8278', marginBottom: 4 }}>酒店會計姓名</div>
+        <input value={accountantName} onChange={e => setAccountantName(e.target.value)}
+          placeholder="例如：林會計"
+          style={{ width: '100%', padding: '6px 10px', background: '#0a0a0a', border: '1px solid #2a2520', borderRadius: 4, color: '#e8dcc8', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+      </div>
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ fontSize: 11, color: '#8a8278', marginBottom: 4 }}>酒店會計簽名</div>
+        <SignaturePad value={accSig} onChange={setAccSig} />
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+        <button onClick={onBack} style={{ ...ghostBtn(), flex: 1, justifyContent: 'center', padding: 10 }}>← 上一步</button>
+        <button onClick={onNext} disabled={busy} style={{ ...primaryBtn(), flex: 2, justifyContent: 'center', padding: 10, opacity: busy ? 0.5 : 1 }}>
+          完成結帳 →
+        </button>
+      </div>
+    </>
+  )
+}
+
+// === Signature Canvas ===
+function SignaturePad({ value, onChange }) {
+  const canvasRef = useRef(null)
+  const drawing = useRef(false)
+  const [hasDrawn, setHasDrawn] = useState(!!value)
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    canvas.width = canvas.offsetWidth * 2
+    canvas.height = canvas.offsetHeight * 2
+    const ctx = canvas.getContext('2d')
+    ctx.scale(2, 2)
+    ctx.lineWidth = 2
+    ctx.lineCap = 'round'
+    ctx.strokeStyle = '#c9a84c'
+    if (value) {
+      const img = new Image()
+      img.onload = () => ctx.drawImage(img, 0, 0, canvas.offsetWidth, canvas.offsetHeight)
+      img.src = value
+    }
+  }, [])
+
+  function getPos(e) {
+    const canvas = canvasRef.current
+    const rect = canvas.getBoundingClientRect()
+    const t = e.touches ? e.touches[0] : e
+    return { x: t.clientX - rect.left, y: t.clientY - rect.top }
+  }
+
+  function start(e) {
+    e.preventDefault()
+    drawing.current = true
+    const ctx = canvasRef.current.getContext('2d')
+    const { x, y } = getPos(e)
+    ctx.beginPath()
+    ctx.moveTo(x, y)
+  }
+  function move(e) {
+    if (!drawing.current) return
+    e.preventDefault()
+    const ctx = canvasRef.current.getContext('2d')
+    const { x, y } = getPos(e)
+    ctx.lineTo(x, y)
+    ctx.stroke()
+  }
+  function end() {
+    if (!drawing.current) return
+    drawing.current = false
+    setHasDrawn(true)
+    onChange(canvasRef.current.toDataURL('image/png'))
+  }
+  function clear() {
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    setHasDrawn(false)
+    onChange(null)
+  }
+
+  return (
+    <div style={{ position: 'relative', background: '#fff', borderRadius: 6, border: '1px solid #2a2520', height: 100 }}>
+      <canvas
+        ref={canvasRef}
+        style={{ width: '100%', height: '100%', touchAction: 'none', cursor: 'crosshair' }}
+        onMouseDown={start} onMouseMove={move} onMouseUp={end} onMouseLeave={end}
+        onTouchStart={start} onTouchMove={move} onTouchEnd={end}
+      />
+      {!hasDrawn && (
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999', fontSize: 11, pointerEvents: 'none' }}>
+          請在此區簽名
+        </div>
+      )}
+      <button onClick={clear} type="button"
+        style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.05)', border: 'none', borderRadius: 4, padding: '3px 8px', fontSize: 10, color: '#666', cursor: 'pointer' }}>
+        <Eraser size={10} style={{ verticalAlign: 'middle' }} /> 清除
+      </button>
+    </div>
+  )
+}
+
 
 function primaryBtn() {
   return {
