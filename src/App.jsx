@@ -152,7 +152,7 @@ function AppInner() {
         <Route path="/admin/inventory/baseline" element={<AdminGuard scope="admin"><AdminInventoryBaseline /></AdminGuard>} />
         <Route path="/admin/replenishment/:id/print" element={<AdminGuard scope="admin"><AdminReplenishmentPrint /></AdminGuard>} />
         <Route path="/admin/venue-hub" element={<AdminGuard scope="admin"><AdminVenueHub /></AdminGuard>} />
-        <Route path="/admin/collections/receipt/:venueId/:period" element={<AdminGuard scope="admin"><AdminCollectionReceipt /></AdminGuard>} />
+        <Route path="/admin/collections/receipt/:venueId/:period" element={<AdminGuard scope="supervisor"><AdminCollectionReceipt /></AdminGuard>} />
         <Route path="/admin/replenishment" element={<AdminGuard scope="admin"><AdminReplenishment /></AdminGuard>} />
         <Route path="/admin/replenishment/:id" element={<AdminGuard scope="admin"><AdminReplenishmentDetail /></AdminGuard>} />
         <Route path="/admin/supply-requests" element={<AdminGuard scope="admin"><AdminSupplyRequests /></AdminGuard>} />
@@ -171,14 +171,14 @@ function AppInner() {
         <Route path="/boss/war-room" element={<AdminGuard scope="boss"><BossWarRoom /></AdminGuard>} />
 
         {/* Phase 3: 薪資 / 獎金 */}
-        <Route path="/admin/ambassador-payroll" element={<AdminGuard scope="admin"><AdminAmbassadorPayroll /></AdminGuard>} />
-        <Route path="/admin/ambassador-payroll/:periodId" element={<AdminGuard scope="admin"><AdminAmbassadorPayrollDetail /></AdminGuard>} />
-        <Route path="/admin/ambassador-payroll/:periodId/:ambassadorId" element={<AdminGuard scope="admin"><AdminAmbassadorPayrollDetail /></AdminGuard>} />
-        <Route path="/admin/compensation-rules" element={<AdminGuard scope="admin"><AdminCompensationRules /></AdminGuard>} />
-        <Route path="/admin/compensation-rules/:ambassadorId" element={<AdminGuard scope="admin"><AdminCompensationRules /></AdminGuard>} />
+        <Route path="/admin/ambassador-payroll" element={<AdminGuard scope="boss"><AdminAmbassadorPayroll /></AdminGuard>} />
+        <Route path="/admin/ambassador-payroll/:periodId" element={<AdminGuard scope="boss"><AdminAmbassadorPayrollDetail /></AdminGuard>} />
+        <Route path="/admin/ambassador-payroll/:periodId/:ambassadorId" element={<AdminGuard scope="boss"><AdminAmbassadorPayrollDetail /></AdminGuard>} />
+        <Route path="/admin/compensation-rules" element={<AdminGuard scope="boss"><AdminCompensationRules /></AdminGuard>} />
+        <Route path="/admin/compensation-rules/:ambassadorId" element={<AdminGuard scope="boss"><AdminCompensationRules /></AdminGuard>} />
         <Route path="/admin/venue-profit-rules" element={<AdminGuard scope="admin"><AdminVenueProfitRules /></AdminGuard>} />
-        <Route path="/admin/accounting-payroll-reports" element={<AdminGuard scope="admin"><AdminAccountingPayrollReports /></AdminGuard>} />
-        <Route path="/admin/accounting-payroll-reports/:reportId" element={<AdminGuard scope="admin"><AdminAccountingPayrollReports /></AdminGuard>} />
+        <Route path="/admin/accounting-payroll-reports" element={<AdminGuard scope="boss"><AdminAccountingPayrollReports /></AdminGuard>} />
+        <Route path="/admin/accounting-payroll-reports/:reportId" element={<AdminGuard scope="boss"><AdminAccountingPayrollReports /></AdminGuard>} />
 
         {/* Phase 3: 新進人員 */}
         <Route path="/admin/onboarding" element={<AdminGuard scope="admin"><AdminOnboarding /></AdminGuard>} />
