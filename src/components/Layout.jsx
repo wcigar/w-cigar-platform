@@ -4,6 +4,7 @@ import { Home, ClipboardList, BarChart3, Calendar, Settings, DollarSign, Users, 
 
 const STAFF_NAV = [
   { path: '/', icon: Home, label: '首頁' },
+  { path: '/admin/venue-hub', icon: Wine, label: '酒店' },
   { path: '/sop', icon: ClipboardList, label: '任務' },
   { path: '/inventory', icon: Package, label: '盤點' },
   { path: '/schedule', icon: Calendar, label: '排班' },
