@@ -256,6 +256,7 @@ export default function BossHome() {
           <HubBtn icon={Package}   label="庫存矩陣" sub="警示 + 一鍵補貨"   color="#f59e0b" path="/admin/inventory" navigate={navigate} />
           <HubBtn icon={Truck}     label="補貨單"   sub="雙人確認 + 列印"   color="#a855f7" path="/admin/replenishment" navigate={navigate} />
           <HubBtn icon={Users}     label="大使薪酬" sub="時薪 + 門檻獎金"   color="#ef4444" path="/admin/compensation-rules" navigate={navigate} />
+          <HubBtn icon={Receipt}   label="督導結帳" sub="4 督導 · 每月10號前" color="#06b6d4" path="/admin/collections" navigate={navigate} />
         </div>
       </div>
 

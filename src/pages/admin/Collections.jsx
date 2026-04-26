@@ -89,8 +89,32 @@ export default function Collections() {
     setRefreshTick(n => n + 1)
   }
 
+  // 每月 10 號截止警示（基於當前 period 與今日比對）
+  const dueWarning = (() => {
+    const today = new Date()
+    const [py, pm] = period.split('-').map(Number)
+    if (!py || !pm) return null
+    // 結帳期間 = period 那個月的 10 號（例：4 月帳，5/10 之前要收完）
+    const dueDate = new Date(py, pm, 10)  // pm 0-indexed → 自動是 next month
+    const diffDays = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24))
+    const dueStr = `${dueDate.getFullYear()}/${String(dueDate.getMonth() + 1).padStart(2,'0')}/10`
+    if (diffDays < 0) return { color: '#ef4444', icon: '🔴', text: `${dueStr} 截止已過 ${-diffDays} 天 — 請盡速完成`, pulse: true }
+    if (diffDays === 0) return { color: '#dc2626', icon: '⚠️', text: `今日 ${dueStr} 為截止日 — 請完成所有結帳`, pulse: true }
+    if (diffDays <= 3) return { color: '#f59e0b', icon: '⏰', text: `距離截止 ${dueStr} 還剩 ${diffDays} 天`, pulse: false }
+    if (diffDays <= 7) return { color: '#3b82f6', icon: '📅', text: `截止日 ${dueStr}，還有 ${diffDays} 天`, pulse: false }
+    return { color: '#6a655c', icon: '📅', text: `截止日 ${dueStr}（${diffDays} 天後）`, pulse: false }
+  })()
+
   return (
     <PageShell title="督導結帳" subtitle="ADMIN · MONTHLY COLLECTIONS">
+      {dueWarning && (
+        <Card style={{ background: dueWarning.color + '15', borderLeft: `3px solid ${dueWarning.color}`, marginBottom: 12 }}>
+          <div style={{ fontSize: 13, color: dueWarning.color, display: 'flex', alignItems: 'center', gap: 6, fontWeight: 500 }}>
+            <span style={{ fontSize: 16 }}>{dueWarning.icon}</span> {dueWarning.text}
+          </div>
+        </Card>
+      )}
+
       {/* 期間 + 督導切換 */}
       <Card style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#8a8278' }}>
