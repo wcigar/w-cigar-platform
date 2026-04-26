@@ -17,7 +17,7 @@ import { supabase } from '../supabase'
 const USE_MOCK = true
 
 const VENUES_OVERRIDE_KEY = 'wcigar_venues_admin_v1'
-const REGIONS = { taipei: '台北', taichung: '台中' }
+const REGIONS = { taipei: '台北', taoyuan: '桃園', hsinchu: '新竹', taichung: '台中', tainan: '台南', kaohsiung: '高雄' }
 
 // ---------- localStorage layer ----------
 

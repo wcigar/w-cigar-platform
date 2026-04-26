@@ -107,7 +107,11 @@ export async function submitVenueSales(payload) {
 
 export const REGIONS = {
   taipei: '台北',
+  taoyuan: '桃園',
+  hsinchu: '新竹',
   taichung: '台中',
+  tainan: '台南',
+  kaohsiung: '高雄',
 }
 
 // ---------- 2026-04 台北模板（22 家）----------

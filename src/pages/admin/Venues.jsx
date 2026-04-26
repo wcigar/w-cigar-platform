@@ -87,8 +87,9 @@ export default function VenuesAdmin() {
         </div>
         <select value={filter.region} onChange={e => setFilter(f => ({ ...f, region: e.target.value }))} style={inputStyle({ width: 'auto' })}>
           <option value="all">全部地區</option>
-          <option value="taipei">台北</option>
-          <option value="taichung">台中</option>
+          {Object.entries(REGION_OPTIONS).map(([k, label]) => (
+            <option key={k} value={k}>{label}</option>
+          ))}
         </select>
         <select value={filter.status} onChange={e => setFilter(f => ({ ...f, status: e.target.value }))} style={inputStyle({ width: 'auto' })}>
           <option value="all">全部狀態</option>
@@ -250,8 +251,9 @@ function VenueEditModal({ venue, ambassadors, busy, onClose, onSave }) {
         </Field>
         <Field label="地區 *">
           <select value={region} onChange={e => setRegion(e.target.value)} style={inputStyle()}>
-            <option value="taipei">台北</option>
-            <option value="taichung">台中</option>
+            {Object.entries(REGION_OPTIONS).map(([k, label]) => (
+              <option key={k} value={k}>{label}</option>
+            ))}
           </select>
         </Field>
         <Field label="地址">
