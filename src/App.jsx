@@ -41,6 +41,7 @@ import AdminInventoryMatrix from './pages/admin/InventoryMatrix'
 import AdminInventoryBaseline from './pages/admin/InventoryBaseline'
 import AdminReplenishmentPrint from './pages/admin/ReplenishmentPrint'
 import AdminCollectionReceipt from './pages/admin/CollectionReceipt'
+import AdminVenueHub from './pages/admin/VenueHub'
 import AdminReplenishment from './pages/admin/Replenishment'
 import AdminReplenishmentDetail from './pages/admin/ReplenishmentDetail'
 import AdminSupplyRequests from './pages/admin/SupplyRequests'
@@ -150,6 +151,7 @@ function AppInner() {
         <Route path="/admin/inventory" element={<AdminGuard scope="admin"><AdminInventoryMatrix /></AdminGuard>} />
         <Route path="/admin/inventory/baseline" element={<AdminGuard scope="admin"><AdminInventoryBaseline /></AdminGuard>} />
         <Route path="/admin/replenishment/:id/print" element={<AdminGuard scope="admin"><AdminReplenishmentPrint /></AdminGuard>} />
+        <Route path="/admin/venue-hub" element={<AdminGuard scope="admin"><AdminVenueHub /></AdminGuard>} />
         <Route path="/admin/collections/receipt/:venueId/:period" element={<AdminGuard scope="admin"><AdminCollectionReceipt /></AdminGuard>} />
         <Route path="/admin/replenishment" element={<AdminGuard scope="admin"><AdminReplenishment /></AdminGuard>} />
         <Route path="/admin/replenishment/:id" element={<AdminGuard scope="admin"><AdminReplenishmentDetail /></AdminGuard>} />
