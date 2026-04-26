@@ -10,7 +10,7 @@ export default function AdminGuard({ scope, children }) {
   if (loading) return null
   if (!user) return <Navigate to="/" replace />
 
-  const roleExt = user?._raw?.role_ext
+  const roleExt = user?._raw?.role
   const isBoss = user.role === 'boss'
 
   const allowed = (() => {
