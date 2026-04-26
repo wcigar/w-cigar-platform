@@ -30,7 +30,7 @@ export default function InventoryBaseline() {
     setVenues(vs)
 
     // pre-fill draft from existing inventory
-    const matrix = buildInventoryMatrix(vs, map, getDefaultAlertMap())
+    const matrix = await buildInventoryMatrix()
     const init = {}
     matrix.forEach(v => {
       v.rows.forEach(r => {
@@ -89,7 +89,7 @@ export default function InventoryBaseline() {
         target_quantity: Number(d.target) || 10,
       })
     })
-    bulkSetInventory(payload, { merge: true })
+    await bulkSetInventory(payload)
     setBusy(false)
     if (window.confirm(`✓ 已寫入 ${payload.length} 筆。返回庫存矩陣頁？`)) {
       navigate('/admin/inventory')

@@ -5,7 +5,7 @@
 import { supabase } from '../supabase'
 import { newIdempotencyKey } from './idempotency'
 import { listVenues, getAssignedAmbassadorCodes } from './venues'
-import { deductInventoryFromSales, buildInventoryMatrix, listAlertItems } from './inventory'
+import { deductInventoryFromSales, buildInventoryMatrix } from './inventory'
 import { getDefaultAlertMap } from './venues'
 
 const USE_MOCK = true
@@ -855,21 +855,14 @@ export async function submitVenueSalesMatrix(payload) {
     })
     let deductLog = []
     if (Object.keys(itemsByVenue).length > 0) {
-      const res = deductInventoryFromSales(itemsByVenue)
-      deductLog = res.log || []
+      deductLog = await deductInventoryFromSales(itemsByVenue)
     }
 
     // ===== 計算扣完後的警示 =====
     let postSubmitAlertCount = 0
     try {
-      const venues = await listVenues()
-      const tplMap = {}
-      for (const region of ['taipei', 'taichung']) {
-        const tpl = await getVenueSalesMatrixTemplate(region)
-        tpl.venues.forEach(v => { tplMap[v.id] = v })
-      }
-      const matrix = buildInventoryMatrix(venues, tplMap, getDefaultAlertMap())
-      postSubmitAlertCount = listAlertItems(matrix).length
+      const matrix = await buildInventoryMatrix()
+      postSubmitAlertCount = matrix.reduce((sum, v) => sum + (v.alert_count || 0), 0)
     } catch { /* best-effort */ }
 
     return {

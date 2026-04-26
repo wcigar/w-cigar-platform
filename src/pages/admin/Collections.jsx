@@ -16,7 +16,6 @@ import {
   COLLECTION_STATUSES, currentPeriod, getMonthlyCollection,
   setSelfSaleQty, recordCollectionPayment, setStocktake, setSignatures,
 } from '../../lib/services/collections'
-import { buildInventoryMatrix } from '../../lib/services/inventory'
 import { getDefaultAlertMap } from '../../lib/services/venues'
 import PageShell, { Card } from '../../components/PageShell'
 

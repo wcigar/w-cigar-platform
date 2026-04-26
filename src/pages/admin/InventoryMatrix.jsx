@@ -3,12 +3,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Zap, Settings, AlertTriangle } from 'lucide-react'
-import { listVenues, getDefaultAlertMap, upsertVenue } from '../../lib/services/venues'
+import { listVenues, upsertVenue } from '../../lib/services/venues'
 import {
-  getVenueSalesMatrixTemplate,
-} from '../../lib/services/venueSales'
-import {
-  buildInventoryMatrix, listAlertItems, upsertInventoryEntry,
+  buildInventoryMatrix, upsertInventoryEntry,
 } from '../../lib/services/inventory'
 import { createRunFromAlerts } from '../../lib/services/replenishment'
 import PageShell, { Card } from '../../components/PageShell'
@@ -16,8 +13,7 @@ import PageShell, { Card } from '../../components/PageShell'
 export default function InventoryMatrix() {
   const navigate = useNavigate()
   const [venues, setVenues] = useState([])
-  const [tplMap, setTplMap] = useState({})
-  const [defaultAlertMap, setDefaultAlertMap] = useState({})
+  const [matrix, setMatrix] = useState([])
   const [filter, setFilter] = useState({ region: 'all', q: '', alertOnly: false })
   const [loading, setLoading] = useState(true)
   const [refreshTick, setRefreshTick] = useState(0)
@@ -26,22 +22,12 @@ export default function InventoryMatrix() {
   async function reload() {
     setLoading(true)
     const vs = await listVenues()
-    const map = {}
-    for (const region of ['taipei', 'taichung']) {
-      const tpl = await getVenueSalesMatrixTemplate(region)
-      tpl.venues.forEach(v => { map[v.id] = v })
-    }
-    setTplMap(map)
+    const m = await buildInventoryMatrix()
     setVenues(vs)
-    setDefaultAlertMap(getDefaultAlertMap())
+    setMatrix(m)
     setLoading(false)
   }
   useEffect(() => { reload() }, [refreshTick])
-
-  const matrix = useMemo(() => {
-    if (venues.length === 0) return []
-    return buildInventoryMatrix(venues, tplMap, defaultAlertMap)
-  }, [venues, tplMap, defaultAlertMap, refreshTick])
 
   const filtered = useMemo(() => {
     return matrix.filter(v => {
@@ -74,7 +60,18 @@ export default function InventoryMatrix() {
     }
   }, [matrix])
 
-  const alertItems = useMemo(() => listAlertItems(matrix), [matrix])
+  const alertItems = useMemo(() => matrix.flatMap(v => v.rows
+    .filter(r => r.status === 'red' || r.status === 'yellow')
+    .map(r => ({
+      venue_id: v.venue_id, venue_name: v.venue_name, region: v.region,
+      product_key: r.product_key, product_name: r.product_name,
+      product_price: r.product_price,
+      current_qty: r.current_qty, alert_threshold: r.alert_threshold,
+      target_quantity: r.target_quantity,
+      suggested_qty: Math.max(0, r.target_quantity - r.current_qty),
+      status: r.status,
+    }))
+  ), [matrix])
 
   async function handleGenerateRun() {
     if (alertItems.length === 0) {
@@ -93,9 +90,9 @@ export default function InventoryMatrix() {
     }
   }
 
-  function handleSetEntryField(venueId, productKey, field, value) {
+  async function handleSetEntryField(venueId, productKey, field, value) {
     const num = Math.max(0, parseInt(value, 10) || 0)
-    upsertInventoryEntry(venueId, productKey, { [field]: num })
+    await upsertInventoryEntry(venueId, productKey, { [field]: num })
     setRefreshTick(t => t + 1)
   }
 

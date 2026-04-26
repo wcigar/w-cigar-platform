@@ -238,7 +238,7 @@ export async function deliverRunForVenue(runId, venueId, actuallyReceived, actor
   })
 
   // 寫入庫存
-  addInventoryFromShipment(itemsByVenue)
+  await addInventoryFromShipment(itemsByVenue)
 
   r.events.push({
     at: nowIso(),

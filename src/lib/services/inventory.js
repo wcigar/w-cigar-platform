@@ -1,44 +1,31 @@
 // src/lib/services/inventory.js
-// 場域庫存（venue_inventory）service：localStorage MVP
-//
-// 資料結構：
-//   localStorage 'wcigar_inventory_v1' = {
-//     "<venueId>:<productKey>": {
-//       venue_id, product_key,
-//       current_qty,           // 當前庫存量（KEY-in 後自動扣）
-//       alert_threshold,        // 低於此值跳紅警示（覆蓋 venue 預設）
-//       target_quantity,        // 補貨目標上限
-//       updated_at,
-//     }
-//   }
-//
-// venue 預設 alert_threshold 存在 venues service 的 override 層
-// 改 USE_MOCK=false 後切到 supabase rpc，UI 不需要改。
-
+// 場域庫存 service — Phase 1 已接 Supabase。
+// table: inventory_balances (venue_id, product_key) PK
 import { supabase } from '../supabase'
+import { listVenues, getDefaultAlertMap } from './venues'
+import { getVenueSalesMatrixTemplate } from './venueSales'
 
-const USE_MOCK = true
-const STORAGE_KEY = 'wcigar_inventory_v1'
-
-function readStore() {
-  if (typeof window === 'undefined') return {}
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') } catch { return {} }
+// Region template cache：getVenueSalesMatrixTemplate(region) 回傳 { venues:[{id,products,...}] }，
+// 同 region 多家店共用一份 template，cache 起來避免每店重打一次。
+const _tplCache = {}
+async function loadRegionTplMap(region) {
+  if (_tplCache[region]) return _tplCache[region]
+  const t = await getVenueSalesMatrixTemplate(region)
+  const map = {}
+  ;(t.venues || []).forEach(v => { map[v.id] = v })
+  _tplCache[region] = map
+  return map
 }
-function writeStore(s) {
-  if (typeof window === 'undefined') return
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)) } catch {}
-}
-function makeKey(venueId, productKey) { return `${venueId}:${productKey}` }
 
-// ---------- Public API ----------
-
-/**
- * 取得單筆庫存記錄（若不存在回傳 default 結構）
- */
-export function getInventoryEntry(venueId, productKey, defaultAlertThreshold = 3) {
-  const store = readStore()
-  const key = makeKey(venueId, productKey)
-  return store[key] || {
+export async function getInventoryEntry(venueId, productKey, defaultAlertThreshold = 3) {
+  const { data, error } = await supabase
+    .from('inventory_balances')
+    .select('*')
+    .eq('venue_id', venueId)
+    .eq('product_key', productKey)
+    .maybeSingle()
+  if (error) throw error
+  return data || {
     venue_id: venueId,
     product_key: productKey,
     current_qty: 0,
@@ -48,191 +35,163 @@ export function getInventoryEntry(venueId, productKey, defaultAlertThreshold = 3
   }
 }
 
-/**
- * upsert 一筆。可只更新部分欄位。
- */
-export function upsertInventoryEntry(venueId, productKey, patch) {
-  const store = readStore()
-  const key = makeKey(venueId, productKey)
-  const existing = store[key] || {
+export async function upsertInventoryEntry(venueId, productKey, patch) {
+  const existing = await getInventoryEntry(venueId, productKey)
+  const row = {
     venue_id: venueId,
     product_key: productKey,
-    current_qty: 0,
-    alert_threshold: 3,
-    target_quantity: 10,
-  }
-  store[key] = {
-    ...existing,
-    ...patch,
-    venue_id: venueId,
-    product_key: productKey,
+    current_qty: patch.current_qty ?? existing.current_qty ?? 0,
+    alert_threshold: patch.alert_threshold ?? existing.alert_threshold ?? 3,
+    target_quantity: patch.target_quantity ?? existing.target_quantity ?? 10,
     updated_at: new Date().toISOString(),
   }
-  writeStore(store)
-  return store[key]
+  const { data, error } = await supabase
+    .from('inventory_balances')
+    .upsert(row, { onConflict: 'venue_id,product_key' })
+    .select()
+    .single()
+  if (error) throw error
+  return data
 }
 
-/**
- * 批次 baseline 寫入。Override 任何已存在的紀錄。
- * payload: [{ venue_id, product_key, current_qty, alert_threshold, target_quantity }, ...]
- */
-export function bulkSetInventory(payload, { merge = false } = {}) {
-  const store = merge ? readStore() : {}
-  payload.forEach(p => {
-    if (!p.venue_id || !p.product_key) return
-    const key = makeKey(p.venue_id, p.product_key)
-    store[key] = {
-      venue_id: p.venue_id,
-      product_key: p.product_key,
-      current_qty: Number(p.current_qty) || 0,
-      alert_threshold: Number(p.alert_threshold) || 3,
-      target_quantity: Number(p.target_quantity) || 10,
-      updated_at: new Date().toISOString(),
-    }
+export async function bulkSetInventory(payload) {
+  if (!Array.isArray(payload) || payload.length === 0) return { success: true, count: 0 }
+  const rows = payload.map(p => ({
+    venue_id: p.venue_id,
+    product_key: p.product_key,
+    current_qty: Math.max(0, Number(p.current_qty || 0)),
+    alert_threshold: Math.max(0, Number(p.alert_threshold || 3)),
+    target_quantity: Math.max(0, Number(p.target_quantity || 10)),
+    updated_at: new Date().toISOString(),
+  }))
+  const { error } = await supabase
+    .from('inventory_balances')
+    .upsert(rows, { onConflict: 'venue_id,product_key' })
+  if (error) throw error
+  return { success: true, count: rows.length }
+}
+
+async function fetchAllBalances() {
+  const { data, error } = await supabase.from('inventory_balances').select('*')
+  if (error) throw error
+  const map = {}
+  ;(data || []).forEach(r => {
+    map[r.venue_id + ':' + r.product_key] = r
   })
-  writeStore(store)
-  return { success: true, count: payload.length }
+  return map
 }
 
-/**
- * 結合 venues + 每店 products 回傳完整 inventory 矩陣
- *   venues: 從 listVenues()
- *   templateByVenueId: { venueId: { products: [{key, name, price}, ...] } }
- *   defaultAlertByVenue: { venueId: number }
- */
-export function buildInventoryMatrix(venues, templateByVenueId, defaultAlertByVenue = {}) {
-  const store = readStore()
-  return venues
-    .filter(v => v.is_active !== false)
-    .map(v => {
-      const tpl = templateByVenueId[v.id]
-      const products = tpl?.products || []
-      const defaultAlert = defaultAlertByVenue[v.id] || 3
-      const rows = products.map(p => {
-        const entry = store[makeKey(v.id, p.key)]
-        return {
-          venue_id: v.id,
-          product_key: p.key,
-          product_name: p.name,
-          product_price: p.price,
-          current_qty: entry?.current_qty ?? 0,
-          alert_threshold: entry?.alert_threshold ?? defaultAlert,
-          target_quantity: entry?.target_quantity ?? 10,
-          updated_at: entry?.updated_at || null,
-          status: computeStatus(entry?.current_qty ?? 0, entry?.alert_threshold ?? defaultAlert, entry?.target_quantity ?? 10),
-        }
-      })
-      const alertCount = rows.filter(r => r.status === 'red' || r.status === 'yellow').length
-      const redCount = rows.filter(r => r.status === 'red').length
-      const reorderTotal = rows
-        .filter(r => r.status === 'red' || r.status === 'yellow')
-        .reduce((sum, r) => sum + Math.max(0, r.target_quantity - r.current_qty) * (r.product_price || 0), 0)
-      return {
-        venue_id: v.id,
-        venue_name: v.name,
-        region: v.region,
-        is_active: v.is_active !== false,
-        rows,
-        alert_count: alertCount,
-        red_count: redCount,
-        reorder_total_amount: reorderTotal,
-        venue_default_alert: defaultAlert,
-      }
-    })
-}
-
-/**
- * 從一筆 sales submit payload 自動扣庫存。
- * itemsByVenue: { venueId: [{ product_key, quantity }, ...] }
- */
-export function deductInventoryFromSales(itemsByVenue) {
-  const store = readStore()
-  const log = []
-  Object.entries(itemsByVenue).forEach(([venueId, items]) => {
-    items.forEach(it => {
-      if (!it.product_key || !it.quantity) return
-      const key = makeKey(venueId, it.product_key)
-      const before = store[key]?.current_qty ?? 0
-      const after = Math.max(0, before - Number(it.quantity))
-      if (!store[key]) {
-        store[key] = {
-          venue_id: venueId, product_key: it.product_key,
-          current_qty: 0, alert_threshold: 3, target_quantity: 10,
-        }
-      }
-      store[key].current_qty = after
-      store[key].updated_at = new Date().toISOString()
-      log.push({ venue_id: venueId, product_key: it.product_key, before, after, deducted: before - after })
-    })
-  })
-  writeStore(store)
-  return { success: true, log }
-}
-
-/**
- * 加庫存（大使收貨入庫）。
- */
-export function addInventoryFromShipment(itemsByVenue) {
-  const store = readStore()
-  const log = []
-  Object.entries(itemsByVenue).forEach(([venueId, items]) => {
-    items.forEach(it => {
-      if (!it.product_key || !it.quantity) return
-      const key = makeKey(venueId, it.product_key)
-      const before = store[key]?.current_qty ?? 0
-      const after = before + Number(it.quantity)
-      if (!store[key]) {
-        store[key] = {
-          venue_id: venueId, product_key: it.product_key,
-          current_qty: 0, alert_threshold: 3, target_quantity: 10,
-        }
-      }
-      store[key].current_qty = after
-      store[key].updated_at = new Date().toISOString()
-      log.push({ venue_id: venueId, product_key: it.product_key, before, after, added: after - before })
-    })
-  })
-  writeStore(store)
-  return { success: true, log }
-}
-
-/**
- * 取得目前所有警示項目（紅 + 黃）— 給 generateRunFromAlerts 用
- */
-export function listAlertItems(matrix) {
-  const out = []
-  matrix.forEach(v => {
-    v.rows.forEach(r => {
-      if (r.status === 'red' || r.status === 'yellow') {
-        out.push({
-          venue_id: v.venue_id,
-          venue_name: v.venue_name,
-          region: v.region,
-          product_key: r.product_key,
-          product_name: r.product_name,
-          product_price: r.product_price,
-          current_qty: r.current_qty,
-          alert_threshold: r.alert_threshold,
-          target_quantity: r.target_quantity,
-          suggested_qty: Math.max(0, r.target_quantity - r.current_qty),
-          status: r.status,
-        })
-      }
-    })
-  })
-  return out
-}
-
-/**
- * 計算單筆狀態：red < alert / yellow ≤ alert+2 / green
- */
 export function computeStatus(qty, alert, target) {
   if (qty <= alert) return 'red'
-  if (qty <= alert + 2) return 'yellow'
+  if (qty <= alert + Math.ceil((target - alert) * 0.3)) return 'yellow'
   return 'green'
 }
 
-/**
- * 清空（測試用）
- */
-export function _clearInventoryStore() { writeStore({}) }
+export async function listAlertItems(venueId) {
+  const venues = await listVenues()
+  const v = venues.find(x => x.id === venueId)
+  if (!v) return []
+  const balances = await fetchAllBalances()
+  const tplMap = await loadRegionTplMap(v.region)
+  const tpl = tplMap[v.id] || { products: [] }
+  const products = tpl.products || []
+  const result = []
+  products.forEach(p => {
+    const key = v.id + ':' + p.key
+    const entry = balances[key]
+    if (!entry) return
+    const status = computeStatus(entry.current_qty, entry.alert_threshold, entry.target_quantity)
+    if (status === 'red' || status === 'yellow') {
+      result.push({
+        product_key: p.key,
+        product_name: p.name,
+        product_price: p.price || 0,
+        ...entry,
+        status,
+      })
+    }
+  })
+  return result
+}
+
+export async function buildInventoryMatrix() {
+  const venues = await listVenues()
+  const balances = await fetchAllBalances()
+  const defaultAlertMap = getDefaultAlertMap()
+  return Promise.all(venues.map(async v => {
+    const tplMap = await loadRegionTplMap(v.region)
+    const tpl = tplMap[v.id] || { products: [] }
+    const defaultAlert = defaultAlertMap[v.id] ?? 3
+    const products = tpl.products || []
+    const rows = products.map(p => {
+      const key = v.id + ':' + p.key
+      const entry = balances[key] || {
+        current_qty: 0,
+        alert_threshold: defaultAlert,
+        target_quantity: 10,
+      }
+      const status = computeStatus(entry.current_qty, entry.alert_threshold, entry.target_quantity)
+      return {
+        product_key: p.key,
+        product_name: p.name,
+        product_price: p.price || 0,
+        current_qty: entry.current_qty,
+        alert_threshold: entry.alert_threshold,
+        target_quantity: entry.target_quantity,
+        status,
+      }
+    })
+    const alertCount = rows.filter(r => r.status === 'red' || r.status === 'yellow').length
+    const redCount = rows.filter(r => r.status === 'red').length
+    const reorderTotal = rows
+      .filter(r => r.status === 'red' || r.status === 'yellow')
+      .reduce((sum, r) => sum + Math.max(0, r.target_quantity - r.current_qty) * (r.product_price || 0), 0)
+    return {
+      venue_id: v.id,
+      venue_name: v.name,
+      region: v.region,
+      is_active: v.is_active !== false,
+      rows,
+      alert_count: alertCount,
+      red_count: redCount,
+      reorder_total_amount: reorderTotal,
+      venue_default_alert: defaultAlert,
+    }
+  }))
+}
+
+export async function deductInventoryFromSales(itemsByVenue) {
+  const log = []
+  for (const [venueId, items] of Object.entries(itemsByVenue)) {
+    for (const it of items) {
+      if (!it.product_key || !it.quantity) continue
+      const existing = await getInventoryEntry(venueId, it.product_key)
+      const before = existing.current_qty || 0
+      const after = Math.max(0, before - Number(it.quantity || 0))
+      await upsertInventoryEntry(venueId, it.product_key, { current_qty: after })
+      log.push({ venue_id: venueId, product_key: it.product_key, before, deducted: Number(it.quantity), after })
+    }
+  }
+  return log
+}
+
+export async function addInventoryFromShipment(itemsByVenue) {
+  const log = []
+  for (const [venueId, items] of Object.entries(itemsByVenue)) {
+    for (const it of items) {
+      if (!it.product_key || !it.quantity) continue
+      const existing = await getInventoryEntry(venueId, it.product_key)
+      const before = existing.current_qty || 0
+      const after = before + Number(it.quantity || 0)
+      await upsertInventoryEntry(venueId, it.product_key, { current_qty: after })
+      log.push({ venue_id: venueId, product_key: it.product_key, before, added: Number(it.quantity), after })
+    }
+  }
+  return log
+}
+
+export async function _clearInventoryStore() {
+  const { error } = await supabase.from('inventory_balances').delete().neq('venue_id', '__never__')
+  if (error) throw error
+  return { success: true }
+}
