@@ -3,11 +3,12 @@
 // 與 venueSales.js 共用 venues service —— 改動會直接影響 KEY-in 頁的大使下拉。
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Pencil, X, Check, Search, Power, Users, MapPin } from 'lucide-react'
+import { Plus, Pencil, X, Check, Search, Power, Users, MapPin, UserCheck } from 'lucide-react'
 import {
   listVenues, upsertVenue, deactivateVenue, activateVenue, REGION_OPTIONS,
 } from '../../lib/services/venues'
 import { getAllAmbassadors } from '../../lib/services/venueSales'
+import { SUPERVISORS, getSupervisorOfVenue, assignVenueToSupervisor } from '../../lib/services/supervisors'
 import PageShell, { Card, Badge } from '../../components/PageShell'
 
 export default function VenuesAdmin() {
@@ -22,7 +23,9 @@ export default function VenuesAdmin() {
   async function reload() {
     setLoading(true)
     const [vs, ambs] = await Promise.all([listVenues(), getAllAmbassadors()])
-    setVenues(vs)
+    // Merge supervisor_id from supervisors store
+    const enriched = vs.map(v => ({ ...v, supervisor_id: getSupervisorOfVenue(v.id) }))
+    setVenues(enriched)
     setAmbassadors(ambs)
     setLoading(false)
   }
@@ -160,6 +163,10 @@ function VenueRow({ venue, ambassadors, onEdit, onToggleActive }) {
             </Badge>
             {venue.source === 'custom' && <Badge color="#10b981">自訂</Badge>}
             {venue.has_self_sale && <Badge color="#f97316">店家自賣</Badge>}
+            {venue.supervisor_id && (() => {
+              const s = SUPERVISORS.find(x => x.id === venue.supervisor_id)
+              return s ? <Badge color={s.color}><UserCheck size={9} style={{ verticalAlign: 'middle' }} /> {s.name}</Badge> : null
+            })()}
             {inactive && <Badge color="#6a655c">已停用</Badge>}
           </div>
           {venue.address && (
@@ -192,6 +199,7 @@ function VenueEditModal({ venue, ambassadors, busy, onClose, onSave }) {
   const [isActive, setIsActive] = useState(venue?.is_active !== false)
   const [codes, setCodes] = useState(() => new Set(venue?.assigned_ambassador_codes || []))
   const [hasSelfSale, setHasSelfSale] = useState(venue?.has_self_sale === true)
+  const [supervisorId, setSupervisorId] = useState(() => venue?.id ? (getSupervisorOfVenue(venue.id) || '') : '')
   const isNew = !venue
 
   function toggleCode(id) {
@@ -204,6 +212,8 @@ function VenueEditModal({ venue, ambassadors, busy, onClose, onSave }) {
 
   function submit() {
     if (!name.trim()) return alert('請輸入店家名稱')
+    const finalId = venue?.id || (name.trim() ? null : null)
+    // 先呼叫 onSave 取得 venue_id（onSave 內部會 upsertVenue），再指派督導
     onSave({
       id: venue?.id,
       name: name.trim(),
@@ -213,6 +223,10 @@ function VenueEditModal({ venue, ambassadors, busy, onClose, onSave }) {
       assigned_ambassador_codes: [...codes],
       has_self_sale: hasSelfSale,
     })
+    // 同時寫督導分配（id 已知時直接寫；新增的 venue 由 onSave 端寫入後 reload 時讀新 id 不需要 — 此處只處理已存在的）
+    if (venue?.id) {
+      assignVenueToSupervisor(venue.id, supervisorId || null)
+    }
   }
 
   return (
@@ -258,6 +272,15 @@ function VenueEditModal({ venue, ambassadors, busy, onClose, onSave }) {
           <div style={{ marginTop: 4, fontSize: 11, color: '#8a8278' }}>
             勾選後：場域定價頁會多一欄「店家自賣抽成」；督導結帳時會分兩段（大使賣 vs 店家自賣）
           </div>
+        </Field>
+
+        <Field label={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><UserCheck size={11} /> 指派督導（每月去這家店收帳的人）</span>}>
+          <select value={supervisorId} onChange={e => setSupervisorId(e.target.value)} style={inputStyle()}>
+            <option value="">— 未指派 —</option>
+            {SUPERVISORS.map(s => (
+              <option key={s.id} value={s.id}>{s.name}（{s.region === 'taipei' ? '台北' : '台中'}）</option>
+            ))}
+          </select>
         </Field>
 
         <div style={{ marginTop: 14, marginBottom: 6, fontSize: 12, color: '#8a8278', letterSpacing: 1 }}>
