@@ -11,6 +11,18 @@ import { getDefaultAlertMap } from './venues'
 const USE_MOCK = false
 const TEMPLATE_VERSION = '2026-04'
 
+// 新加 / 跨區搬移 / DB 有但 hardcoded template 沒列的店家，fallback 用這份產品列。
+// 之後可由「店家管理」獨立設定取代。
+const DEFAULT_PRODUCTS = [
+  { key: 'romeo',            name: '羅密歐',       price: 1500, category: 'cuban_cigar' },
+  { key: 'trinidad_emerald', name: '3T翡翠',       price: 2000, category: 'cuban_cigar' },
+  { key: 'd4',               name: '帕特加斯D4號', price: 2000, category: 'cuban_cigar' },
+  { key: 'monte_no2',        name: '蒙特二號',     price: 2000, category: 'cuban_cigar' },
+  { key: 'romeo_wide',       name: '羅密歐 Wide',  price: 1500, category: 'cuban_cigar' },
+  { key: 'robusto',          name: 'Robusto',      price: 1500, category: 'cuban_cigar' },
+  { key: 'siglo6_tube',      name: 'Siglo VI 管',  price: 2500, category: 'cuban_cigar' },
+]
+
 // ============================================================
 // List / Fetch
 // ============================================================
@@ -544,64 +556,45 @@ const TAICHUNG_VENUE_TEMPLATE = [
   },
 ]
 
+// hardcoded 產品基線：用 venue.id 對 lookup。新加 / 移到別 region 的店在 DB 找得到但這裡找不到時，fallback 用 DEFAULT_PRODUCTS。
+const HARDCODED_TEMPLATE_VENUES = [...TAIPEI_VENUE_TEMPLATE, ...TAICHUNG_VENUE_TEMPLATE]
+
+/**
+ * Phase 2 重做：venues 來自 DB（venues 表，is_active=true），products 從 hardcoded template 用 venue.id 對 lookup。
+ *  - DB 改 region 立即生效（金沙→桃園）
+ *  - DB 新增店立即出現在對應 region（fallback DEFAULT_PRODUCTS）
+ *  - 不再有 source='custom' / hardcoded region 之分
+ */
 export async function getVenueSalesMatrixTemplate(region = 'taipei') {
-  const baseTpl = region === 'taichung' ? TAICHUNG_VENUE_TEMPLATE : TAIPEI_VENUE_TEMPLATE
-  // 取一次 admin 後台 venues（含 localStorage 覆寫的 active 狀態 + 大使綁定 + 自訂新增的店）
-  let adminVenues = []
-  try { adminVenues = await listVenues() } catch { adminVenues = [] }
-  const adminVenueMap = Object.fromEntries(adminVenues.map(v => [v.id, v]))
+  const { data, error } = await supabase
+    .from('venues')
+    .select('id, name, region, has_self_sale, assigned_ambassador_codes')
+    .eq('region', region)
+    .eq('is_active', true)
+    .order('name')
+  if (error) throw error
 
-  // 1) base template 過濾 inactive
-  const baseList = baseTpl
-    .filter(v => {
-      const av = adminVenueMap[v.id]
-      return !av || av.is_active !== false
-    })
-    .map(v => {
-      const av = adminVenueMap[v.id]
-      return {
-        ...v,
-        products: v.products.filter(p => p.price !== null && p.key !== 'pre_shift_venue_sales'),
-        supports_pre_shift: true,
-        assigned_ambassador_codes: av?.assigned_ambassador_codes || [],
-        is_admin_overridden: !!av?.is_overridden,
-      }
-    })
-
-  // 2) custom 新增的店（不在 base template）— 沒有 products，先 fallback 到一個通用商品列
-  const customList = adminVenues
-    .filter(v => v.source === 'custom' && v.region === region && v.is_active !== false)
-    .map(v => ({
+  const venues = (data || []).map(v => {
+    const tplVenue = HARDCODED_TEMPLATE_VENUES.find(t => t.id === v.id)
+    const products = tplVenue?.products
+      ? tplVenue.products.filter(p => p.price !== null && p.key !== 'pre_shift_venue_sales')
+      : DEFAULT_PRODUCTS
+    return {
       id: v.id,
       name: v.name,
       region: v.region,
-      products: defaultProductsForCustomVenue(),
-      supports_pre_shift: true,
+      has_self_sale: !!v.has_self_sale,
       assigned_ambassador_codes: v.assigned_ambassador_codes || [],
-      is_admin_overridden: true,
-      is_custom: true,
-    }))
+      products,
+    }
+  })
 
   return {
     region,
     region_name: REGIONS[region] || region,
     template_version: TEMPLATE_VERSION,
-    venues: [...baseList, ...customList],
+    venues,
   }
-}
-
-// 新增的 custom 店家暫時用通用 fallback 商品列；之後可改成「複製其他店」或獨立設定。
-function defaultProductsForCustomVenue() {
-  return [
-    { key: 'capadura_888_robusto', name: 'Capadura 888 Robusto', price: 1000, category: 'non_cuban_cigar' },
-    { key: 'capadura_898_robusto', name: 'Capadura 898 Robusto', price: 1000, category: 'non_cuban_cigar' },
-    { key: 'capadura_888_toro',    name: 'Capadura 888 TORO',    price: 1000, category: 'non_cuban_cigar' },
-    { key: 'capadura_898_toro',    name: 'Capadura 898 TORO',    price: 1000, category: 'non_cuban_cigar' },
-    { key: 'romeo',                name: '羅密歐',               price: 1500, category: 'cuban_cigar' },
-    { key: 'monte_no2',             name: '蒙特二號',             price: 2000, category: 'cuban_cigar' },
-    { key: 'partagas_d4',           name: '帕特加斯D4號',         price: 2000, category: 'cuban_cigar' },
-    { key: 'trinidad_emerald',      name: '3T翡翠',               price: 2000, category: 'cuban_cigar' },
-  ]
 }
 
 // ============================================================
