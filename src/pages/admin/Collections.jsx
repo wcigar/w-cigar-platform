@@ -8,8 +8,13 @@ import { useEffect, useMemo, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Calendar, UserCheck, AlertTriangle, Check, X, Edit3, ChevronRight, Coins, Printer, FileText, Send, Eraser } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
-import { listVenues } from '../../lib/services/venues'
+import { listVenues, REGION_OPTIONS as REGIONS } from '../../lib/services/venues'
 import { getVenueSalesMatrixTemplate } from '../../lib/services/venueSales'
+
+const REGION_COLOR = {
+  taipei: '#3b82f6', taoyuan: '#10b981', hsinchu: '#06b6d4',
+  taichung: '#a855f7', tainan: '#f97316', kaohsiung: '#ef4444',
+}
 import {
   SUPERVISORS, getSupervisorVenueMap, autoAssignByRegion,
 } from '../../lib/services/supervisors'
@@ -34,7 +39,8 @@ export default function Collections() {
     setLoading(true)
     const vs = await listVenues()
     const map = {}
-    for (const r of ['taipei', 'taichung']) {
+    const regs = Object.keys(REGIONS).filter(r => vs.some(v => v.region === r))
+    for (const r of regs) {
       const tpl = await getVenueSalesMatrixTemplate(r)
       tpl.venues.forEach(v => { map[v.id] = v })
     }
@@ -215,8 +221,8 @@ function CollectionRow({ c, onClick }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
         <div>
           <span style={{ fontSize: 15, fontWeight: 500, color: '#e8e0d0' }}>{c.venue_name}</span>
-          <span style={{ marginLeft: 8, fontSize: 10, padding: '2px 6px', borderRadius: 4, background: c.venue_region === 'taipei' ? '#3b82f622' : '#a855f722', color: c.venue_region === 'taipei' ? '#3b82f6' : '#a855f7' }}>
-            {c.venue_region === 'taipei' ? '台北' : '台中'}
+          <span style={{ marginLeft: 8, fontSize: 10, padding: '2px 6px', borderRadius: 4, background: (REGION_COLOR[c.venue_region] || '#6b7280') + '22', color: REGION_COLOR[c.venue_region] || '#6b7280' }}>
+            {REGIONS[c.venue_region] || c.venue_region}
           </span>
           {c.has_self_sale && <span style={{ marginLeft: 6, fontSize: 10, padding: '2px 6px', borderRadius: 4, background: '#f9731622', color: '#f97316' }}>店家自賣</span>}
         </div>

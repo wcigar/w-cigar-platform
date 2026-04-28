@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Save, Copy, ArrowLeft, AlertTriangle } from 'lucide-react'
-import { listVenues, getDefaultAlertMap } from '../../lib/services/venues'
+import { listVenues, getDefaultAlertMap, REGION_OPTIONS as REGIONS } from '../../lib/services/venues'
 import { getVenueSalesMatrixTemplate } from '../../lib/services/venueSales'
 import { bulkSetInventory, buildInventoryMatrix } from '../../lib/services/inventory'
 import PageShell, { Card } from '../../components/PageShell'
@@ -13,6 +13,7 @@ export default function InventoryBaseline() {
   const navigate = useNavigate()
   const [venues, setVenues] = useState([])
   const [tplMap, setTplMap] = useState({})
+  const [activeRegions, setActiveRegions] = useState([])
   const [draft, setDraft] = useState({}) // { "venueId:productKey": { qty, alert, target } }
   const [region, setRegion] = useState('taipei')
   const [busy, setBusy] = useState(false)
@@ -21,13 +22,17 @@ export default function InventoryBaseline() {
   async function load() {
     setLoading(true)
     const vs = await listVenues()
+    const regs = Object.keys(REGIONS).filter(r => vs.some(v => v.region === r))
+    setActiveRegions(regs)
     const map = {}
-    for (const r of ['taipei', 'taichung']) {
+    for (const r of regs) {
       const tpl = await getVenueSalesMatrixTemplate(r)
       tpl.venues.forEach(v => { map[v.id] = v })
     }
     setTplMap(map)
     setVenues(vs)
+    // 若預設 region 不在 active 列表，切到第一個有店的 region
+    if (regs.length > 0 && !regs.includes(region)) setRegion(regs[0])
 
     // pre-fill draft from existing inventory
     const matrix = await buildInventoryMatrix()
@@ -102,9 +107,12 @@ export default function InventoryBaseline() {
         <button onClick={() => navigate('/admin/inventory')} style={ghostBtn()}>
           <ArrowLeft size={13} /> 返回庫存矩陣
         </button>
-        <div style={{ display: 'flex', gap: 6 }}>
-          <button onClick={() => setRegion('taipei')} style={tabBtn(region === 'taipei')}>台北 ({venues.filter(v => v.region === 'taipei' && v.is_active !== false).length})</button>
-          <button onClick={() => setRegion('taichung')} style={tabBtn(region === 'taichung')}>台中 ({venues.filter(v => v.region === 'taichung' && v.is_active !== false).length})</button>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {activeRegions.map(r => (
+            <button key={r} onClick={() => setRegion(r)} style={tabBtn(region === r)}>
+              {REGIONS[r]} ({venues.filter(v => v.region === r && v.is_active !== false).length})
+            </button>
+          ))}
         </div>
         <div style={{ fontSize: 11, color: '#8a8278' }}>
           已填 <span style={{ color: '#c9a84c', fontWeight: 500 }}>{filledCount}</span> / {totalSlots} 格

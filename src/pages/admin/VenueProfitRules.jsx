@@ -4,12 +4,17 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Save, Lock, Calculator, AlertTriangle, EyeOff } from 'lucide-react'
-import { listVenues } from '../../lib/services/venues'
+import { listVenues, REGION_OPTIONS as REGIONS } from '../../lib/services/venues'
 import { getVenueSalesMatrixTemplate } from '../../lib/services/venueSales'
 import {
   buildPricingMatrix, upsertVenuePricing, bulkSetVenuePricing, canSeeCostPrice,
 } from '../../lib/services/venueProfitRules'
 import PageShell, { Card } from '../../components/PageShell'
+
+const REGION_COLOR = {
+  taipei: '#3b82f6', taoyuan: '#10b981', hsinchu: '#06b6d4',
+  taichung: '#a855f7', tainan: '#f97316', kaohsiung: '#ef4444',
+}
 
 export default function VenueProfitRules() {
   const navigate = useNavigate()
@@ -30,7 +35,8 @@ export default function VenueProfitRules() {
     setLoading(true)
     const vs = await listVenues()
     const map = {}
-    for (const r of ['taipei', 'taichung']) {
+    const regs = Object.keys(REGIONS).filter(r => vs.some(v => v.region === r))
+    for (const r of regs) {
       const tpl = await getVenueSalesMatrixTemplate(r)
       tpl.venues.forEach(v => { map[v.id] = v })
     }
@@ -89,8 +95,9 @@ export default function VenueProfitRules() {
         </div>
         <select value={filter.region} onChange={e => setFilter(f => ({ ...f, region: e.target.value }))} style={inputStyle({ width: 'auto' })}>
           <option value="all">全部地區</option>
-          <option value="taipei">台北</option>
-          <option value="taichung">台中</option>
+          {Object.keys(REGIONS).filter(r => matrix.some(v => v.region === r)).map(r => (
+            <option key={r} value={r}>{REGIONS[r]}</option>
+          ))}
         </select>
       </Card>
 
@@ -132,8 +139,8 @@ function VenuePricingCard({ venue, seeCost, onEdit }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
         <div>
           <span style={{ fontSize: 15, fontWeight: 500, color: '#e8e0d0' }}>{venue.venue_name}</span>
-          <span style={{ marginLeft: 8, fontSize: 10, padding: '2px 6px', borderRadius: 4, background: venue.region === 'taipei' ? '#3b82f622' : '#a855f722', color: venue.region === 'taipei' ? '#3b82f6' : '#a855f7' }}>
-            {venue.region === 'taipei' ? '台北' : '台中'}
+          <span style={{ marginLeft: 8, fontSize: 10, padding: '2px 6px', borderRadius: 4, background: (REGION_COLOR[venue.region] || '#6b7280') + '22', color: REGION_COLOR[venue.region] || '#6b7280' }}>
+            {REGIONS[venue.region] || venue.region}
           </span>
           <span style={{ marginLeft: 6, fontSize: 11, color: '#8a8278' }}>
             已設 {venue.set_count} / {venue.product_count}

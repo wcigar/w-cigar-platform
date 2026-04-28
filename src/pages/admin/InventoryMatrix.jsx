@@ -3,12 +3,17 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Zap, Settings, AlertTriangle } from 'lucide-react'
-import { listVenues, upsertVenue } from '../../lib/services/venues'
+import { listVenues, upsertVenue, REGION_OPTIONS as REGIONS } from '../../lib/services/venues'
 import {
   buildInventoryMatrix, upsertInventoryEntry,
 } from '../../lib/services/inventory'
 import { createRunFromAlerts } from '../../lib/services/replenishment'
 import PageShell, { Card } from '../../components/PageShell'
+
+const REGION_COLOR = {
+  taipei: '#3b82f6', taoyuan: '#10b981', hsinchu: '#06b6d4',
+  taichung: '#a855f7', tainan: '#f97316', kaohsiung: '#ef4444',
+}
 
 export default function InventoryMatrix() {
   const navigate = useNavigate()
@@ -116,8 +121,9 @@ export default function InventoryMatrix() {
         </div>
         <select value={filter.region} onChange={e => setFilter(f => ({ ...f, region: e.target.value }))} style={inputStyle({ width: 'auto' })}>
           <option value="all">全部地區</option>
-          <option value="taipei">台北</option>
-          <option value="taichung">台中</option>
+          {Object.keys(REGIONS).filter(r => matrix.some(v => v.region === r)).map(r => (
+            <option key={r} value={r}>{REGIONS[r]}</option>
+          ))}
         </select>
         <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#8a8278', cursor: 'pointer' }}>
           <input type="checkbox" checked={filter.alertOnly}
@@ -207,8 +213,8 @@ function VenueInventoryCard({ venue, onChangeEntry, onChangeDefaultAlert }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 15, fontWeight: 500, color: '#e8e0d0' }}>{venue.venue_name}</span>
-          <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: venue.region === 'taipei' ? '#3b82f622' : '#a855f722', color: venue.region === 'taipei' ? '#3b82f6' : '#a855f7' }}>
-            {venue.region === 'taipei' ? '台北' : '台中'}
+          <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: (REGION_COLOR[venue.region] || '#6b7280') + '22', color: REGION_COLOR[venue.region] || '#6b7280' }}>
+            {REGIONS[venue.region] || venue.region}
           </span>
           <span style={{ fontSize: 11, color: '#8a8278', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             預設閾值
