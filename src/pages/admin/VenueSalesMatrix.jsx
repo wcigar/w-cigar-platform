@@ -226,7 +226,13 @@ export default function VenueSalesMatrix() {
       payment: { cash, transfer, monthly, unpaid },
     })
     setErrors(errs)
-    if (errs.length === 0) setConfirming(true)
+    if (errs.length === 0) {
+      setConfirming(true)
+    } else {
+      // 員工常看不到上方錯誤卡，明確 alert + scroll
+      alert('請先修正以下 ' + errs.length + ' 項：\n\n' + errs.map((e, i) => `${i + 1}. ${e}`).join('\n'))
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
   }
 
   async function doSubmit() {
@@ -235,7 +241,17 @@ export default function VenueSalesMatrix() {
     try {
       const payload = buildCurrentPayload()
       const res = await oneShot.run(() => submitVenueSalesMatrix(payload))
-      alert(`✓ 已送出（MVP mock）\n\n寫入 ${res.sales_count} 家店的銷售單`)
+      if (!res) {
+        // oneShot 被 lock 攔下（500ms 內已有送出 in-flight）
+        alert('送出處理中，請稍候再試')
+        return
+      }
+      if (res.success === false) {
+        alert('送出失敗：' + (res.error || '未知錯誤'))
+        setConfirming(false)
+        return
+      }
+      alert(`✓ 已送出 ${res.sales_count} 家店的銷售單${res.inventory_deducted ? `\n（庫存已自動扣減 ${res.inventory_deducted} 項）` : ''}`)
       navigate('/admin/venue-sales')
     } catch (e) {
       alert('送出失敗：' + (e.message || '未知錯誤'))

@@ -924,7 +924,11 @@ export async function submitVenueSalesMatrix(payload) {
 
   const salesWithData = (withKey.venues || []).filter(v => v.has_sales && v.venue_total > 0)
   if (salesWithData.length === 0) {
-    return { success: true, sales_count: 0, sale_ids: [], inventory_deducted: 0, alert_count_after: 0 }
+    return {
+      success: false,
+      error: '沒有可送出的銷售資料：每家店都需要 has_sales=true 且 venue_total>0（請確認至少一家店有勾選「有銷售」+ 至少 1 項商品數量 > 0，或上班前店家銷售金額 > 0）',
+      sales_count: 0, sale_ids: [], inventory_deducted: 0, alert_count_after: 0,
+    }
   }
 
   const rows = salesWithData.map(v => ({
