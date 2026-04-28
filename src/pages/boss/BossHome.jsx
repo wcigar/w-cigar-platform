@@ -7,6 +7,7 @@ import { zhTW } from 'date-fns/locale'
 import { getTaskUrgency } from '../../lib/taskUtils'
 import { getSlaStatus } from '../../lib/slaUtils'
 import DashboardCards from '../../components/DashboardCards'
+import { BossCigarRewardSection } from '../../components/CigarRewardCard'
 
 export default function BossHome() {
   const navigate = useNavigate()
@@ -266,6 +267,9 @@ export default function BossHome() {
       })}
 
       {/* Action items tracking */}
+      {/* 雪茄獎勵簽核 */}
+      <BossCigarRewardSection />
+
       {openActions.length > 0 && (
         <div className="card" style={{ marginTop: 16, marginBottom: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>

@@ -78,6 +78,10 @@ export default function StaffExpense() {
   const [editPreviews, setEditPreviews] = useState([])
   const editFileRef = useRef(null)
   const editGalleryRef = useRef(null)
+  // 零用金編輯
+  const [editingCash, setEditingCash] = useState(null)
+  const [cashEditForm, setCashEditForm] = useState({ amount: '', method: '', given_by: '', received_by: '', note: '' })
+  const isBoss = user.role === 'boss' || user.employee_id === 'ADMIN' || user.is_admin
 
   useEffect(() => { load() }, [])
 
@@ -195,6 +199,23 @@ export default function StaffExpense() {
     const allUrls = [...existingUrls, ...newUrls]
     await supabase.from('expenses').update({ item: editForm.item, amount: +editForm.amount, note: editForm.note, photo_url: allUrls.length > 1 ? JSON.stringify(allUrls) : (allUrls[0] || '') }).eq('id', id)
     setEditing(null); setEditPhotos([]); setEditPreviews([])
+    load()
+  }
+
+  function startEditCash(r) {
+    setEditingCash(r.id)
+    setCashEditForm({ amount: String(r.amount || ''), method: r.method || '現金', given_by: r.given_by || '', received_by: r.received_by || r.employee_name || '', note: r.note || '' })
+  }
+
+  async function saveCashEdit(id) {
+    if (!cashEditForm.amount || +cashEditForm.amount <= 0) return alert('金額不可為空')
+    await supabase.from('petty_cash').update({ amount: +cashEditForm.amount, method: cashEditForm.method, given_by: cashEditForm.given_by, received_by: cashEditForm.received_by, note: cashEditForm.note }).eq('id', id)
+    setEditingCash(null); load()
+  }
+
+  async function deleteCash(r) {
+    if (!confirm(`確定要刪除這筆零用金紀錄？金額：$${r.amount.toLocaleString()}`)) return
+    await supabase.from('petty_cash').delete().eq('id', r.id)
     load()
   }
 
@@ -416,11 +437,39 @@ export default function StaffExpense() {
             <>
               {cashRecords.map(r => (
                 <div key={'c' + r.id} className="card" style={{ padding: 12, marginBottom: 6, borderColor: 'rgba(77,168,108,.2)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                    <div><div style={{ fontSize: 13, fontWeight: 600, color: 'var(--green)' }}>💰 收到零用金</div><div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{r.date} · {r.given_by} · {r.method} · 經手：{r.received_by || r.employee_name}</div></div>
-                    <span style={{ fontSize: 18, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--green)' }}>+${r.amount.toLocaleString()}</span>
-                  </div>
-                  {r.signature_url && <img src={r.signature_url} alt="" style={{ maxWidth: 160, height: 50, objectFit: 'contain', borderRadius: 6, border: '1px solid var(--border)', background: '#fff', marginTop: 4 }} />}
+                  {editingCash === r.id ? (
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--green)', marginBottom: 8 }}>✏️ 編輯零用金</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
+                        <div><div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>金額</div><input type="number" value={cashEditForm.amount} onChange={e => setCashEditForm(f => ({ ...f, amount: e.target.value }))} style={{ width: '100%', fontSize: 13, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text)', boxSizing: 'border-box' }} /></div>
+                        <div><div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>撥付方式</div><select value={cashEditForm.method} onChange={e => setCashEditForm(f => ({ ...f, method: e.target.value }))} style={{ width: '100%', fontSize: 13, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text)' }}><option>現金</option><option>轉帳</option></select></div>
+                        <div><div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>撥付人</div><select value={cashEditForm.given_by} onChange={e => setCashEditForm(f => ({ ...f, given_by: e.target.value }))} style={{ width: '100%', fontSize: 13, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text)' }}><option>Wilson</option><option>Shanshan</option></select></div>
+                        <div><div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>經手人</div><input value={cashEditForm.received_by} onChange={e => setCashEditForm(f => ({ ...f, received_by: e.target.value }))} style={{ width: '100%', fontSize: 13, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text)', boxSizing: 'border-box' }} /></div>
+                      </div>
+                      <div style={{ marginBottom: 8 }}><div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>備註</div><input value={cashEditForm.note} onChange={e => setCashEditForm(f => ({ ...f, note: e.target.value }))} placeholder="備註" style={{ width: '100%', fontSize: 13, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text)', boxSizing: 'border-box' }} /></div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button onClick={() => saveCashEdit(r.id)} style={{ flex: 1, padding: 8, fontSize: 12, fontWeight: 700, borderRadius: 6, border: 'none', background: 'var(--gold)', color: 'var(--black)', cursor: 'pointer' }}>✅ 儲存</button>
+                        <button onClick={() => setEditingCash(null)} style={{ flex: 1, padding: 8, fontSize: 12, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--black-card)', color: 'var(--text-muted)', cursor: 'pointer' }}>取消</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                        <div><div style={{ fontSize: 13, fontWeight: 600, color: 'var(--green)' }}>💰 收到零用金</div><div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{r.date} · {r.given_by} · {r.method} · 經手：{r.received_by || r.employee_name}</div></div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontSize: 18, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--green)' }}>+${r.amount.toLocaleString()}</span>
+                        </div>
+                      </div>
+                      {r.note && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>📝 {r.note}</div>}
+                      {r.signature_url && <img src={r.signature_url} alt="" style={{ maxWidth: 160, height: 50, objectFit: 'contain', borderRadius: 6, border: '1px solid var(--border)', background: '#fff', marginTop: 4 }} />}
+                      {isBoss && (
+                        <div style={{ display: 'flex', gap: 6, marginTop: 8, justifyContent: 'flex-end' }}>
+                          <button onClick={() => startEditCash(r)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--black-card)', color: 'var(--gold)', cursor: 'pointer', fontWeight: 600 }}>✏️ 編輯</button>
+                          <button onClick={() => deleteCash(r)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(196,77,77,.3)', background: 'rgba(196,77,77,.08)', color: 'var(--red)', cursor: 'pointer', fontWeight: 600 }}>🗑️ 刪除</button>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               ))}
               {expenses.map(r => (

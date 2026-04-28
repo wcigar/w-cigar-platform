@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { logAudit } from '../../lib/audit'
+import { CigarRewardPayrollStatus } from '../../components/CigarRewardCard'
 import { calcLaborIns, calcHealthIns, calcLaborPension, calcLaborInsER, calcHealthInsER, findBracket, calcOvertimePay, LABOR_INS_BRACKETS, HEALTH_INS_BRACKETS, SHIFTS, LATE_GRACE_MIN, OT_GRACE_MIN } from '../../lib/constants'
 import { ChevronDown, ChevronUp, Plus, Trash2, Save, FileText, Printer, Edit3, Clock, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react'
 import { taipeiHM } from '../../lib/timezone'
@@ -457,6 +458,7 @@ export default function Payroll() {
               {p.att.lateDetails.length>0&&<div style={{marginBottom:8}}><div style={{fontSize:11,color:'var(--red)',fontWeight:600,marginBottom:4}}>⚠️ 遲到明細</div>{p.att.lateDetails.map((d,i)=><div key={i} style={{fontSize:11,color:'var(--text-dim)',display:'flex',justifyContent:'space-between',padding:'2px 0'}}><span>{d.date} 打卡{d.time}{d.overridden?' ⚙️':''}</span><span style={{color:'var(--red)'}}>遲{d.minutes}分</span></div>)}</div>}
               {p.att.earlyDetails.length>0&&<div style={{marginBottom:8}}><div style={{fontSize:11,color:'#f59e0b',fontWeight:600,marginBottom:4}}>⚠️ 早退明細</div>{p.att.earlyDetails.map((d,i)=><div key={i} style={{fontSize:11,color:'var(--text-dim)',display:'flex',justifyContent:'space-between',padding:'2px 0'}}><span>{d.date} 下班{d.time}{d.overridden?' ⚙️':''}</span><span style={{color:'#f59e0b'}}>早{d.minutes}分</span></div>)}</div>}
               {p.otDetails.length>0&&<div style={{marginBottom:8}}><div style={{fontSize:11,color:'var(--green)',fontWeight:600,marginBottom:4}}>⏰ 加班（時薪${p.hourlyBase}）</div>{p.otDetails.map((d,i)=><div key={i} style={{fontSize:11,color:'var(--text-dim)',display:'flex',justifyContent:'space-between',padding:'2px 0'}}><span>{d.date} {d.hours}hr</span><span style={{color:'var(--green)'}}>+${d.pay.toLocaleString()}</span></div>)}</div>}
+              <CigarRewardPayrollStatus employeeId={emp.id} month={month} />
               <SH>薪資明細</SH>
               <R label="月底薪" value={p.monthlyBase} dim/><R label={`當月天數`} value={`${p.daysInMonth} 天`} dim/><R label="每日底薪" value={p.dailyBase} dim/>
               <R label="實際出勤天數" value={`${p.actualWorkedDays} 天`} dim/>
