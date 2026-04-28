@@ -150,9 +150,8 @@ export default function StaffHome() {
   const done = tasks.filter(t => t.completed).length
   const hh = new Date().getHours()
   const greeting = hh < 12 ? '早安' : hh < 18 ? '午安' : '晚安'
+  const greetingEn = hh < 12 ? 'Good Morning' : hh < 18 ? 'Good Afternoon' : 'Good Evening'
   const myGrabs = leaderboard.find(x => x.name === user.name)?.count || 0
-
-  // Performance data
   const tiers = [{min:0,max:300000,pct:0},{min:300000,max:500000,pct:3},{min:500000,max:700000,pct:5},{min:700000,max:1000000,pct:7},{min:1000000,max:Infinity,pct:10}]
   const cur = tiers.find(t => monthRevenue >= t.min && monthRevenue < t.max) || tiers[0]
   const next = tiers.find(t => t.min > monthRevenue)
@@ -161,6 +160,9 @@ export default function StaffHome() {
   const pctInTier = cur.max === Infinity ? 100 : Math.min(100, ((monthRevenue - cur.min) / (cur.max - cur.min)) * 100)
   const myCabinetCount = cabinetRewards.length
   const myBonus = cabinetRewards.reduce((s, r) => s + (+r.bonus_per_staff || 0), 0)
+  const nowTime = new Date().toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false })
+  const shiftLabel = shiftName || '未排班'
+  const sopPct = tasks.length ? Math.round(done / tasks.length * 100) : 0
 
   async function updateActionItem(id, updates) {
     await supabase.from('meeting_action_items').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id)
@@ -174,192 +176,200 @@ export default function StaffHome() {
     setActionItems(data || [])
   }
 
-  if (loading) return <div className="page-container"><div className="loading-shimmer" style={{ height: 120, marginBottom: 12 }} /><div className="loading-shimmer" style={{ height: 80 }} /></div>
-
-  const ZT = ({ color, children, right, onClick }) => (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderLeft: `3px solid ${color}`, paddingLeft: 12, fontSize: 15, fontWeight: 700, margin: '20px 0 12px', cursor: onClick ? 'pointer' : 'default' }} onClick={onClick}>
-      <span>{children}</span>{right && <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 400 }}>{right}</span>}
-    </div>
-  )
+  if (loading) return <div style={{padding:24}}><div className="loading-shimmer" style={{height:120,marginBottom:12,borderRadius:14}}/><div className="loading-shimmer" style={{height:80,borderRadius:14}}/></div>
 
   return (
-    <div className="page-container fade-in">
+    <div style={{padding:'0 20px 100px',maxWidth:460,margin:'0 auto'}}>
       <AbnormalReport show={showAbnormal} onClose={() => setShowAbnormal(false)} />
-      {motivation && <div onClick={() => setMotivation(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 9998, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 20 }}>
-        <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
-        <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--gold)', marginBottom: 8 }}>{motivation.type}打卡成功！</div>
-        <div style={{ fontSize: 16, color: 'var(--text)', textAlign: 'center', lineHeight: 1.6, maxWidth: 300 }}>{motivation.text}</div>
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 16 }}>點擊任意處關閉</div>
+      {motivation && <div onClick={() => setMotivation(null)} style={{position:'fixed',inset:0,background:'rgba(5,4,3,.9)',zIndex:9998,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',cursor:'pointer',padding:20}}>
+        <div style={{fontSize:48,marginBottom:16}}>✅</div>
+        <div style={{fontFamily:'var(--serif)',fontSize:22,fontWeight:600,color:'var(--cream)',marginBottom:8}}>{motivation.type}打卡成功！</div>
+        <div style={{fontFamily:'var(--serif)',fontSize:15,color:'var(--bone)',textAlign:'center',lineHeight:1.8,maxWidth:300}}>{motivation.text}</div>
+        <div style={{fontFamily:'var(--display)',fontSize:11,fontStyle:'italic',color:'rgba(196,163,90,.3)',marginTop:20,letterSpacing:3}}>tap anywhere to close</div>
       </div>}
 
-      {/* 問候 */}
-      <div style={{ marginBottom: 16 }}>
-        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 28, color: 'var(--gold)', fontWeight: 600 }}>{greeting}，{user.name}</h2>
-        <p style={{ color: 'var(--text-dim)', fontSize: 13, marginTop: 4 }}>{format(new Date(), 'yyyy年M月d日 EEEE', { locale: zhTW })}</p>
+      {/* ══ Header ══ */}
+      <div style={{textAlign:'center',padding:'48px 0 36px'}}>
+        <div style={{width:120,height:1,margin:'0 auto 20px',background:'linear-gradient(90deg,transparent,rgba(196,163,90,.4),transparent)',position:'relative'}}>
+          <span style={{position:'absolute',left:'50%',top:'50%',transform:'translate(-50%,-50%)',fontSize:6,color:'rgba(196,163,90,.5)',background:'#050403',padding:'0 8px'}}>◆</span>
+        </div>
+        <div style={{fontFamily:'Cormorant Garamond,serif',fontSize:56,fontWeight:300,letterSpacing:8,background:'linear-gradient(180deg,#f0e8d8 30%,rgba(196,163,90,.7))',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>W</div>
+        <div style={{fontFamily:'Noto Serif TC,serif',fontSize:11,color:'rgba(196,163,90,.5)',letterSpacing:8,marginTop:8,fontWeight:300}}>紳 士 雪 茄 館</div>
       </div>
 
-      {/* ═══ Zone A：即時行動 ═══ */}
-      <ZT color="#c9a84c">⚡ 即時行動</ZT>
-
-      {/* 打卡卡片 */}
-      <div className="card" style={{ marginBottom: 12, borderColor: 'var(--border-gold)', borderWidth: 2 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Clock size={16} color="var(--gold)" /><span style={{ fontSize: 14, fontWeight: 600, color: 'var(--gold)' }}>今日班別</span></div>
-          {shiftName && <span className={`badge ${shiftName === '休假' || shiftName === '臨時請假' ? 'badge-blue' : 'badge-gold'}`}>{shiftName}</span>}
+      {/* ══ Greeting ══ */}
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-end',padding:'0 4px 20px'}}>
+        <div>
+          <div style={{fontFamily:'Cormorant Garamond,serif',fontSize:12,fontStyle:'italic',color:'rgba(196,163,90,.4)',letterSpacing:2}}>{greetingEn}</div>
+          <div style={{fontFamily:'Noto Serif TC,serif',fontSize:22,fontWeight:500,color:'#f0e8d8',marginTop:4}}>{user.name}，{greeting}</div>
         </div>
-        {shiftInfo?.start ? <div style={{ fontSize: 28, fontFamily: 'var(--font-mono)', fontWeight: 500 }}>{shiftInfo.start} — {shiftInfo.end}</div>
-          : shiftName ? <div style={{ fontSize: 16, color: 'var(--blue)' }}>今日{shiftName}</div>
-          : <div style={{ fontSize: 14, color: 'var(--text-dim)' }}>尚未排班</div>}
-        {shiftInfo?.start && <>
-          <div style={{ display: 'flex', gap: 12, marginTop: 12, padding: '8px 10px', background: 'rgba(201,168,76,.06)', borderRadius: 8 }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>上班打卡{crossDayPunchDate ? ` (${crossDayPunchDate.slice(5)})` : ''}</div>
-              {punchIn ? <div style={{ fontSize: 16, fontFamily: 'var(--font-mono)', fontWeight: 600, color: crossDayPunchDate ? '#f59e0b' : 'var(--green)' }}>{toTaipei(punchIn.time, true)}</div> : <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>尚未上班打卡</div>}
+        <div style={{textAlign:'right'}}>
+          <div style={{fontFamily:'JetBrains Mono,monospace',fontSize:10,color:'rgba(196,163,90,.35)',letterSpacing:1}}>{format(new Date(), 'yyyy.MM.dd')}</div>
+          <div style={{display:'inline-block',marginTop:4,fontFamily:'JetBrains Mono,monospace',fontSize:9,color:'rgba(196,163,90,.6)',padding:'3px 10px',borderRadius:20,border:'1px solid rgba(196,163,90,.12)',letterSpacing:2}}>{shiftLabel}</div>
+        </div>
+      </div>
+
+      {/* ══════ Zone A：即時行動 ══════ */}
+      <div className="wcb-zone">
+        <div className="wcb-zone-head"><div className="wcb-zone-accent gold"/><div className="wcb-zone-label">即時行動</div><div className="wcb-zone-eng">Immediate</div></div>
+
+        {/* 打卡卡片 */}
+        <div className="wcb-card" style={{background:'linear-gradient(160deg,rgba(30,24,18,.96),rgba(14,12,10,.99))',borderColor:'rgba(196,163,90,.15)',padding:'28px 24px',textAlign:'center'}}>
+          <div style={{fontFamily:'Cormorant Garamond,serif',fontSize:11,fontStyle:'italic',color:'rgba(196,163,90,.4)',letterSpacing:4}}>Current Shift</div>
+          {shiftInfo?.start ? (
+            <div style={{fontFamily:'JetBrains Mono,monospace',fontSize:48,fontWeight:300,letterSpacing:4,margin:'12px 0',lineHeight:1,background:'linear-gradient(180deg,#f0e8d8 50%,rgba(196,163,90,.5))',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>{shiftInfo.start} — {shiftInfo.end}</div>
+          ) : <div style={{fontFamily:'var(--serif)',fontSize:18,color:'rgba(196,163,90,.4)',margin:'16px 0'}}>{shiftName ? `今日${shiftName}` : '尚未排班'}</div>}
+
+          {shiftInfo?.start && <>
+            <div style={{display:'flex',gap:16,justifyContent:'center',margin:'16px 0'}}>
+              <div><div style={{fontFamily:'var(--mono)',fontSize:9,color:'rgba(196,163,90,.3)',letterSpacing:1}}>CLOCK IN{crossDayPunchDate ? ` (${crossDayPunchDate.slice(5)})` : ''}</div><div style={{fontFamily:'var(--mono)',fontSize:16,fontWeight:400,color:punchIn?(crossDayPunchDate?'#f59e0b':'rgba(100,170,100,.8)'):'rgba(196,163,90,.2)',marginTop:4}}>{punchIn ? toTaipei(punchIn.time, true) : '—:—'}</div></div>
+              <div style={{width:1,background:'rgba(196,163,90,.1)'}}/>
+              <div><div style={{fontFamily:'var(--mono)',fontSize:9,color:'rgba(196,163,90,.3)',letterSpacing:1}}>CLOCK OUT</div><div style={{fontFamily:'var(--mono)',fontSize:16,fontWeight:400,color:punchOut?'rgba(100,140,170,.8)':'rgba(196,163,90,.2)',marginTop:4}}>{punchOut ? toTaipei(punchOut.time, true) : '—:—'}</div></div>
             </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>下班打卡</div>
-              {punchOut ? <div style={{ fontSize: 16, fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--blue)' }}>{toTaipei(punchOut.time, true)}</div> : <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>尚未下班打卡</div>}
+            <div style={{display:'flex',gap:10}}>
+              <button className="wcb-btn-gold" style={{flex:1,letterSpacing:3}} onClick={() => openPunchCam('上班')}>上班打卡</button>
+              <button className="wcb-btn-outline" style={{flex:1,padding:16,letterSpacing:3}} onClick={() => openPunchCam('下班')}>下班打卡</button>
             </div>
+          </>}
+        </div>
+
+        {/* 盤點提醒 */}
+        {invReminder.length > 0 && (
+          <div className="wcb-card" style={{borderColor:'rgba(190,70,60,.2)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}><span style={{fontFamily:'var(--serif)',fontSize:13,color:'rgba(190,70,60,.8)'}}>📦 月底盤點提醒</span><span className="wcb-tag wcb-tag-red">{invReminder.length} 項待盤</span></div>
+            {invReminder.slice(0,5).map(item => <div key={item.id} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderBottom:'1px solid rgba(196,163,90,.04)',fontFamily:'var(--serif)',fontSize:12}}><span style={{color:'var(--bone)'}}>{item.name} <span style={{color:'var(--ash)'}}>{item.category}</span></span><span style={{fontFamily:'var(--mono)',fontSize:11,color:item.current_stock<=(item.safe_stock||0)?'rgba(190,70,60,.7)':'var(--ash)'}}>{item.current_stock??'?'} {item.unit}</span></div>)}
+            <button className="wcb-btn-outline" style={{width:'100%',marginTop:10}} onClick={() => navigate('/inventory')}>📋 前往盤點</button>
           </div>
-          <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
-            <button className="btn-gold" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '14px 0', fontSize: 16 }} onClick={() => openPunchCam('上班')}><MapPin size={16} />上班打卡</button>
-            <button className="btn-outline" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '14px 0', fontSize: 16 }} onClick={() => openPunchCam('下班')}><MapPin size={16} />下班打卡</button>
+        )}
+
+        {/* 異常回報 */}
+        <button className="wcb-btn-danger" style={{width:'100%',padding:16,fontSize:14,letterSpacing:2}} onClick={() => setShowAbnormal(true)}>🚨 突發異常回報</button>
+      </div>
+
+      {/* ══════ Zone B：今日任務 ══════ */}
+      <div className="wcb-zone">
+        <div className="wcb-zone-head"><div className="wcb-zone-accent blue"/><div className="wcb-zone-label">今日任務</div><div className="wcb-zone-eng">Today's Tasks</div></div>
+
+        {/* SOP 進度 */}
+        <div className="wcb-card">
+          <div style={{display:'flex',justifyContent:'space-between',marginBottom:10}}><span style={{fontFamily:'var(--serif)',fontSize:12,color:'var(--ash)'}}>SOP 進度</span><span style={{fontFamily:'var(--mono)',fontSize:13,color:'rgba(196,163,90,.7)'}}>{done} / {tasks.length}</span></div>
+          <div className="wcb-progress-track"><div className="wcb-progress-fill" style={{width:`${sopPct}%`}}/></div>
+          <div className="wcb-sep"/>
+          {tasks.slice(0,5).map(t => (
+            <div key={t.id} style={{display:'flex',alignItems:'center',gap:14,padding:'11px 0',borderBottom:'1px solid rgba(196,163,90,.03)'}}>
+              <div style={{width:18,height:18,borderRadius:5,flexShrink:0,border:`1px solid rgba(196,163,90,${t.completed?.15:.08})`,display:'flex',alignItems:'center',justifyContent:'center',...(t.completed?{background:'rgba(196,163,90,.1)'}:{})}}>{t.completed&&<span style={{fontSize:9,color:'rgba(196,163,90,.7)'}}>✓</span>}</div>
+              <span style={{fontFamily:'var(--serif)',fontSize:13,color:t.completed?'rgba(232,220,200,.3)':'rgba(232,220,200,.85)',flex:1,...(t.completed?{textDecoration:'line-through',textDecorationColor:'rgba(196,163,90,.1)'}:{})}}>{t.title}</span>
+              {t.due_time&&<span style={{fontFamily:'var(--mono)',fontSize:9,color:'rgba(196,163,90,.25)',letterSpacing:1}}>{t.due_time}</span>}
+            </div>
+          ))}
+        </div>
+
+        {/* 待辦任務 */}
+        {actionItems.length > 0 && (
+          <div className="wcb-card" style={{borderColor:'rgba(100,140,170,.15)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',marginBottom:10}}><span style={{fontFamily:'var(--serif)',fontSize:13,color:'var(--bone)'}}>📋 待辦任務</span><span className="wcb-tag wcb-tag-blue">{actionItems.length} 項</span></div>
+            {actionItems.map(item => {
+              const overdue = item.due_date && item.due_date < today
+              return <div key={item.id} style={{padding:'12px 0',borderTop:'1px solid rgba(196,163,90,.04)'}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
+                  <div style={{flex:1}}><div style={{fontFamily:'var(--serif)',fontSize:13,fontWeight:500,color:overdue?'rgba(190,70,60,.8)':'var(--bone)'}}>{item.title}</div><div style={{fontFamily:'var(--mono)',fontSize:10,color:'var(--ash)',marginTop:3}}>{item.due_date&&<span style={{color:overdue?'rgba(190,70,60,.6)':'var(--ash)'}}>截止 {item.due_date}{overdue?' (逾期!)':''}</span>}{item.priority!=='normal'&&<span style={{marginLeft:8,color:item.priority==='high'?'rgba(190,70,60,.7)':'#f59e0b'}}>{item.priority==='high'?'高':'緊急'}</span>}</div></div>
+                  <span className={`wcb-tag ${item.status==='in_progress'?'wcb-tag-blue':'wcb-tag-gold'}`}>{item.status==='pending'?'待執行':'進行中'}</span>
+                </div>
+                <div style={{display:'flex',gap:6,marginTop:8}}>
+                  {item.status==='pending'&&<button className="wcb-btn-outline" style={{fontSize:11,padding:'5px 12px'}} onClick={()=>updateActionItem(item.id,{status:'in_progress'})}>🔄 開始</button>}
+                  <button className="wcb-btn-outline" style={{fontSize:11,padding:'5px 12px',borderColor:'rgba(100,170,100,.2)',color:'rgba(100,170,100,.7)'}} onClick={()=>updateActionItem(item.id,{status:'completed',completed_at:new Date().toISOString()})}>✅ 完成</button>
+                  <button className="wcb-btn-outline" style={{fontSize:11,padding:'5px 12px'}} onClick={()=>setReassigning(reassigning===item.id?null:item.id)}>🔀 轉派</button>
+                </div>
+                {reassigning===item.id&&<div style={{marginTop:6,display:'flex',flexWrap:'wrap',gap:4}}>{colleagues.map(c=><button key={c.id} className="wcb-btn-outline" style={{fontSize:10,padding:'4px 10px'}} onClick={()=>reassignTask(item.id,c.id,c.name)}>{c.name}</button>)}</div>}
+                <div style={{display:'flex',gap:6,marginTop:6}}>
+                  <input className="wcb-input" style={{fontSize:11,padding:'6px 10px'}} value={progressNote[item.id]||item.progress_note||''} onChange={e=>setProgressNote(prev=>({...prev,[item.id]:e.target.value}))} placeholder="回報進度…"/>
+                  <button className="wcb-btn-outline" style={{padding:'6px 12px',fontSize:11}} onClick={()=>{const note=progressNote[item.id]||item.progress_note||'';if(note.trim())updateActionItem(item.id,{progress_note:note.trim()})}}>💬</button>
+                </div>
+              </div>
+            })}
           </div>
+        )}
+
+        <button className="wcb-btn-outline" style={{width:'100%',padding:16,letterSpacing:2,marginTop:4}} onClick={()=>navigate('/meeting')}><FileText size={14} style={{marginRight:8,verticalAlign:'middle'}}/>週會準備</button>
+      </div>
+
+      {/* ══════ Zone C：本月績效 ══════ */}
+      <div className="wcb-zone">
+        <div className="wcb-zone-head"><div className="wcb-zone-accent green"/><div className="wcb-zone-label">本月績效</div><div className="wcb-zone-eng">Performance</div></div>
+
+        {/* 收合/展開 */}
+        <div className="wcb-card" onClick={()=>setShowPerformance(!showPerformance)} style={{cursor:'pointer'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            <div style={{display:'flex',gap:20,alignItems:'baseline'}}>
+              <span style={{fontFamily:'var(--mono)',fontSize:12,color:'rgba(196,163,90,.5)'}}>${monthRevenue.toLocaleString()}</span>
+              <span style={{fontFamily:'var(--mono)',fontSize:12,color:cur.pct>0?'rgba(100,170,100,.6)':'rgba(196,163,90,.3)'}}>{cur.pct}%</span>
+              <span style={{fontFamily:'var(--mono)',fontSize:12,color:'rgba(196,163,90,.4)'}}>{myGrabs} 單</span>
+            </div>
+            <div style={{fontFamily:'Cormorant Garamond,serif',fontSize:10,fontStyle:'italic',color:'rgba(196,163,90,.3)',letterSpacing:2,padding:'4px 14px',borderRadius:20,border:'1px solid rgba(196,163,90,.1)'}}>{showPerformance?'收合 ▴':'展開 ▾'}</div>
+          </div>
+        </div>
+
+        {showPerformance && <>
+          {/* 營業額分紅 */}
+          <div className="wcb-card">
+            <div style={{fontFamily:'var(--serif)',fontSize:13,color:'var(--bone)',marginBottom:12}}>💰 營業額分紅</div>
+            <div className="wcb-stat"><span className="wcb-stat-k">本月營業額</span><span className="wcb-stat-v hero">${monthRevenue.toLocaleString()}</span></div>
+            <div className="wcb-stat"><span className="wcb-stat-k">目前分紅</span><span className="wcb-stat-v" style={{color:cur.pct>0?'rgba(100,170,100,.8)':'var(--ash)'}}>{cur.pct}%</span></div>
+            <div className="wcb-progress-track" style={{margin:'12px 0'}}><div className="wcb-progress-fill" style={{width:`${pctInTier}%`}}/></div>
+            <div style={{display:'flex',justifyContent:'space-between',fontSize:9,fontFamily:'var(--mono)',color:'var(--ash)',marginBottom:8}}>{tiers.map((t,i)=><span key={i} style={{color:i<=curIdx?'rgba(196,163,90,.6)':'var(--smoke)',fontWeight:i===curIdx?600:400}}>{t.pct}%</span>)}</div>
+            {next&&gap>0&&<div style={{fontFamily:'var(--serif)',fontSize:12,color:'var(--ash)',textAlign:'center',padding:'8px 0',background:'rgba(196,163,90,.03)',borderRadius:8}}>{cur.pct>0?<>📈 再 <b style={{color:'var(--gold-hex)'}}>${gap.toLocaleString()}</b> → <b style={{color:'rgba(100,170,100,.8)'}}>{next.pct}%</b></>:<>💪 再 <b style={{color:'var(--gold-hex)'}}>${gap.toLocaleString()}</b> 即達 <b style={{color:'rgba(100,170,100,.8)'}}>{next.pct}%</b></>}</div>}
+          </div>
+
+          {/* 開櫃 VIP */}
+          <div className="wcb-card">
+            <div style={{fontFamily:'var(--serif)',fontSize:13,color:'var(--bone)',marginBottom:12}}>🔑 開櫃 VIP 獎勵</div>
+            <div style={{display:'flex',gap:12}}>
+              <div style={{flex:1,textAlign:'center',padding:'10px 0',background:'rgba(196,163,90,.03)',borderRadius:8}}><div style={{fontFamily:'var(--mono)',fontSize:9,color:'var(--ash)',letterSpacing:1}}>CABINET</div><div style={{fontFamily:'var(--mono)',fontSize:22,fontWeight:300,color:'rgba(196,163,90,.7)',marginTop:4}}>{myCabinetCount}</div></div>
+              <div style={{flex:1,textAlign:'center',padding:'10px 0',background:'rgba(196,163,90,.03)',borderRadius:8}}><div style={{fontFamily:'var(--mono)',fontSize:9,color:'var(--ash)',letterSpacing:1}}>BONUS</div><div style={{fontFamily:'var(--mono)',fontSize:22,fontWeight:300,color:myBonus>0?'rgba(100,170,100,.7)':'var(--ash)',marginTop:4}}>${myBonus.toLocaleString()}</div></div>
+            </div>
+            {myCabinetCount>0&&<div style={{marginTop:10}}>{cabinetRewards.map(r=><div key={r.id} className="wcb-stat"><span className="wcb-stat-k">{r.customer_name}</span><span className="wcb-stat-v" style={{color:r.status==='approved'?'rgba(100,170,100,.7)':'rgba(196,163,90,.5)'}}>${(+r.bonus_per_staff).toLocaleString()} {r.status==='approved'?'✓':'⏳'}</span></div>)}</div>}
+          </div>
+
+          {/* 全勤 */}
+          <div className="wcb-card">
+            <div className="wcb-stat" style={{border:'none',padding:0}}><span className="wcb-stat-k">✅ 全勤獎金</span><span className="wcb-stat-v hero">$2,000</span></div>
+            <div style={{fontFamily:'var(--serif)',fontSize:11,color:'var(--smoke)',marginTop:6}}>本月無遲到、無缺勤、無臨時請假即可領取</div>
+          </div>
+
+          {/* 雪茄獎勵 */}
+          <StaffCigarReward user={user} />
+
+          {/* 搶單排行 */}
+          {leaderboard.length>0&&(
+            <div className="wcb-card">
+              <div style={{fontFamily:'var(--serif)',fontSize:13,color:'var(--bone)',marginBottom:10}}>🏆 搶單排行榜</div>
+              {leaderboard.slice(0,5).map((x,i)=><div key={x.name} className="wcb-stat"><span className="wcb-stat-k">{i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}.`} {x.name}</span><span className="wcb-stat-v">{x.count} 單</span></div>)}
+            </div>
+          )}
+
+          {/* 公告 */}
+          {notices.length>0&&(
+            <div className="wcb-card" style={{borderColor:'rgba(190,70,60,.12)'}}>
+              <div style={{fontFamily:'var(--serif)',fontSize:13,color:'rgba(190,70,60,.7)',marginBottom:8}}>📢 公告</div>
+              {notices.map(n=><div key={n.id} style={{padding:'8px 0',borderBottom:'1px solid rgba(196,163,90,.04)',fontFamily:'var(--serif)',fontSize:13,color:'var(--bone)'}}>{n.content}<div style={{fontFamily:'var(--mono)',fontSize:10,color:'var(--smoke)',marginTop:3}}>{n.publisher}</div></div>)}
+            </div>
+          )}
         </>}
       </div>
 
-      {/* 盤點提醒 */}
-      {invReminder.length > 0 && (
-        <div className="card" style={{ marginBottom: 12, borderColor: 'rgba(245,158,11,.3)', background: 'rgba(245,158,11,.05)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 16 }}>📦</span><span style={{ fontSize: 14, fontWeight: 700, color: '#f59e0b' }}>月底盤點提醒</span></div>
-            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{invReminder.length} 項待盤</span>
-          </div>
-          {invReminder.slice(0, 5).map(item => <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderTop: '1px solid var(--border)', fontSize: 12 }}><span><b style={{ color: 'var(--text)' }}>{item.name}</b> <span style={{ color: 'var(--text-muted)' }}>{item.category}</span></span><span style={{ fontFamily: 'var(--font-mono)', color: item.current_stock <= (item.safe_stock || 0) ? 'var(--red)' : 'var(--text-dim)' }}>{item.current_stock ?? '?'} {item.unit}</span></div>)}
-          {invReminder.length > 5 && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>...還有 {invReminder.length - 5} 項</div>}
-          <button onClick={() => navigate('/inventory')} style={{ width: '100%', marginTop: 8, padding: 10, fontSize: 13, fontWeight: 700, borderRadius: 8, border: '1px solid rgba(245,158,11,.3)', background: 'rgba(245,158,11,.1)', color: '#f59e0b', cursor: 'pointer' }}>📋 前往盤點</button>
-        </div>
-      )}
-
-      {/* 突發異常 */}
-      <button style={{ width: '100%', marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, background: 'rgba(196,77,77,.1)', border: '1px solid rgba(196,77,77,.25)', borderRadius: 'var(--radius-sm)', color: 'var(--red)', fontSize: 15, fontWeight: 700, cursor: 'pointer' }} onClick={() => setShowAbnormal(true)}>
-        <AlertTriangle size={18} /> 🚨 突發異常回報
-      </button>
-
-      {/* ═══ Zone B：今日任務 ═══ */}
-      <ZT color="#4d8cc4">📋 今日任務</ZT>
-
-      <div className="card" style={{ marginBottom: 12 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <span style={{ fontSize: 14, fontWeight: 600 }}>今日 SOP</span>
-          <span style={{ fontSize: 15, color: done >= tasks.length && tasks.length > 0 ? 'var(--green)' : 'var(--gold)', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{done}/{tasks.length}</span>
-        </div>
-        <div style={{ height: 6, background: 'var(--black)', borderRadius: 3, overflow: 'hidden', marginBottom: 10 }}>
-          <div style={{ height: '100%', borderRadius: 3, width: tasks.length ? (done / tasks.length * 100) + '%' : '0%', background: 'linear-gradient(90deg,var(--gold-dim),var(--gold))', transition: 'width .5s' }} />
-        </div>
-        {tasks.slice(0, 5).map(t => <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, padding: '3px 0' }}>{t.completed ? <CheckCircle2 size={14} color="var(--green)" /> : <Circle size={14} color="var(--text-muted)" />}<span style={{ color: t.completed ? 'var(--text-dim)' : 'var(--text)' }}>{t.title}</span></div>)}
-      </div>
-
-      {actionItems.length > 0 && (
-        <div className="card" style={{ marginBottom: 12, borderColor: 'rgba(77,140,196,.25)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}><span style={{ fontSize: 16 }}>📋</span><span style={{ fontSize: 14, fontWeight: 700 }}>待辦任務</span><span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto' }}>{actionItems.length} 項</span></div>
-          {actionItems.map(item => {
-            const overdue = item.due_date && item.due_date < today
-            const pc = item.priority === 'high' ? 'var(--red)' : item.priority === 'urgent' ? '#f59e0b' : 'var(--text-muted)'
-            return <div key={item.id} style={{ padding: '10px 0', borderTop: '1px solid var(--border)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                <div style={{ flex: 1 }}><div style={{ fontSize: 13, fontWeight: 600, color: overdue ? 'var(--red)' : 'var(--text)' }}>{item.title}</div><div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{item.due_date && <span style={{ color: overdue ? 'var(--red)' : 'var(--text-dim)' }}>截止 {item.due_date} {overdue ? '(逾期!)' : ''}</span>}{item.priority !== 'normal' && <span style={{ color: pc, marginLeft: 8, fontWeight: 600 }}>{item.priority === 'high' ? '高' : '緊急'}</span>}</div></div>
-                <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, fontWeight: 600, background: item.status === 'in_progress' ? 'rgba(77,140,196,.15)' : 'rgba(201,168,76,.1)', color: item.status === 'in_progress' ? 'var(--blue)' : 'var(--gold)' }}>{item.status === 'pending' ? '待執行' : '進行中'}</span>
-              </div>
-              <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-                {item.status === 'pending' && <button onClick={() => updateActionItem(item.id, { status: 'in_progress' })} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'rgba(77,140,196,.08)', color: 'var(--blue)', cursor: 'pointer', fontWeight: 600 }}>🔄 開始執行</button>}
-                <button onClick={() => updateActionItem(item.id, { status: 'completed', completed_at: new Date().toISOString() })} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(77,168,108,.3)', background: 'rgba(77,168,108,.08)', color: 'var(--green)', cursor: 'pointer', fontWeight: 600 }}>✅ 完成</button>
-                <button onClick={() => setReassigning(reassigning === item.id ? null : item.id)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--black-card)', color: 'var(--text-muted)', cursor: 'pointer', fontWeight: 600 }}>🔀 轉派</button>
-              </div>
-              {reassigning === item.id && <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 4 }}>{colleagues.map(c => <button key={c.id} onClick={() => reassignTask(item.id, c.id, c.name)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border-gold)', background: 'rgba(201,168,76,.08)', color: 'var(--gold)', cursor: 'pointer' }}>{c.name}</button>)}</div>}
-              <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-                <input value={progressNote[item.id] || item.progress_note || ''} onChange={e => setProgressNote(prev => ({ ...prev, [item.id]: e.target.value }))} placeholder="回報進度…" style={{ flex: 1, fontSize: 11, padding: '5px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text)' }} />
-                <button onClick={() => { const note = progressNote[item.id] || item.progress_note || ''; if (note.trim()) updateActionItem(item.id, { progress_note: note.trim() }) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--black-card)', color: 'var(--text)', cursor: 'pointer' }}>💬</button>
-              </div>
-            </div>
-          })}
-        </div>
-      )}
-
-      <button onClick={() => navigate('/meeting')} style={{ width: '100%', marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, background: 'rgba(201,168,76,.08)', border: '1px solid var(--border-gold)', borderRadius: 'var(--radius-sm)', color: 'var(--gold)', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
-        <FileText size={18} /> 週會準備
-      </button>
-
-      {/* ═══ Zone C：本月績效（可收合） ═══ */}
-      <ZT color="#4da86c" right={showPerformance ? '收合 ▲' : '展開 ▼'} onClick={() => setShowPerformance(!showPerformance)}>📊 本月績效</ZT>
-
-      {!showPerformance && (
-        <div className="card" style={{ marginBottom: 16, padding: 12, display: 'flex', justifyContent: 'space-around', textAlign: 'center', cursor: 'pointer' }} onClick={() => setShowPerformance(true)}>
-          <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>營業額</div><div style={{ fontSize: 14, fontWeight: 700, color: 'var(--gold)', fontFamily: 'var(--font-mono)' }}>${monthRevenue.toLocaleString()}</div></div>
-          <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>分紅</div><div style={{ fontSize: 14, fontWeight: 700, color: cur.pct > 0 ? 'var(--green)' : 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{cur.pct}%</div></div>
-          <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>搶單</div><div style={{ fontSize: 14, fontWeight: 700, color: 'var(--gold)', fontFamily: 'var(--font-mono)' }}>{myGrabs} 單</div></div>
-        </div>
-      )}
-
-      {showPerformance && <>
-        {/* 營業額分紅 */}
-        <div className="card" style={{ marginBottom: 12, borderColor: cur.pct > 0 ? 'rgba(77,168,108,.3)' : 'var(--border-gold)', background: cur.pct > 0 ? 'rgba(77,168,108,.03)' : 'rgba(201,168,76,.03)' }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}><span style={{ fontSize:14, fontWeight:700 }}>💰 店內營業額分紅</span><span style={{ fontSize:10, color:'var(--text-muted)' }}>{format(new Date(), 'M月')}</span></div>
-          <div style={{ textAlign:'center', marginBottom:10 }}>
-            <div style={{ fontSize:11, color:'var(--text-dim)' }}>本月店內營業額</div>
-            <div style={{ fontSize:28, fontWeight:800, color:'var(--gold)', fontFamily:'var(--font-mono)', marginTop:2 }}>${monthRevenue.toLocaleString()}</div>
-            <div style={{ fontSize:13, fontWeight:700, color:cur.pct>0?'var(--green)':'var(--text-muted)', marginTop:4 }}>{cur.pct>0?`🎉 目前 ${cur.pct}% 分紅！`:'尚未達分紅門檻'}</div>
-          </div>
-          <div style={{ display:'flex', gap:3, marginBottom:6 }}>{tiers.map((t,i) => <div key={i} style={{ flex:1, height:7, borderRadius:4, background:i<curIdx?'var(--green)':i===curIdx?`linear-gradient(90deg,${cur.pct>0?'var(--green)':'var(--gold)'} ${pctInTier}%, var(--black) ${pctInTier}%)`:'var(--black)', border:'1px solid var(--border)' }} />)}</div>
-          <div style={{ display:'flex', justifyContent:'space-between', fontSize:9, color:'var(--text-muted)', marginBottom:8 }}>{tiers.map((t,i) => <span key={i} style={{ color:i<=curIdx?'var(--gold)':'var(--text-muted)', fontWeight:i===curIdx?700:400 }}>{t.pct}%</span>)}</div>
-          {next && gap > 0 && <div style={{ background:'var(--black)', borderRadius:8, padding:'7px 12px', fontSize:12, textAlign:'center' }}>{cur.pct > 0 ? <span>📈 再 <b style={{ color:'var(--gold)' }}>${gap.toLocaleString()}</b> 升級到 <b style={{ color:'var(--green)' }}>{next.pct}%</b></span> : <span>💪 再 <b style={{ color:'var(--gold)' }}>${gap.toLocaleString()}</b> 即達 <b style={{ color:'var(--green)' }}>{next.pct}%</b> 分紅門檻</span>}</div>}
-        </div>
-
-        {/* 開櫃 VIP 獎勵 */}
-        <div className="card" style={{ marginBottom: 12, borderColor: myCabinetCount > 0 ? 'rgba(77,168,108,.3)' : 'var(--border)', background: myCabinetCount > 0 ? 'rgba(77,168,108,.03)' : 'transparent' }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}><span style={{ fontSize:14, fontWeight:700 }}>🔑 開櫃 VIP 獎勵</span><span style={{ fontSize:10, color:'var(--text-muted)' }}>{format(new Date(), 'M月')}</span></div>
-          <div style={{ display:'flex', gap:8 }}>
-            <div style={{ flex:1, background:'var(--black)', borderRadius:8, padding:'8px 10px', textAlign:'center' }}><div style={{ color:'var(--text-muted)', fontSize:9 }}>本月開櫃數</div><div style={{ color:'var(--gold)', fontWeight:700, fontSize:20, fontFamily:'var(--font-mono)' }}>{myCabinetCount}</div></div>
-            <div style={{ flex:1, background:'var(--black)', borderRadius:8, padding:'8px 10px', textAlign:'center' }}><div style={{ color:'var(--text-muted)', fontSize:9 }}>我的獎金</div><div style={{ color:myBonus>0?'var(--green)':'var(--text-muted)', fontWeight:700, fontSize:20, fontFamily:'var(--font-mono)' }}>${myBonus.toLocaleString()}</div></div>
-          </div>
-          {myCabinetCount > 0 && <div style={{ marginTop:8, fontSize:11, color:'var(--text-dim)' }}>{cabinetRewards.map(r => <div key={r.id} style={{ display:'flex', justifyContent:'space-between', padding:'4px 0', borderBottom:'1px solid var(--border)' }}><span>{r.customer_name}</span><span style={{ color: r.status === 'approved' ? 'var(--green)' : 'var(--gold)', fontFamily:'var(--font-mono)' }}>${(+r.bonus_per_staff).toLocaleString()} {r.status === 'approved' ? '✓' : '⏳'}</span></div>)}</div>}
-        </div>
-
-        {/* 全勤獎金 */}
-        <div className="card" style={{ marginBottom: 12 }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}><span style={{ fontSize:14, fontWeight:700 }}>✅ 全勤獎金</span><span style={{ color:'var(--gold)', fontWeight:700, fontSize:18, fontFamily:'var(--font-mono)' }}>$2,000</span></div>
-          <div style={{ fontSize:11, color:'var(--text-dim)', marginTop:4 }}>本月無遲到、無缺勤、無臨時請假即可領取</div>
-        </div>
-
-        {/* 雪茄獎勵 */}
-        <StaffCigarReward user={user} />
-
-        {/* 搶單排行 */}
-        {leaderboard.length > 0 && (
-          <div className="card" style={{ marginBottom: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}><Trophy size={16} color="var(--gold)" /><span style={{ fontSize: 14, fontWeight: 600 }}>搶單排行榜</span></div>
-            {leaderboard.slice(0, 5).map((x, i) => <div key={x.name} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: 13, borderBottom: '1px solid var(--border)' }}><span>{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`} {x.name}</span><strong style={{ color: 'var(--gold)' }}>{x.count} 單</strong></div>)}
-          </div>
-        )}
-
-        {/* 公告 */}
-        {notices.length > 0 && (
-          <div className="card" style={{ marginBottom: 16, borderColor: 'rgba(196,77,77,.25)', background: 'rgba(196,77,77,.04)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}><span style={{ fontSize: 16 }}>📢</span><span style={{ fontSize: 14, fontWeight: 700, color: 'var(--red)' }}>公告</span></div>
-            {notices.map(n => <div key={n.id} style={{ padding: '6px 0', borderBottom: '1px solid var(--border)', fontSize: 13 }}>{n.content}<div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{n.publisher}</div></div>)}
-          </div>
-        )}
-      </>}
+      <div className="wcb-ornament">◇</div>
 
       {/* 打卡相機 */}
       {showPunchCam && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.9)', zIndex:9999, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center' }}>
-          <div style={{ fontSize:16, color:'var(--gold)', fontWeight:700, marginBottom:12 }}>{punchType}打卡 - 請拍照</div>
-          <video ref={punchCamRef} autoPlay playsInline muted style={{ width:'90%', maxWidth:400, borderRadius:12, border:'2px solid var(--gold)' }} />
-          <canvas ref={punchCanvasRef} style={{ display:'none' }} />
-          <div style={{ display:'flex', gap:12, marginTop:16 }}>
-            <button onClick={capturePunchPhoto} className="btn-gold" style={{ padding:'14px 32px', fontSize:16 }}>📸 拍照打卡</button>
-            <button onClick={closePunchCam} className="btn-outline" style={{ padding:'14px 24px', fontSize:14 }}>取消</button>
+        <div className="wcb-modal-overlay" style={{alignItems:'center'}} onClick={closePunchCam}>
+          <div style={{maxWidth:420,width:'100%',textAlign:'center'}} onClick={e=>e.stopPropagation()}>
+            <div style={{fontFamily:'var(--serif)',fontSize:16,color:'var(--cream)',marginBottom:12}}>{punchType}打卡 — 請拍照</div>
+            <video ref={punchCamRef} autoPlay playsInline muted style={{width:'100%',borderRadius:14,border:'2px solid rgba(196,163,90,.3)'}}/>
+            <canvas ref={punchCanvasRef} style={{display:'none'}}/>
+            <div style={{display:'flex',gap:12,marginTop:16,justifyContent:'center'}}>
+              <button className="wcb-btn-gold" style={{flex:1,maxWidth:200}} onClick={capturePunchPhoto}>📸 拍照打卡</button>
+              <button className="wcb-btn-outline" style={{padding:'14px 24px'}} onClick={closePunchCam}>取消</button>
+            </div>
           </div>
         </div>
       )}
