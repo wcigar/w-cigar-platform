@@ -217,14 +217,14 @@ export default function StaffHome() {
         <div className="wcb-card" style={{background:'linear-gradient(160deg,rgba(30,24,18,.96),rgba(14,12,10,.99))',borderColor:'rgba(196,163,90,.15)',padding:'28px 24px',textAlign:'center'}}>
           <div style={{fontFamily:'Cormorant Garamond,serif',fontSize:11,fontStyle:'italic',color:'rgba(196,163,90,.4)',letterSpacing:4}}>Current Shift</div>
           {shiftInfo?.start ? (
-            <div style={{fontFamily:'JetBrains Mono,monospace',fontSize:48,fontWeight:300,letterSpacing:4,margin:'12px 0',lineHeight:1,background:'linear-gradient(180deg,#f0e8d8 50%,rgba(196,163,90,.5))',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>{shiftInfo.start} — {shiftInfo.end}</div>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:12,margin:'8px 0',lineHeight:1}}><span style={{fontFamily:'JetBrains Mono,monospace',fontSize:32,fontWeight:300,letterSpacing:4,color:'#f0e8d8'}}>{shiftInfo.start}</span><span style={{fontSize:20,color:'rgba(196,163,90,.3)'}}>—</span><span style={{fontFamily:'JetBrains Mono,monospace',fontSize:32,fontWeight:300,letterSpacing:4,color:'#f0e8d8'}}>{shiftInfo.end}</span></div>
           ) : <div style={{fontFamily:'var(--serif)',fontSize:18,color:'rgba(196,163,90,.4)',margin:'16px 0'}}>{shiftName ? `今日${shiftName}` : '尚未排班'}</div>}
 
           {shiftInfo?.start && <>
-            <div style={{display:'flex',gap:16,justifyContent:'center',margin:'16px 0'}}>
-              <div><div style={{fontFamily:'var(--mono)',fontSize:9,color:'rgba(196,163,90,.3)',letterSpacing:1}}>CLOCK IN{crossDayPunchDate ? ` (${crossDayPunchDate.slice(5)})` : ''}</div><div style={{fontFamily:'var(--mono)',fontSize:16,fontWeight:400,color:punchIn?(crossDayPunchDate?'#f59e0b':'rgba(100,170,100,.8)'):'rgba(196,163,90,.2)',marginTop:4}}>{punchIn ? toTaipei(punchIn.time, true) : '—:—'}</div></div>
-              <div style={{width:1,background:'rgba(196,163,90,.1)'}}/>
-              <div><div style={{fontFamily:'var(--mono)',fontSize:9,color:'rgba(196,163,90,.3)',letterSpacing:1}}>CLOCK OUT</div><div style={{fontFamily:'var(--mono)',fontSize:16,fontWeight:400,color:punchOut?'rgba(100,140,170,.8)':'rgba(196,163,90,.2)',marginTop:4}}>{punchOut ? toTaipei(punchOut.time, true) : '—:—'}</div></div>
+            <div style={{display:'flex',gap:16,justifyContent:'center',alignItems:'center',margin:'16px 0'}}>
+              <div style={{display:'flex',alignItems:'center',gap:8}}><span style={{fontFamily:'var(--mono)',fontSize:9,color:'rgba(196,163,90,.3)',letterSpacing:1}}>CLOCK IN{crossDayPunchDate?` (${crossDayPunchDate.slice(5)})`:''}</span><span style={{fontFamily:'var(--mono)',fontSize:16,fontWeight:400,color:punchIn?(crossDayPunchDate?'#f59e0b':'rgba(100,170,100,.8)'):'rgba(196,163,90,.2)'}}>{punchIn?toTaipei(punchIn.time,true):'—:—'}</span></div>
+              <div style={{width:1,height:16,background:'rgba(196,163,90,.1)'}}/>
+              <div style={{display:'flex',alignItems:'center',gap:8}}><span style={{fontFamily:'var(--mono)',fontSize:9,color:'rgba(196,163,90,.3)',letterSpacing:1}}>OUT</span><span style={{fontFamily:'var(--mono)',fontSize:16,fontWeight:400,color:punchOut?'rgba(100,140,170,.8)':'rgba(196,163,90,.2)'}}>{punchOut?toTaipei(punchOut.time,true):'—:—'}</span></div>
             </div>
             <div style={{display:'flex',gap:10}}>
               <button className="wcb-btn-gold" style={{flex:1,letterSpacing:3}} onClick={() => openPunchCam('上班')}>上班打卡</button>
