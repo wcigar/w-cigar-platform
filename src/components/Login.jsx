@@ -22,55 +22,64 @@ export default function Login() {
   }
 
   return (
-    <div style={S.wrapper}>
-      <div style={S.bgGradient}/><div style={S.bgVignette}/>
-      <div style={S.container} className="fade-in">
-        <div style={S.logoSection}>
-          <div style={S.logoMark}>W</div>
-          <h1 style={S.brandName}>W CIGAR BAR</h1>
-          <div style={S.brandSub}>紳士雪茄館 · 營運管理平台</div>
-          <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:12,marginTop:16}}>
-            <span style={{width:60,height:1,background:'linear-gradient(90deg,transparent,rgba(201,168,76,.3),transparent)',display:'block'}}/>
-            <span style={{color:'#c9a84c',fontSize:8,opacity:.6}}>◆</span>
-            <span style={{width:60,height:1,background:'linear-gradient(90deg,transparent,rgba(201,168,76,.3),transparent)',display:'block'}}/>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: 20 }}>
+      <div className="wcb-card" style={{ padding: 36, maxWidth: 380, width: '100%' }}>
+        {/* Logo */}
+        <div style={{ textAlign: 'center', marginBottom: 36 }}>
+          <div style={{ width: 120, height: 1, margin: '0 auto 20px', background: 'linear-gradient(90deg,transparent,rgba(196,163,90,.4),transparent)', position: 'relative' }}>
+            <span style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', fontSize: 6, color: 'rgba(196,163,90,.5)', background: 'rgba(12,10,8,.96)', padding: '0 8px' }}>◆</span>
           </div>
+          <div style={{ fontFamily: 'Cormorant Garamond,serif', fontSize: 48, fontWeight: 300, background: 'linear-gradient(180deg,#f0e8d8 30%,rgba(196,163,90,.7))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', letterSpacing: 6 }}>W</div>
+          <div style={{ fontFamily: 'Noto Serif TC,serif', fontSize: 11, color: 'rgba(196,163,90,.5)', letterSpacing: 6, marginTop: 8, fontWeight: 300 }}>紳 士 雪 茄 館</div>
+          <div style={{ fontFamily: 'Cormorant Garamond,serif', fontSize: 10, fontStyle: 'italic', color: 'rgba(196,163,90,.2)', letterSpacing: 3, marginTop: 12 }}>Employee Portal</div>
         </div>
-        <div style={{display:'flex',flexDirection:'column',gap:16}}>
-          <div style={{display:'flex',flexDirection:'column',gap:6}}>
-            <label style={S.label}>選擇身份</label>
-            <select style={S.input} value={selectedId} onChange={e => setSelectedId(e.target.value)}>
-              <option value="">— 請選擇 —</option>
-              {employees.map(emp => (
-                <option key={emp.id} value={emp.id}>{emp.name}（{emp.id}）{emp.is_admin ? ' 👑' : ''}</option>
-              ))}
-            </select>
-          </div>
-          <div style={{display:'flex',flexDirection:'column',gap:6}}>
-            <label style={S.label}>登入碼</label>
-            <input style={S.input} type="password" placeholder="••••" value={pin}
-              onChange={e => setPin(e.target.value)} onKeyDown={e => e.key==='Enter' && handleLogin()}
-              maxLength={6} inputMode="numeric" pattern="[0-9]*"/>
-          </div>
-          {error && <div style={{color:'#c44d4d',fontSize:13,textAlign:'center'}}>{error}</div>}
-          <button style={{...S.loginBtn, opacity: loading?.7:1}} onClick={handleLogin} disabled={loading}>
-            {loading ? '驗證中...' : '登入系統'}
-          </button>
+
+        {/* 選擇身份 */}
+        <div style={{ marginBottom: 16 }}>
+          <label className="wcb-label">選擇身份</label>
+          <select className="wcb-select" value={selectedId} onChange={e => setSelectedId(e.target.value)}>
+            <option value="">— 請選擇 —</option>
+            {employees.map(emp => (
+              <option key={emp.id} value={emp.id}>{emp.name}（{emp.id}）{emp.is_admin ? ' 👑' : ''}</option>
+            ))}
+          </select>
         </div>
-        <div style={{textAlign:'center',marginTop:40,fontSize:10,color:'#5a554e',letterSpacing:4}}>CAPADURA · 雪茄紳士俱樂部</div>
+
+        {/* 登入碼 */}
+        <div style={{ marginBottom: 20 }}>
+          <label className="wcb-label">登入碼</label>
+          <input
+            className="wcb-input"
+            type="password"
+            placeholder="••••"
+            value={pin}
+            onChange={e => setPin(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleLogin()}
+            maxLength={6}
+            inputMode="numeric"
+            pattern="[0-9]*"
+            style={{ letterSpacing: 8, textAlign: 'center', fontFamily: 'JetBrains Mono,monospace', fontSize: 20 }}
+          />
+        </div>
+
+        {/* 錯誤訊息 */}
+        {error && <div style={{ color: 'rgba(190,70,60,.8)', fontSize: 13, textAlign: 'center', marginBottom: 12 }}>{error}</div>}
+
+        {/* 登入按鈕 */}
+        <button
+          className="wcb-btn-gold"
+          style={{ letterSpacing: 4, opacity: loading ? 0.6 : 1 }}
+          onClick={handleLogin}
+          disabled={loading}
+        >
+          {loading ? '驗證中...' : '登入系統'}
+        </button>
+
+        {/* 底部版權 */}
+        <div style={{ fontFamily: 'Cormorant Garamond,serif', fontStyle: 'italic', color: 'rgba(196,163,90,.15)', fontSize: 11, marginTop: 24, textAlign: 'center', letterSpacing: 3 }}>
+          W Cigar Bar · Premium Lounge
+        </div>
       </div>
     </div>
   )
-}
-const S = {
-  wrapper:{height:'100vh',width:'100vw',display:'flex',alignItems:'center',justifyContent:'center',position:'relative',overflow:'hidden',background:'#080808'},
-  bgGradient:{position:'absolute',inset:0,background:'radial-gradient(ellipse at 50% 30%, rgba(201,168,76,.06) 0%, transparent 60%)'},
-  bgVignette:{position:'absolute',inset:0,background:'radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,.6) 100%)'},
-  container:{position:'relative',zIndex:1,width:'100%',maxWidth:380,padding:'0 24px'},
-  logoSection:{textAlign:'center',marginBottom:40},
-  logoMark:{fontFamily:'var(--font-display)',fontSize:72,fontWeight:700,color:'#c9a84c',lineHeight:1,marginBottom:8,textShadow:'0 0 40px rgba(201,168,76,.3)'},
-  brandName:{fontFamily:'var(--font-display)',fontSize:18,fontWeight:500,color:'#c9a84c',letterSpacing:8,marginBottom:8},
-  brandSub:{fontSize:12,color:'#8a8278',letterSpacing:3},
-  label:{fontSize:11,color:'#8a8278',letterSpacing:2,fontWeight:500},
-  input:{background:'rgba(26,26,26,.8)',border:'1px solid rgba(201,168,76,.15)',borderRadius:10,padding:'14px 16px',fontSize:16,color:'#e8e0d0',outline:'none',fontFamily:'var(--font-body)',width:'100%',WebkitAppearance:'none',appearance:'none'},
-  loginBtn:{background:'linear-gradient(135deg, #c9a84c, #8b7a3e)',color:'#0a0a0a',fontWeight:700,padding:16,borderRadius:10,fontSize:15,letterSpacing:2,cursor:'pointer',border:'none',fontFamily:'var(--font-body)',marginTop:8},
 }
