@@ -15,6 +15,7 @@ export default function VenueProfitRules() {
   const navigate = useNavigate()
   const [venues, setVenues] = useState([])
   const [tplMap, setTplMap] = useState({})
+  const [matrix, setMatrix] = useState([])
   const [loading, setLoading] = useState(true)
   const [refreshTick, setRefreshTick] = useState(0)
   const [filter, setFilter] = useState({ q: '', region: 'all', onlyConfigured: false })
@@ -35,14 +36,11 @@ export default function VenueProfitRules() {
     }
     setTplMap(map)
     setVenues(vs)
+    const m = await buildPricingMatrix(vs, map, session)
+    setMatrix(m)
     setLoading(false)
   }
   useEffect(() => { reload() }, [refreshTick])
-
-  const matrix = useMemo(() => {
-    if (venues.length === 0) return []
-    return buildPricingMatrix(venues, tplMap, session)
-  }, [venues, tplMap, session, refreshTick])
 
   const filtered = useMemo(() => matrix.filter(v => {
     if (filter.region !== 'all' && v.region !== filter.region) return false
@@ -59,9 +57,9 @@ export default function VenueProfitRules() {
     return { venues: matrix.length, total, set, unset: total - set }
   }, [matrix])
 
-  function handleEdit(venueId, productKey, field, value) {
+  async function handleEdit(venueId, productKey, field, value) {
     const num = Math.max(0, parseInt(value, 10) || 0)
-    upsertVenuePricing(venueId, productKey, { [field]: num }, actor)
+    await upsertVenuePricing(venueId, productKey, { [field]: num }, actor)
     setRefreshTick(t => t + 1)
   }
 

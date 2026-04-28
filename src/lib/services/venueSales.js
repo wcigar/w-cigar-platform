@@ -8,7 +8,7 @@ import { listVenues, getAssignedAmbassadorCodes } from './venues'
 import { deductInventoryFromSales, buildInventoryMatrix } from './inventory'
 import { getDefaultAlertMap } from './venues'
 
-const USE_MOCK = true
+const USE_MOCK = false
 const TEMPLATE_VERSION = '2026-04'
 
 // ============================================================
@@ -20,13 +20,36 @@ export async function listVenueSales({ date } = {}) {
     if (date) return mockSales.filter(s => s.sale_date === date)
     return mockSales
   }
+  const target = date || todayISO()
   const { data, error } = await supabase
     .from('venue_sales_daily')
-    .select('*, venue:venues(name), ambassador:ambassadors(name)')
-    .eq('sale_date', date || todayISO())
+    .select('*')
+    .eq('sale_date', target)
     .order('created_at', { ascending: false })
   if (error) throw error
-  return data || []
+  if (!data || data.length === 0) return []
+
+  const venueIds = [...new Set(data.map(s => s.venue_id).filter(Boolean))]
+  const ambIds = [...new Set(data.map(s => s.ambassador_id).filter(Boolean))]
+  const [venuesRes, ambsRes] = await Promise.all([
+    venueIds.length ? supabase.from('venues').select('id, name').in('id', venueIds) : Promise.resolve({ data: [] }),
+    ambIds.length ? supabase.from('ambassadors').select('id, name').in('id', ambIds) : Promise.resolve({ data: [] }),
+  ])
+  const vn = Object.fromEntries((venuesRes.data || []).map(v => [v.id, v.name]))
+  const an = Object.fromEntries((ambsRes.data || []).map(a => [a.id, a.name]))
+  return data.map(s => {
+    const p = s.raw_payload?.payment || {}
+    return {
+      ...s,
+      venue_name: vn[s.venue_id] || s.raw_payload?.venue_name || '—',
+      ambassador_name: an[s.ambassador_id] || s.raw_payload?.ambassador_name || '—',
+      cash_amount: p.cash_amount || 0,
+      transfer_amount: p.bank_transfer_amount || 0,
+      monthly_amount: p.monthly_settlement_amount || 0,
+      unpaid_amount: p.unpaid_amount || 0,
+      payment_status: p.payment_status || 'paid',
+    }
+  })
 }
 
 export async function getVenues() {
@@ -36,10 +59,10 @@ export async function getVenues() {
     }))
   }
   const { data, error } = await supabase
-    .from('venues').select('id, name, type, supervisor_id, region')
+    .from('venues').select('id, name, supervisor_id, region')
     .eq('is_active', true).order('name')
   if (error) throw error
-  return data || []
+  return (data || []).map(v => ({ ...v, type: 'hotel' }))
 }
 
 export async function getAmbassadors() {
@@ -94,11 +117,35 @@ export async function submitVenueSales(payload) {
     })
     return { success: true, sale_id: saleId, mock: true }
   }
-  const { data, error } = await supabase.rpc('hq_submit_venue_sales', {
-    payload: withKey, p_idempotency_key: withKey.idempotency_key, p_actor_id: withKey.created_by,
-  })
+  const totalAmount = (withKey.items || []).reduce((sum, it) => sum + (it.subtotal || 0), 0)
+  const row = {
+    sale_date: withKey.sale_date,
+    venue_id: withKey.venue_id,
+    ambassador_id: withKey.ambassador_id || null,
+    is_self_sale: !!withKey.is_self_sale,
+    items: withKey.items || [],
+    total_amount: totalAmount,
+    performance_note: withKey.performance_note || null,
+    idempotency_key: withKey.idempotency_key,
+    submitted_by_name: withKey.submitted_by_name || withKey.created_by_name || null,
+    raw_payload: withKey,
+  }
+  const { data, error } = await supabase
+    .from('venue_sales_daily')
+    .insert(row)
+    .select('id')
+    .single()
   if (error) throw error
-  return data
+
+  // 自動扣庫存
+  const items = (withKey.items || []).filter(it => it.product_key && Number(it.quantity) > 0)
+  if (items.length > 0) {
+    const itemsByVenue = {
+      [withKey.venue_id]: items.map(it => ({ product_key: it.product_key, quantity: it.quantity })),
+    }
+    try { await deductInventoryFromSales(itemsByVenue) } catch { /* best-effort */ }
+  }
+  return { success: true, sale_id: data.id }
 }
 
 // ============================================================
@@ -875,11 +922,59 @@ export async function submitVenueSalesMatrix(payload) {
     }
   }
 
-  const { data, error } = await supabase.rpc('hq_submit_venue_sales_matrix', {
-    payload: withKey, p_idempotency_key: withKey.idempotency_key,
-  })
+  const salesWithData = (withKey.venues || []).filter(v => v.has_sales && v.venue_total > 0)
+  if (salesWithData.length === 0) {
+    return { success: true, sales_count: 0, sale_ids: [], inventory_deducted: 0, alert_count_after: 0 }
+  }
+
+  const rows = salesWithData.map(v => ({
+    sale_date: withKey.sale_date,
+    venue_id: v.venue_id,
+    ambassador_id: v.ambassador_id || null,
+    is_self_sale: !!v.is_self_sale,
+    items: v.products || [],
+    total_amount: v.venue_total,
+    performance_note: v.performance_note || null,
+    // venue_sales_daily.idempotency_key UNIQUE：每店一個 row 必須各自 unique，concat venue_id
+    idempotency_key: `${withKey.idempotency_key}-${v.venue_id}`,
+    submitted_by_name: withKey.submitted_by_name || withKey.created_by_name || null,
+    raw_payload: { matrix_payload: withKey, venue_summary: v },
+  }))
+
+  const { data, error } = await supabase
+    .from('venue_sales_daily')
+    .insert(rows)
+    .select('id')
   if (error) throw error
-  return data
+  const sale_ids = (data || []).map(d => d.id)
+
+  // 扣庫存
+  const itemsByVenue = {}
+  salesWithData.forEach(v => {
+    const items = (v.products || []).filter(it => it.quantity > 0)
+    if (items.length > 0) {
+      itemsByVenue[v.venue_id] = items.map(it => ({ product_key: it.product_key, quantity: it.quantity }))
+    }
+  })
+  let deductLog = []
+  if (Object.keys(itemsByVenue).length > 0) {
+    try { deductLog = await deductInventoryFromSales(itemsByVenue) } catch { /* best-effort */ }
+  }
+
+  // 扣完後警示總數
+  let postSubmitAlertCount = 0
+  try {
+    const matrix = await buildInventoryMatrix()
+    postSubmitAlertCount = matrix.reduce((sum, vv) => sum + (vv.alert_count || 0), 0)
+  } catch { /* best-effort */ }
+
+  return {
+    success: true,
+    sales_count: sale_ids.length,
+    sale_ids,
+    inventory_deducted: deductLog.length,
+    alert_count_after: postSubmitAlertCount,
+  }
 }
 
 // ============================================================

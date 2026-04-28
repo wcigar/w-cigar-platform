@@ -7,6 +7,7 @@
 import { useEffect, useMemo, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Calendar, UserCheck, AlertTriangle, Check, X, Edit3, ChevronRight, Coins, Printer, FileText, Send, Eraser } from 'lucide-react'
+import { supabase } from '../../lib/supabase'
 import { listVenues } from '../../lib/services/venues'
 import { getVenueSalesMatrixTemplate } from '../../lib/services/venueSales'
 import {
@@ -58,20 +59,27 @@ export default function Collections() {
   // For each venue assigned to supervisor, build collection row
   const supervisor = SUPERVISORS.find(s => s.id === supervisorId)
   const myVenueIds = supVenueMap[supervisorId] || []
-  const collections = useMemo(() => {
-    return myVenueIds.map(vid => {
-      const venue = venuesById[vid]
-      if (!venue) return null
-      // MVP: empty ambassador sales (上線後改從 sales table 聚合)
-      const ambSales = {}
-      const c = getMonthlyCollection(period, vid, ambSales, !!venue.has_self_sale)
-      return {
-        ...c,
-        venue_name: venue.name, venue_region: venue.region,
-        has_self_sale: venue.has_self_sale,
-        products: tplMap[vid]?.products || [],
+  const [collections, setCollections] = useState([])
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const out = []
+      for (const vid of myVenueIds) {
+        const venue = venuesById[vid]
+        if (!venue) continue
+        // MVP: empty ambassador sales (上線後改從 sales table 聚合)
+        const c = await getMonthlyCollection(period, vid, {}, !!venue.has_self_sale)
+        if (cancelled) return
+        out.push({
+          ...c,
+          venue_name: venue.name, venue_region: venue.region,
+          has_self_sale: venue.has_self_sale,
+          products: tplMap[vid]?.products || [],
+        })
       }
-    }).filter(Boolean)
+      if (!cancelled) setCollections(out)
+    })()
+    return () => { cancelled = true }
   }, [myVenueIds, venuesById, period, tplMap, refreshTick])
 
   const stats = useMemo(() => {
@@ -253,25 +261,32 @@ function CollectionEditModal({ collection, actor, period, onClose, onSaved }) {
   const [accSig, setAccSig] = useState(collection.accountant_signature || null)
   const [busy, setBusy] = useState(false)
 
-  // 取每店每品的「系統當前庫存」(已扣大使賣)
+  // 取每店每品的「系統當前庫存」(已扣大使賣) — Phase 2: 直接從 inventory_balances 撈
   const [inventoryMap, setInventoryMap] = useState({})
+  // 取每店的 venue_pricing 作 self_sale 推算 — Phase 2: 直接從 venue_pricing 撈
+  const [venuePricing, setVenuePricing] = useState({})
   useEffect(() => {
-    (async () => {
-      try {
-        const venues = (await import('../../lib/services/venues')).then ? null : null
-      } catch {}
-      // 直接從 buildInventoryMatrix 拉，需要傳入 venues + tplMap，但這 modal 沒有
-      // 簡化：從 localStorage wcigar_inventory_v1 直接讀對應 venueId 的 entries
-      const inv = (() => {
-        try { return JSON.parse(localStorage.getItem('wcigar_inventory_v1') || '{}') } catch { return {} }
-      })()
+    let cancelled = false
+    ;(async () => {
       const map = {}
-      collection.products.forEach(p => {
-        const e = inv[`${collection.venue_id}:${p.key}`]
-        map[p.key] = e?.current_qty ?? 0
-      })
-      setInventoryMap(map)
+      collection.products.forEach(p => { map[p.key] = 0 })
+      if (collection.products.length > 0) {
+        const keys = collection.products.map(p => p.key)
+        const { data } = await supabase
+          .from('inventory_balances').select('product_key, current_qty')
+          .eq('venue_id', collection.venue_id).in('product_key', keys)
+        ;(data || []).forEach(e => { map[e.product_key] = e.current_qty || 0 })
+      }
+      const { data: priceData } = await supabase
+        .from('venue_pricing').select('*').eq('venue_id', collection.venue_id)
+      const priceMap = {}
+      ;(priceData || []).forEach(p => { priceMap[p.product_key] = p })
+      if (!cancelled) {
+        setInventoryMap(map)
+        setVenuePricing(priceMap)
+      }
     })()
+    return () => { cancelled = true }
   }, [collection])
 
   function setQty(key, v) {
@@ -283,9 +298,6 @@ function CollectionEditModal({ collection, actor, period, onClose, onSaved }) {
     const selfSale = {}
     const discrepancies = []
     let selfRevenue = 0, selfShareDue = 0
-    const pricing = (() => {
-      try { return JSON.parse(localStorage.getItem('wcigar_venue_pricing_v1') || '{}') } catch { return {} }
-    })()
     Object.entries(stocktake).forEach(([pk, actualStr]) => {
       if (actualStr === '' || actualStr == null) return
       const actual = Math.max(0, Number(actualStr) || 0)
@@ -293,9 +305,9 @@ function CollectionEditModal({ collection, actor, period, onClose, onSaved }) {
       if (current > actual) {
         const qty = current - actual
         selfSale[pk] = qty
-        const entry = pricing[`${collection.venue_id}:${pk}`]
+        const entry = venuePricing[pk]
         if (entry) {
-          selfRevenue += entry.sale_price * qty
+          selfRevenue += (entry.sale_price || 0) * qty
           selfShareDue += (entry.venue_share_self_per_unit || 0) * qty
         }
       } else if (current < actual) {
@@ -305,18 +317,18 @@ function CollectionEditModal({ collection, actor, period, onClose, onSaved }) {
     const ambDue = collection.ambassador?.venue_share_due || 0
     const totalDue = ambDue + selfShareDue
     return { selfSale, discrepancies, selfRevenue, selfShareDue, ambDue, totalDue }
-  }, [stocktake, inventoryMap, collection])
+  }, [stocktake, inventoryMap, venuePricing, collection])
 
   async function handleSubmitStocktake() {
     setBusy(true)
-    setStocktake(period, collection.venue_id, stocktake, inventoryMap, actor)
+    await setStocktake(period, collection.venue_id, stocktake, inventoryMap, actor)
     setBusy(false)
     setStage('confirm')
   }
 
   async function handleSubmitConfirm() {
     setBusy(true)
-    recordCollectionPayment(period, collection.venue_id, {
+    await recordCollectionPayment(period, collection.venue_id, {
       paid_amount: Number(paid) || 0, note,
       status: Number(paid) >= computed.totalDue ? 'collected' : (Number(paid) > 0 ? 'partial' : 'pending'),
     }, actor)
@@ -329,7 +341,7 @@ function CollectionEditModal({ collection, actor, period, onClose, onSaved }) {
     if (!accSig) return alert('請酒店會計簽名')
     if (!accountantName.trim()) return alert('請填酒店會計姓名')
     setBusy(true)
-    setSignatures(period, collection.venue_id,
+    await setSignatures(period, collection.venue_id,
       { supervisor_signature: supSig, accountant_signature: accSig, accountant_name: accountantName.trim() }, actor)
     setBusy(false)
     setStage('done')

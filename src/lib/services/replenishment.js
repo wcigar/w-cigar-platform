@@ -1,23 +1,22 @@
 // src/lib/services/replenishment.js
-// 補貨單 service：localStorage MVP
+// 補貨單 service — Phase 2 已接 Supabase。
+// tables: replenishment_runs (id PK uuid)
+//         replenishment_run_items (id PK uuid, run_id FK)
 //
 // 狀態機：
 //   draft → maker_done(=待確認) → checker_done(=待出貨) → shipping → delivered
 //                                                                    └ cancelled
-//   單人模式：draft → checker_done（同一員工 +理由 + 連續兩次 confirm）
-//
-// localStorage 'wcigar_replenishment_runs_v1' = { [runId]: { ...run, items:[], events:[] } }
+//   單人模式：draft → checker_done（同一員工 + 理由 + 連續兩次 confirm）
 
+import { supabase } from '../supabase'
 import { addInventoryFromShipment } from './inventory'
 
-const USE_MOCK = true
-const STORAGE_KEY = 'wcigar_replenishment_runs_v1'
 const STATUS = {
   DRAFT: 'draft',
-  MAKER_DONE: 'maker_done',     // 員工 A 已建單，等員工 B 確認
-  CHECKER_DONE: 'checker_done', // 雙人確認完成，等出貨
-  SHIPPING: 'shipping',          // 已出貨（叫快遞）
-  DELIVERED: 'delivered',        // 大使簽收完成
+  MAKER_DONE: 'maker_done',
+  CHECKER_DONE: 'checker_done',
+  SHIPPING: 'shipping',
+  DELIVERED: 'delivered',
   CANCELLED: 'cancelled',
 }
 export const REPLENISHMENT_STATUS = STATUS
@@ -28,193 +27,252 @@ const STATUS_LABEL = {
 }
 export const REPLENISHMENT_STATUS_LABEL = STATUS_LABEL
 
-function readRuns() {
-  if (typeof window === 'undefined') return {}
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') } catch { return {} }
-}
-function writeRuns(s) {
-  if (typeof window === 'undefined') return
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)) } catch {}
-}
-
-function nextRunNo() {
-  const today = new Date()
-  const y = today.getFullYear().toString().slice(2)
-  const m = String(today.getMonth() + 1).padStart(2, '0')
-  const d = String(today.getDate()).padStart(2, '0')
-  const prefix = `RP-${y}${m}${d}`
-  const runs = Object.values(readRuns())
-  const todayRuns = runs.filter(r => r.run_no?.startsWith(prefix))
-  const seq = String(todayRuns.length + 1).padStart(4, '0')
-  return `${prefix}-${seq}`
-}
-
 function nowIso() { return new Date().toISOString() }
+
+// run_no 由 id + created_at 派生（DB 沒有此欄位）
+function deriveRunNo(id, createdAt) {
+  const d = createdAt ? new Date(createdAt) : new Date()
+  const yy = d.getFullYear().toString().slice(2)
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  const tail = (id || '').replace(/-/g, '').slice(0, 4).toUpperCase() || '0000'
+  return `RP-${yy}${mm}${dd}-${tail}`
+}
+
+// 把 DB row 補上 UI 需要的派生欄位
+function hydrateRun(run, items, venueNameMap = {}, venueRegionMap = {}) {
+  const its = (items || []).map(it => ({
+    id: it.id,
+    run_id: it.run_id,
+    venue_id: it.venue_id,
+    venue_name: venueNameMap[it.venue_id] || it.venue_id,
+    region: venueRegionMap[it.venue_id] || null,
+    product_key: it.product_key,
+    product_name: it.product_name,
+    product_price: it.unit_price,
+    final_qty: it.quantity,
+    suggested_qty: it.quantity,                       // DB 不存，回讀用 quantity
+    current_qty_snapshot: it.current_qty_snapshot,
+    alert_threshold_snapshot: it.alert_threshold_snapshot,
+    target_quantity_snapshot: it.target_quantity_snapshot,
+    received_qty: it.delivered_qty,                   // alias
+    delivered_qty: it.delivered_qty,
+    received_at: it.ambassador_signed_at,
+    ambassador_signed_at: it.ambassador_signed_at,
+    ambassador_signed_by: it.ambassador_signed_by,
+    warehouse_adjusted: false,                        // DB 不存，預設 false（事件 log 內可查）
+    warehouse_adjusted_reason: null,
+  }))
+  const venueIds = [...new Set(its.map(i => i.venue_id))]
+  const total_amount = its.reduce((s, i) => s + (i.final_qty || 0) * (i.product_price || 0), 0)
+  return {
+    id: run.id,
+    run_no: deriveRunNo(run.id, run.created_at),
+    status: run.status,
+    created_at: run.created_at,
+    created_by: null,
+    created_by_name: run.created_by_name,
+    confirmed_at: run.checker_at,
+    confirmed_by: null,
+    confirmed_by_name: run.checker_name,
+    maker_name: run.maker_name,
+    maker_at: run.maker_at,
+    checker_name: run.checker_name,
+    checker_at: run.checker_at,
+    shipped_at: run.shipped_at,
+    delivered_at: run.delivered_at,
+    cancelled_at: run.cancelled_at,
+    cancel_reason: run.cancel_reason,
+    single_user_mode: !!run.single_user_mode,
+    single_user_reason: run.single_user_reason,
+    events: Array.isArray(run.events) ? run.events : [],
+    notes: run.notes,
+    venues: venueIds,
+    items: its,
+    total_amount,
+    item_count: its.length,
+    venue_count: venueIds.length,
+  }
+}
+
+async function fetchVenueNameMap(venueIds) {
+  if (!venueIds || venueIds.length === 0) return { vn: {}, vr: {} }
+  const { data } = await supabase.from('venues').select('id, name, region').in('id', venueIds)
+  const vn = {}, vr = {}
+  ;(data || []).forEach(v => { vn[v.id] = v.name; vr[v.id] = v.region })
+  return { vn, vr }
+}
 
 // ---------- Public API ----------
 
 export async function listReplenishmentRuns({ status } = {}) {
-  const runs = Object.values(readRuns())
-  let out = runs
-  if (status) out = out.filter(r => r.status === status)
-  return out.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+  let q = supabase.from('replenishment_runs').select('*').order('created_at', { ascending: false })
+  if (status) q = q.eq('status', status)
+  const { data: runs, error } = await q
+  if (error) throw error
+  if (!runs || runs.length === 0) return []
+
+  const runIds = runs.map(r => r.id)
+  const { data: items, error: e2 } = await supabase
+    .from('replenishment_run_items').select('*').in('run_id', runIds)
+  if (e2) throw e2
+  const itemsByRun = {}
+  ;(items || []).forEach(it => {
+    if (!itemsByRun[it.run_id]) itemsByRun[it.run_id] = []
+    itemsByRun[it.run_id].push(it)
+  })
+
+  const allVenueIds = [...new Set((items || []).map(i => i.venue_id))]
+  const { vn, vr } = await fetchVenueNameMap(allVenueIds)
+
+  return runs.map(r => hydrateRun(r, itemsByRun[r.id] || [], vn, vr))
 }
 
 export async function getReplenishmentRun(id) {
-  const runs = readRuns()
-  return runs[id] || null
+  const { data: run, error } = await supabase
+    .from('replenishment_runs').select('*').eq('id', id).maybeSingle()
+  if (error) throw error
+  if (!run) return null
+
+  const { data: items, error: e2 } = await supabase
+    .from('replenishment_run_items').select('*').eq('run_id', id)
+  if (e2) throw e2
+
+  const venueIds = [...new Set((items || []).map(i => i.venue_id))]
+  const { vn, vr } = await fetchVenueNameMap(venueIds)
+  return hydrateRun(run, items || [], vn, vr)
 }
 
-/**
- * 從 listAlertItems() 產生的清單一鍵建單。
- * alertItems: 已 prefilled suggested_qty 的清單
- * actor: { id, name }（maker）
- */
 export async function createRunFromAlerts(alertItems, actor) {
   if (!alertItems || alertItems.length === 0) {
     return { success: false, error: '沒有警示項目，無需建單' }
   }
-  const id = `run_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`
-  const run_no = nextRunNo()
-  const items = alertItems.map((a, i) => ({
-    id: `${id}_i${i}`,
-    venue_id: a.venue_id, venue_name: a.venue_name, region: a.region,
-    product_key: a.product_key, product_name: a.product_name, product_price: a.product_price,
+
+  const createdAt = nowIso()
+  const runRow = {
+    status: STATUS.MAKER_DONE,
+    created_by_name: actor?.name || null,
+    maker_name: actor?.name || null,
+    maker_at: createdAt,
+    single_user_mode: false,
+    events: [{
+      at: createdAt, action: 'create', actor: actor?.name || '?',
+      detail: `從警示自動建單（${alertItems.length} 項，${new Set(alertItems.map(a => a.venue_id)).size} 店）`,
+    }],
+  }
+  const { data: insertedRun, error } = await supabase
+    .from('replenishment_runs').insert(runRow).select('*').single()
+  if (error) throw error
+
+  const itemRows = alertItems.map(a => ({
+    run_id: insertedRun.id,
+    venue_id: a.venue_id,
+    product_key: a.product_key,
+    product_name: a.product_name,
+    quantity: a.suggested_qty,
+    unit_price: a.product_price || 0,
     current_qty_snapshot: a.current_qty,
     alert_threshold_snapshot: a.alert_threshold,
     target_quantity_snapshot: a.target_quantity,
-    suggested_qty: a.suggested_qty,
-    final_qty: a.suggested_qty,
-    warehouse_adjusted: false,
-    warehouse_adjusted_reason: null,
   }))
-  const venueIds = [...new Set(items.map(i => i.venue_id))]
-  const total_amount = items.reduce((s, i) => s + (i.final_qty * (i.product_price || 0)), 0)
-  const run = {
-    id, run_no,
-    status: STATUS.MAKER_DONE,         // 一建單就是「待確認」
-    created_at: nowIso(),
-    created_by: actor?.id || null,
-    created_by_name: actor?.name || null,
-    confirmed_at: null,
-    confirmed_by: null,
-    confirmed_by_name: null,
-    shipped_at: null,
-    delivered_at: null,
-    single_user_mode: false,
-    single_user_reason: null,
-    venues: venueIds,
-    items,
-    total_amount,
-    item_count: items.length,
-    venue_count: venueIds.length,
-    events: [{ at: nowIso(), action: 'create', actor: actor?.name || '?', detail: `從警示自動建單（${items.length} 項，${venueIds.length} 店）` }],
-  }
-  const all = readRuns()
-  all[id] = run
-  writeRuns(all)
-  return { success: true, run_id: id, run_no, run }
+  const { data: insertedItems, error: e2 } = await supabase
+    .from('replenishment_run_items').insert(itemRows).select('*')
+  if (e2) throw e2
+
+  const venueIds = [...new Set(itemRows.map(i => i.venue_id))]
+  const { vn, vr } = await fetchVenueNameMap(venueIds)
+  const run = hydrateRun(insertedRun, insertedItems, vn, vr)
+  return { success: true, run_id: run.id, run_no: run.run_no, run }
 }
 
-/**
- * 員工 B 確認（double-check 簽名）。同帳號禁止。
- */
 export async function confirmRun(runId, actor) {
-  const all = readRuns()
-  const r = all[runId]
+  const r = await getReplenishmentRun(runId)
   if (!r) return { success: false, error: '補貨單不存在' }
   if (r.status !== STATUS.MAKER_DONE) return { success: false, error: `狀態 ${r.status} 不可確認` }
-  if (r.created_by && actor?.id && r.created_by === actor.id) {
+  if (r.maker_name && actor?.name && r.maker_name === actor.name) {
     return { success: false, error: '同一員工不可同時建單與確認，請另一員工確認，或啟用「單人模式」', need_single_user_mode: true }
   }
-  r.status = STATUS.CHECKER_DONE
-  r.confirmed_at = nowIso()
-  r.confirmed_by = actor?.id || null
-  r.confirmed_by_name = actor?.name || null
-  r.events.push({ at: nowIso(), action: 'confirm', actor: actor?.name || '?', detail: '雙人確認完成' })
-  all[runId] = r
-  writeRuns(all)
-  return { success: true, run: r }
+
+  const at = nowIso()
+  const events = [...r.events, { at, action: 'confirm', actor: actor?.name || '?', detail: '雙人確認完成' }]
+  const { error } = await supabase.from('replenishment_runs').update({
+    status: STATUS.CHECKER_DONE,
+    checker_name: actor?.name || null,
+    checker_at: at,
+    events,
+  }).eq('id', runId)
+  if (error) throw error
+  return { success: true, run: await getReplenishmentRun(runId) }
 }
 
-/**
- * 單人模式確認：同一員工自己 confirm，需要理由 + 兩次 confirm dialog。
- */
 export async function confirmRunSingleUser(runId, actor, reason) {
   if (!reason || !reason.trim()) {
     return { success: false, error: '單人模式需要填寫理由' }
   }
-  const all = readRuns()
-  const r = all[runId]
+  const r = await getReplenishmentRun(runId)
   if (!r) return { success: false, error: '補貨單不存在' }
   if (r.status !== STATUS.MAKER_DONE) return { success: false, error: `狀態 ${r.status} 不可確認` }
-  r.status = STATUS.CHECKER_DONE
-  r.confirmed_at = nowIso()
-  r.confirmed_by = actor?.id || null
-  r.confirmed_by_name = actor?.name || null
-  r.single_user_mode = true
-  r.single_user_reason = reason.trim()
-  r.events.push({
-    at: nowIso(), action: 'confirm_single_user',
-    actor: actor?.name || '?',
+
+  const at = nowIso()
+  const events = [...r.events, {
+    at, action: 'confirm_single_user', actor: actor?.name || '?',
     detail: `單人模式確認（理由：${reason.trim()}）`,
-  })
-  all[runId] = r
-  writeRuns(all)
-  return { success: true, run: r, single_user_mode: true }
+  }]
+  const { error } = await supabase.from('replenishment_runs').update({
+    status: STATUS.CHECKER_DONE,
+    checker_name: actor?.name || null,
+    checker_at: at,
+    single_user_mode: true,
+    single_user_reason: reason.trim(),
+    events,
+  }).eq('id', runId)
+  if (error) throw error
+  return { success: true, run: await getReplenishmentRun(runId), single_user_mode: true }
 }
 
-/**
- * 倉庫調整補貨量（缺貨時調降）
- * adjustments: [{ item_id, final_qty, reason }, ...]
- */
 export async function adjustItems(runId, adjustments, actor) {
-  const all = readRuns()
-  const r = all[runId]
+  const r = await getReplenishmentRun(runId)
   if (!r) return { success: false, error: '補貨單不存在' }
   let changed = 0
-  adjustments.forEach(adj => {
+  for (const adj of adjustments) {
     const it = r.items.find(i => i.id === adj.item_id)
-    if (!it) return
-    if (Number(adj.final_qty) === it.final_qty) return
-    it.final_qty = Math.max(0, Number(adj.final_qty) || 0)
-    it.warehouse_adjusted = true
-    it.warehouse_adjusted_reason = adj.reason || null
+    if (!it) continue
+    const newQty = Math.max(0, Number(adj.final_qty) || 0)
+    if (newQty === it.final_qty) continue
+    const { error } = await supabase
+      .from('replenishment_run_items').update({ quantity: newQty }).eq('id', adj.item_id)
+    if (error) throw error
     changed++
-  })
-  r.total_amount = r.items.reduce((s, i) => s + i.final_qty * (i.product_price || 0), 0)
-  if (changed > 0) {
-    r.events.push({ at: nowIso(), action: 'warehouse_adjust', actor: actor?.name || '?', detail: `倉庫調整 ${changed} 項` })
   }
-  all[runId] = r
-  writeRuns(all)
-  return { success: true, run: r, changed }
+  if (changed > 0) {
+    const at = nowIso()
+    const events = [...r.events, {
+      at, action: 'warehouse_adjust', actor: actor?.name || '?',
+      detail: `倉庫調整 ${changed} 項：${adjustments.map(a => `${a.item_id.slice(0,4)}→${a.final_qty}（${a.reason || '無理由'}）`).join('；')}`,
+    }]
+    const { error } = await supabase.from('replenishment_runs').update({ events }).eq('id', runId)
+    if (error) throw error
+  }
+  return { success: true, run: await getReplenishmentRun(runId), changed }
 }
 
-/**
- * 出貨（叫快遞）—— 必須先 checker_done
- */
 export async function shipRun(runId, actor) {
-  const all = readRuns()
-  const r = all[runId]
+  const r = await getReplenishmentRun(runId)
   if (!r) return { success: false, error: '補貨單不存在' }
   if (r.status !== STATUS.CHECKER_DONE) return { success: false, error: `狀態 ${r.status} 不可出貨（需先確認）` }
-  r.status = STATUS.SHIPPING
-  r.shipped_at = nowIso()
-  r.events.push({ at: nowIso(), action: 'ship', actor: actor?.name || '?', detail: '已叫快遞，配送中' })
-  all[runId] = r
-  writeRuns(all)
-  return { success: true, run: r }
+  const at = nowIso()
+  const events = [...r.events, { at, action: 'ship', actor: actor?.name || '?', detail: '已叫快遞，配送中' }]
+  const { error } = await supabase.from('replenishment_runs').update({
+    status: STATUS.SHIPPING,
+    shipped_at: at,
+    events,
+  }).eq('id', runId)
+  if (error) throw error
+  return { success: true, run: await getReplenishmentRun(runId) }
 }
 
-/**
- * 大使端簽收 → 入庫（從 ambassador receipts 觸發）
- *   actuallyReceived: { [item_id]: 實收數量 }（缺漏走 discrepancy）
- *   若為 null 表示「全部一致」
- */
 export async function deliverRunForVenue(runId, venueId, actuallyReceived, actor) {
-  const all = readRuns()
-  const r = all[runId]
+  const r = await getReplenishmentRun(runId)
   if (!r) return { success: false, error: '補貨單不存在' }
   if (r.status !== STATUS.SHIPPING && r.status !== STATUS.CHECKER_DONE) {
     return { success: false, error: `狀態 ${r.status} 不可簽收` }
@@ -222,69 +280,76 @@ export async function deliverRunForVenue(runId, venueId, actuallyReceived, actor
   const venueItems = r.items.filter(i => i.venue_id === venueId)
   if (venueItems.length === 0) return { success: false, error: '此補貨單不含此店' }
 
+  const at = nowIso()
   const itemsByVenue = { [venueId]: [] }
   const discrepancies = []
-  venueItems.forEach(it => {
+  for (const it of venueItems) {
     const expected = it.final_qty
     const actual = actuallyReceived && actuallyReceived[it.id] != null
       ? Number(actuallyReceived[it.id])
       : expected
     itemsByVenue[venueId].push({ product_key: it.product_key, quantity: actual })
-    it.received_qty = actual
-    it.received_at = nowIso()
+    const { error } = await supabase
+      .from('replenishment_run_items').update({
+        delivered_qty: actual,
+        ambassador_signed_at: at,
+        ambassador_signed_by: actor?.name || null,
+      }).eq('id', it.id)
+    if (error) throw error
     if (actual !== expected) {
       discrepancies.push({ item_id: it.id, expected, actual, diff: actual - expected, product_name: it.product_name })
     }
-  })
+  }
 
   // 寫入庫存
   await addInventoryFromShipment(itemsByVenue)
 
-  r.events.push({
-    at: nowIso(),
-    action: 'deliver',
-    actor: actor?.name || '?',
+  const events = [...r.events, {
+    at, action: 'deliver', actor: actor?.name || '?',
     detail: `${venueId} 簽收（${venueItems.length} 項${discrepancies.length ? `，${discrepancies.length} 項異常` : ''}）`,
-  })
+  }]
   if (discrepancies.length > 0) {
-    r.events.push({ at: nowIso(), action: 'discrepancy', actor: actor?.name || '?', detail: JSON.stringify(discrepancies) })
+    events.push({ at, action: 'discrepancy', actor: actor?.name || '?', detail: JSON.stringify(discrepancies) })
   }
 
   // 全部 venue 都簽收完 → status = delivered
-  const allReceived = r.items.every(i => i.received_qty != null)
+  const refreshed = await getReplenishmentRun(runId)
+  const allReceived = refreshed.items.every(i => i.delivered_qty != null)
+  const updates = { events }
   if (allReceived) {
-    r.status = STATUS.DELIVERED
-    r.delivered_at = nowIso()
+    updates.status = STATUS.DELIVERED
+    updates.delivered_at = at
   }
-  all[runId] = r
-  writeRuns(all)
-  return { success: true, run: r, discrepancies, all_delivered: allReceived }
+  const { error } = await supabase.from('replenishment_runs').update(updates).eq('id', runId)
+  if (error) throw error
+  return { success: true, run: await getReplenishmentRun(runId), discrepancies, all_delivered: allReceived }
 }
 
-/**
- * 取消補貨單（只能在 maker_done / checker_done 狀態取消）
- */
 export async function cancelRun(runId, reason, actor) {
-  const all = readRuns()
-  const r = all[runId]
+  const r = await getReplenishmentRun(runId)
   if (!r) return { success: false, error: '補貨單不存在' }
   if (r.status === STATUS.SHIPPING || r.status === STATUS.DELIVERED) {
     return { success: false, error: '已出貨/已完成的補貨單不可取消' }
   }
-  r.status = STATUS.CANCELLED
-  r.events.push({ at: nowIso(), action: 'cancel', actor: actor?.name || '?', detail: reason || '無理由' })
-  all[runId] = r
-  writeRuns(all)
-  return { success: true, run: r }
+  const at = nowIso()
+  const events = [...r.events, { at, action: 'cancel', actor: actor?.name || '?', detail: reason || '無理由' }]
+  const { error } = await supabase.from('replenishment_runs').update({
+    status: STATUS.CANCELLED,
+    cancelled_at: at,
+    cancel_reason: reason || null,
+    events,
+  }).eq('id', runId)
+  if (error) throw error
+  return { success: true, run: await getReplenishmentRun(runId) }
 }
 
 /**
- * 把單筆 run 拆成「每店 packing slip」格式 — 給列印頁用
+ * 把單筆 run 拆成「每店 packing slip」格式 — 給列印頁用。pure function
  */
 export function buildPackingSlips(run) {
   if (!run) return []
   const byVenue = {}
-  run.items.forEach(it => {
+  ;(run.items || []).forEach(it => {
     if (!byVenue[it.venue_id]) {
       byVenue[it.venue_id] = {
         venue_id: it.venue_id,
@@ -297,11 +362,7 @@ export function buildPackingSlips(run) {
       }
     }
     byVenue[it.venue_id].items.push(it)
-    byVenue[it.venue_id].subtotal += it.final_qty * (it.product_price || 0)
+    byVenue[it.venue_id].subtotal += (it.final_qty || 0) * (it.product_price || 0)
   })
   return Object.values(byVenue)
-}
-
-export function _clearReplenishmentStore() {
-  if (typeof window !== 'undefined') localStorage.removeItem(STORAGE_KEY)
 }

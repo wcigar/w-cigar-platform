@@ -1,23 +1,18 @@
 // src/lib/services/collections.js
-// 督導月度結帳 service
+// 督導月度結帳 service — Phase 2 已接 Supabase。
+// table: monthly_collections (period text, venue_id text) PK
+//   columns: supervisor_id, ambassador_total, self_sale_total,
+//            self_sale_items jsonb, stocktake_items jsonb,
+//            venue_share_due_ambassador, venue_share_due_self,
+//            paid_amount, paid_at, paid_method,
+//            signature_supervisor, signature_venue,
+//            status, notes, created_at, updated_at
 //
-// 業務模型：
-//   每月每店有一筆結算單（period: 'YYYY-MM' × venue_id）
-//   - ambassador_total: 從 sales 自動加總（大使賣的）
-//   - self_sale_total: 督導現場補錄（店家自賣，only when has_self_sale）
-//   - venue_share_due_ambassador: 自動算 = Σ(qty × venue_share_per_unit)
-//   - venue_share_due_self: 自動算 = Σ(qty × venue_share_self_per_unit)
-//   - paid_amount: 督導實際向酒店付/收的金額
-//   - status: pending / partial / collected / exception
-//
-// localStorage:
-//   wcigar_monthly_collections_v1 = { "<period>:<venue_id>": entry }
+// accountant_name 沒有獨立欄位，存在 notes 內：
+//   notes = JSON.stringify({ accountant_name, user_note })
 
 import { supabase } from '../supabase'
 import { settleVenueSales } from './venueProfitRules'
-
-const USE_MOCK = true
-const STORAGE_KEY = 'wcigar_monthly_collections_v1'
 
 export const COLLECTION_STATUSES = {
   pending:   { label: '待收',     color: '#f59e0b' },
@@ -26,37 +21,68 @@ export const COLLECTION_STATUSES = {
   exception: { label: '差額異常', color: '#dc2626' },
 }
 
-function readStore() {
-  if (typeof window === 'undefined') return {}
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') } catch { return {} }
-}
-function writeStore(s) {
-  if (typeof window === 'undefined') return
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)) } catch {}
-}
-function makeKey(period, venueId) { return `${period}:${venueId}` }
-
 export function currentPeriod() {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
+function packNotes({ accountant_name, user_note }) {
+  return JSON.stringify({
+    accountant_name: accountant_name || null,
+    user_note: user_note || '',
+  })
+}
+
+function unpackNotes(s) {
+  if (!s) return { accountant_name: null, user_note: '' }
+  try {
+    const o = JSON.parse(s)
+    if (o && typeof o === 'object') {
+      return { accountant_name: o.accountant_name || null, user_note: o.user_note || '' }
+    }
+  } catch { /* legacy plain string */ }
+  return { accountant_name: null, user_note: String(s) }
+}
+
+async function fetchRow(period, venueId) {
+  const { data, error } = await supabase
+    .from('monthly_collections')
+    .select('*')
+    .eq('period', period)
+    .eq('venue_id', venueId)
+    .maybeSingle()
+  if (error) throw error
+  return data
+}
+
 // ---------- Public API ----------
 
 /**
- * 取得單筆月度結帳資料（自動計算 ambassador 部分；self_sale 從 store 讀）
- *   ambassadorSalesByProduct: { product_key: total_qty }（呼叫端從 sales 聚合）
+ * 取得單筆月度結帳資料（含結算試算）
+ *   ambassadorSalesByProduct: { product_key: total_qty }
  */
-export function getMonthlyCollection(period, venueId, ambassadorSalesByProduct = {}, hasSelfSale = false) {
-  const store = readStore()
-  const key = makeKey(period, venueId)
-  const entry = store[key] || { period, venue_id: venueId, self_sale_qty_by_product: {}, paid_amount: 0, note: '', collected_at: null, collected_by: null, status: 'pending' }
-  const settle = settleVenueSales(venueId, {
+export async function getMonthlyCollection(period, venueId, ambassadorSalesByProduct = {}, hasSelfSale = false) {
+  const row = await fetchRow(period, venueId)
+  const settle = await settleVenueSales(venueId, {
     ambassador: ambassadorSalesByProduct || {},
-    self_sale:  entry.self_sale_qty_by_product || {},
+    self_sale: row?.self_sale_items || {},
   })
+  const noteParts = unpackNotes(row?.notes)
+
+  const base = row || {
+    period, venue_id: venueId,
+    supervisor_id: null,
+    ambassador_total: 0, self_sale_total: 0,
+    self_sale_items: {}, stocktake_items: {},
+    venue_share_due_ambassador: 0, venue_share_due_self: 0,
+    paid_amount: 0, paid_at: null, paid_method: null,
+    signature_supervisor: null, signature_venue: null,
+    status: 'pending',
+    notes: null,
+  }
+  const paid = Number(base.paid_amount || 0)
   return {
-    ...entry,
+    ...base,
     period, venue_id: venueId,
     has_self_sale: hasSelfSale,
     ambassador: settle.ambassador,
@@ -64,43 +90,40 @@ export function getMonthlyCollection(period, venueId, ambassadorSalesByProduct =
     total: settle.total,
     venue_share_due_total: settle.total.venue_share_due,
     company_gross_profit_total: settle.total.company_gross_profit,
-    pending_amount: Math.max(0, settle.total.venue_share_due - (entry.paid_amount || 0)),
-    stocktake_qty_by_product: entry.stocktake_qty_by_product || {},
-    stocktake_discrepancies: entry.stocktake_discrepancies || [],
-    supervisor_signature: entry.supervisor_signature || null,
-    accountant_signature: entry.accountant_signature || null,
-    accountant_name: entry.accountant_name || '',
-    signed_at: entry.signed_at || null,
+    pending_amount: Math.max(0, settle.total.venue_share_due - paid),
+    // legacy field aliases for existing UI
+    self_sale_qty_by_product: base.self_sale_items || {},
+    stocktake_qty_by_product: base.stocktake_items || {},
+    stocktake_discrepancies: [],
+    supervisor_signature: base.signature_supervisor,
+    accountant_signature: base.signature_venue,
+    accountant_name: noteParts.accountant_name,
+    note: noteParts.user_note,
+    collected_at: base.paid_at,
+    signed_at: base.updated_at,
   }
 }
 
-/**
- * 補錄店家自賣量（督導現場盤點後填，舊 API 保留向後相容）
- */
-export function setSelfSaleQty(period, venueId, selfSaleQtyByProduct, actor) {
-  const store = readStore()
-  const key = makeKey(period, venueId)
-  const entry = store[key] || { period, venue_id: venueId, paid_amount: 0, note: '', status: 'pending' }
-  entry.self_sale_qty_by_product = selfSaleQtyByProduct || {}
-  entry.updated_at = new Date().toISOString()
-  entry.updated_by = actor?.id || actor?.name || null
-  store[key] = entry
-  writeStore(store)
+export async function setSelfSaleQty(period, venueId, selfSaleQtyByProduct, actor) {
+  const existing = await fetchRow(period, venueId)
+  const row = {
+    period, venue_id: venueId,
+    self_sale_items: selfSaleQtyByProduct || {},
+    self_sale_total: Object.values(selfSaleQtyByProduct || {}).reduce((s, q) => s + (Number(q) || 0), 0),
+    status: existing?.status || 'pending',
+    updated_at: new Date().toISOString(),
+  }
+  const { error } = await supabase
+    .from('monthly_collections').upsert(row, { onConflict: 'period,venue_id' })
+  if (error) throw error
   return { success: true }
 }
 
 /**
  * 督導現場盤點：填「實際剩餘」+ 系統反推自賣量
- *   stocktakeQtyByProduct: { product_key: 實際剩餘根數 }
- *   currentInventoryByProduct: { product_key: 系統當前庫存（已扣大使賣後）}
- *
- *   自賣量 = max(0, current - actual)
- *   若 actual > current → 異常（系統內銷量比實際少，可能漏 KEY）
  */
-export function setStocktake(period, venueId, stocktakeQtyByProduct, currentInventoryByProduct, actor) {
-  const store = readStore()
-  const key = makeKey(period, venueId)
-  const entry = store[key] || { period, venue_id: venueId, paid_amount: 0, note: '', status: 'pending' }
+export async function setStocktake(period, venueId, stocktakeQtyByProduct, currentInventoryByProduct, actor) {
+  const existing = await fetchRow(period, venueId)
   const stocktake = {}
   const selfSale = {}
   const discrepancies = []
@@ -109,77 +132,98 @@ export function setStocktake(period, venueId, stocktakeQtyByProduct, currentInve
     const current = Number(currentInventoryByProduct?.[pk]) || 0
     stocktake[pk] = actual
     if (current > actual) {
-      selfSale[pk] = current - actual  // 系統比實際多 → 差額 = 自賣
+      selfSale[pk] = current - actual
     } else if (current < actual) {
       discrepancies.push({ product_key: pk, current, actual, diff: actual - current })
     }
   })
-  entry.stocktake_qty_by_product = stocktake
-  entry.self_sale_qty_by_product = selfSale  // 自動覆寫
-  entry.stocktake_discrepancies = discrepancies
-  entry.stocktake_at = new Date().toISOString()
-  entry.stocktake_by = actor?.name || null
-  store[key] = entry
-  writeStore(store)
+  const selfTotal = Object.values(selfSale).reduce((s, q) => s + q, 0)
+  const row = {
+    period, venue_id: venueId,
+    stocktake_items: stocktake,
+    self_sale_items: selfSale,
+    self_sale_total: selfTotal,
+    status: existing?.status || 'pending',
+    updated_at: new Date().toISOString(),
+  }
+  const { error } = await supabase
+    .from('monthly_collections').upsert(row, { onConflict: 'period,venue_id' })
+  if (error) throw error
   return { success: true, self_sale: selfSale, discrepancies }
 }
 
 /**
  * 督導 + 酒店會計簽名（base64 PNG dataURL）
+ *   accountant_name 包進 notes JSON（沒有獨立欄位）
  */
-export function setSignatures(period, venueId, { supervisor_signature, accountant_signature, accountant_name }, actor) {
-  const store = readStore()
-  const key = makeKey(period, venueId)
-  const entry = store[key] || { period, venue_id: venueId, paid_amount: 0, note: '', status: 'pending' }
-  if (supervisor_signature) entry.supervisor_signature = supervisor_signature
-  if (accountant_signature) entry.accountant_signature = accountant_signature
-  if (accountant_name) entry.accountant_name = accountant_name
-  entry.signed_at = new Date().toISOString()
-  entry.signed_by = actor?.name || null
-  store[key] = entry
-  writeStore(store)
+export async function setSignatures(period, venueId, { supervisor_signature, accountant_signature, accountant_name }, actor) {
+  const existing = await fetchRow(period, venueId)
+  const prevNotes = unpackNotes(existing?.notes)
+  const newNotes = packNotes({
+    accountant_name: accountant_name ?? prevNotes.accountant_name,
+    user_note: prevNotes.user_note,
+  })
+  const row = {
+    period, venue_id: venueId,
+    status: existing?.status || 'pending',
+    notes: newNotes,
+    updated_at: new Date().toISOString(),
+  }
+  if (supervisor_signature) row.signature_supervisor = supervisor_signature
+  if (accountant_signature) row.signature_venue = accountant_signature
+  const { error } = await supabase
+    .from('monthly_collections').upsert(row, { onConflict: 'period,venue_id' })
+  if (error) throw error
   return { success: true }
 }
 
-/**
- * 督導確認收款（標記已收 / 部分收 / 異常）
- */
-export function recordCollectionPayment(period, venueId, { paid_amount, note, status }, actor) {
-  const store = readStore()
-  const key = makeKey(period, venueId)
-  const entry = store[key] || { period, venue_id: venueId, self_sale_qty_by_product: {} }
-  entry.paid_amount = Math.max(0, Number(paid_amount) || 0)
-  entry.note = note || ''
-  entry.status = status || 'collected'
-  entry.collected_at = new Date().toISOString()
-  entry.collected_by = actor?.name || null
-  store[key] = entry
-  writeStore(store)
+export async function recordCollectionPayment(period, venueId, { paid_amount, note, status, paid_method }, actor) {
+  const existing = await fetchRow(period, venueId)
+  const prevNotes = unpackNotes(existing?.notes)
+  const newNotes = packNotes({
+    accountant_name: prevNotes.accountant_name,
+    user_note: note ?? prevNotes.user_note,
+  })
+  const row = {
+    period, venue_id: venueId,
+    paid_amount: Math.max(0, Number(paid_amount) || 0),
+    paid_at: new Date().toISOString(),
+    paid_method: paid_method || existing?.paid_method || null,
+    status: status || 'collected',
+    notes: newNotes,
+    updated_at: new Date().toISOString(),
+  }
+  const { error } = await supabase
+    .from('monthly_collections').upsert(row, { onConflict: 'period,venue_id' })
+  if (error) throw error
   return { success: true }
 }
 
 /**
  * 取得某 period × supervisor 負責的所有店結帳狀況
  */
-export function listCollectionsForSupervisor(period, venueIds, ambassadorSalesByVenue, venuesById) {
-  return venueIds.map(vid => {
+export async function listCollectionsForSupervisor(period, venueIds, ambassadorSalesByVenue, venuesById) {
+  const out = []
+  for (const vid of venueIds) {
     const venue = venuesById[vid]
     const ambSales = ambassadorSalesByVenue[vid] || {}
     const hasSelfSale = !!venue?.has_self_sale
-    const c = getMonthlyCollection(period, vid, ambSales, hasSelfSale)
-    return {
+    const c = await getMonthlyCollection(period, vid, ambSales, hasSelfSale)
+    out.push({
       ...c,
       venue_name: venue?.name || vid,
       venue_region: venue?.region,
-    }
-  })
+    })
+  }
+  return out
 }
 
 // ---------- Backward compat ----------
 
-export async function listCollections() { return [] }
-export async function submitCollection() { return { success: true } }
-
-export function _clearCollectionsStore() {
-  if (typeof window !== 'undefined') localStorage.removeItem(STORAGE_KEY)
+export async function listCollections() {
+  const { data, error } = await supabase.from('monthly_collections').select('*')
+  if (error) throw error
+  return data || []
 }
+
+export async function submitCollection() { return { success: true } }

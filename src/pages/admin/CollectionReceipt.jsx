@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Printer, Send, Download } from 'lucide-react'
+import { supabase } from '../../lib/supabase'
 import { listVenues } from '../../lib/services/venues'
 import { getVenueSalesMatrixTemplate } from '../../lib/services/venueSales'
 import { getMonthlyCollection } from '../../lib/services/collections'
@@ -15,6 +16,7 @@ export default function CollectionReceipt() {
   const [venue, setVenue] = useState(null)
   const [products, setProducts] = useState([])
   const [collection, setCollection] = useState(null)
+  const [inventoryMap, setInventoryMap] = useState({})
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -27,9 +29,19 @@ export default function CollectionReceipt() {
       const venueTpl = tpl.venues.find(x => x.id === venueId)
       const ps = venueTpl?.products || []
       setProducts(ps)
-      const c = getMonthlyCollection(period, venueId, {}, !!v.has_self_sale)
-      // attach products for line items
+      const c = await getMonthlyCollection(period, venueId, {}, !!v.has_self_sale)
       setCollection({ ...c, products: ps, venue_name: v.name, venue_region: v.region })
+
+      // 系統庫存：用於「應剩 vs 實剩」推算自賣
+      if (ps.length > 0) {
+        const keys = ps.map(p => p.key)
+        const { data } = await supabase
+          .from('inventory_balances').select('product_key, current_qty')
+          .eq('venue_id', venueId).in('product_key', keys)
+        const map = {}
+        ;(data || []).forEach(e => { map[e.product_key] = e.current_qty || 0 })
+        setInventoryMap(map)
+      }
       setLoading(false)
     })()
   }, [venueId, period])
@@ -140,8 +152,7 @@ export default function CollectionReceipt() {
                   {Object.entries(collection.stocktake_qty_by_product || {}).filter(([_, v]) => v != null && v !== '').map(([pk, actual]) => {
                     const product = products.find(p => p.key === pk)
                     if (!product) return null
-                    const inv = (() => { try { return JSON.parse(localStorage.getItem('wcigar_inventory_v1') || '{}') } catch { return {} } })()
-                    const should = inv[`${venueId}:${pk}`]?.current_qty ?? 0
+                    const should = inventoryMap[pk] ?? 0
                     const selfSale = Math.max(0, should - Number(actual))
                     return (
                       <tr key={pk}>

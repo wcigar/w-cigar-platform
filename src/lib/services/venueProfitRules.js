@@ -1,36 +1,14 @@
 // src/lib/services/venueProfitRules.js
-// === 重做：每店每品的「每根利潤模型」===
-// 取代舊的 % 分潤。每筆 = 一個 (venue_id × product_key) 組合。
-//
-//   sale_price             售價（公開，員工/大使都可看）
-//   cost_price             進貨成本（boss-only，敏感資料）
-//   venue_share_per_unit   場域抽成 — 每賣 1 根給酒店多少錢
-//   company_profit_per_unit  公司毛利 = sale_price − cost_price − venue_share（自動）
-//
-// localStorage key: 'wcigar_venue_pricing_v1' = { "<venue>:<product>": entry, ... }
+// 每店每品的「每根利潤模型」— Phase 2 已接 Supabase。
+// table: venue_pricing (venue_id, product_key) PK
+//   sale_price, cost_price, venue_share_per_unit, venue_share_self_per_unit,
+//   updated_at, updated_by_name
+// company_profit_per_unit / company_profit_self_per_unit 由 caller 在讀取時計算（不存 DB）。
 
 import { supabase } from '../supabase'
-import { listVenues } from './venues'
-
-const USE_MOCK = true
-const STORAGE_KEY = 'wcigar_venue_pricing_v1'
-
-function readStore() {
-  if (typeof window === 'undefined') return {}
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') } catch { return {} }
-}
-function writeStore(s) {
-  if (typeof window === 'undefined') return
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)) } catch {}
-}
-function makeKey(venueId, productKey) { return `${venueId}:${productKey}` }
 
 // ---------- Permissions ----------
 
-/**
- * 判斷當前登入者是否可以看到「進貨成本」欄位
- * boss / admin 可以看；其他角色看不到（顯示 ***）
- */
 export function canSeeCostPrice(session) {
   if (!session) return false
   const role = (session.role || '').toLowerCase()
@@ -39,98 +17,84 @@ export function canSeeCostPrice(session) {
 
 // ---------- Public API ----------
 
-/**
- * 取得單筆定價
- */
-export function getVenuePricing(venueId, productKey) {
-  const store = readStore()
-  return store[makeKey(venueId, productKey)] || null
+export async function getVenuePricing(venueId, productKey) {
+  const { data, error } = await supabase
+    .from('venue_pricing')
+    .select('*')
+    .eq('venue_id', venueId)
+    .eq('product_key', productKey)
+    .maybeSingle()
+  if (error) throw error
+  return data
 }
 
-/**
- * upsert 單筆。可只更新部分欄位。
- * 若 cost_price 同時提供 → 自動重算 company_profit_per_unit
- */
-export function upsertVenuePricing(venueId, productKey, patch, actor) {
-  const store = readStore()
-  const key = makeKey(venueId, productKey)
-  const existing = store[key] || {
-    venue_id: venueId,
-    product_key: productKey,
-    sale_price: 0,
-    cost_price: 0,
-    venue_share_per_unit: 0,
-    company_profit_per_unit: 0,
-  }
-  const merged = {
-    ...existing,
-    ...patch,
-    venue_id: venueId,
-    product_key: productKey,
-  }
-  // 自動重算 company_profit_per_unit (大使賣)
-  merged.company_profit_per_unit = Math.max(0,
-    Number(merged.sale_price || 0)
-    - Number(merged.cost_price || 0)
-    - Number(merged.venue_share_per_unit || 0))
-  // 自動重算 company_profit_self_per_unit (店家自賣)
-  merged.company_profit_self_per_unit = Math.max(0,
-    Number(merged.sale_price || 0)
-    - Number(merged.cost_price || 0)
-    - Number(merged.venue_share_self_per_unit || 0))
-  merged.updated_at = new Date().toISOString()
-  if (actor) merged.updated_by_name = actor.name || null
-  store[key] = merged
-  writeStore(store)
-  return merged
+export async function listVenuePricing() {
+  const { data, error } = await supabase.from('venue_pricing').select('*')
+  if (error) throw error
+  return data || []
 }
 
-/**
- * 批次寫入（給矩陣頁批次儲存用）
- * payload: [{ venue_id, product_key, sale_price, cost_price, venue_share_per_unit }, ...]
- */
-export function bulkSetVenuePricing(payload, actor) {
-  const store = readStore()
-  payload.forEach(p => {
-    if (!p.venue_id || !p.product_key) return
-    const key = makeKey(p.venue_id, p.product_key)
-    const sale = Number(p.sale_price) || 0
-    const cost = Number(p.cost_price) || 0
-    const share = Number(p.venue_share_per_unit) || 0
-    const shareSelf = Number(p.venue_share_self_per_unit) || 0
-    store[key] = {
+export async function upsertVenuePricing(venueId, productKey, patch, actor) {
+  const existing = await getVenuePricing(venueId, productKey)
+  const row = {
+    venue_id: venueId,
+    product_key: productKey,
+    sale_price: patch.sale_price ?? existing?.sale_price ?? 0,
+    cost_price: patch.cost_price ?? existing?.cost_price ?? 0,
+    venue_share_per_unit: patch.venue_share_per_unit ?? existing?.venue_share_per_unit ?? 0,
+    venue_share_self_per_unit: patch.venue_share_self_per_unit ?? existing?.venue_share_self_per_unit ?? 0,
+    updated_at: new Date().toISOString(),
+    updated_by_name: actor?.name || existing?.updated_by_name || null,
+  }
+  const { data, error } = await supabase
+    .from('venue_pricing')
+    .upsert(row, { onConflict: 'venue_id,product_key' })
+    .select()
+    .single()
+  if (error) throw error
+  // 回傳含計算欄位（caller 端 compute）
+  return enrichPricing(data)
+}
+
+export async function bulkSetVenuePricing(payload, actor) {
+  if (!Array.isArray(payload) || payload.length === 0) return { success: true, count: 0 }
+  const rows = payload
+    .filter(p => p.venue_id && p.product_key)
+    .map(p => ({
       venue_id: p.venue_id,
       product_key: p.product_key,
-      sale_price: sale,
-      cost_price: cost,
-      venue_share_per_unit: share,
-      venue_share_self_per_unit: shareSelf,
-      company_profit_per_unit: Math.max(0, sale - cost - share),
-      company_profit_self_per_unit: Math.max(0, sale - cost - shareSelf),
-      note: p.note || '',
+      sale_price: Number(p.sale_price) || 0,
+      cost_price: Number(p.cost_price) || 0,
+      venue_share_per_unit: Number(p.venue_share_per_unit) || 0,
+      venue_share_self_per_unit: Number(p.venue_share_self_per_unit) || 0,
       updated_at: new Date().toISOString(),
       updated_by_name: actor?.name || null,
-    }
-  })
-  writeStore(store)
-  return { success: true, count: payload.length }
+    }))
+  const { error } = await supabase
+    .from('venue_pricing')
+    .upsert(rows, { onConflict: 'venue_id,product_key' })
+  if (error) throw error
+  return { success: true, count: rows.length }
 }
 
 /**
- * 列出所有定價（用於矩陣頁）
+ * 矩陣頁用：fetch 全部 pricing 一次，再對每店每品 enrich。
  *   templateByVenueId: { venueId: { products: [{key, name, price, category}, ...] } }
  *   session: 用於判斷是否可看 cost
  */
-export function buildPricingMatrix(venues, templateByVenueId, session) {
-  const store = readStore()
+export async function buildPricingMatrix(venues, templateByVenueId, session) {
   const seeCost = canSeeCostPrice(session)
+  const all = await listVenuePricing()
+  const byKey = {}
+  all.forEach(r => { byKey[r.venue_id + ':' + r.product_key] = r })
+
   return venues
     .filter(v => v.is_active !== false)
     .map(v => {
       const products = templateByVenueId[v.id]?.products || []
       const hasSelfSale = v.has_self_sale === true
       const rows = products.map(p => {
-        const entry = store[makeKey(v.id, p.key)]
+        const entry = byKey[v.id + ':' + p.key]
         const sale = entry?.sale_price ?? p.price ?? 0
         const cost = entry?.cost_price ?? 0
         const share = entry?.venue_share_per_unit ?? 0
@@ -150,7 +114,6 @@ export function buildPricingMatrix(venues, templateByVenueId, session) {
           margin_rate: sale > 0 ? (profit / sale) : 0,
           margin_rate_self: sale > 0 ? (profitSelf / sale) : 0,
           has_self_sale: hasSelfSale,
-          note: entry?.note || '',
           configured: !!entry,
           updated_at: entry?.updated_at || null,
         }
@@ -173,32 +136,35 @@ export function buildPricingMatrix(venues, templateByVenueId, session) {
  * 結算試算：給定該店指定期間的銷售（按 product key 累計）
  *   salesByProduct.ambassador: { product_key: qty }  (大使賣的)
  *   salesByProduct.self_sale:   { product_key: qty }  (店家少爺自賣)
- *
- * 兩段獨立計算，因為抽成不同。回傳：
- *   { ambassador: { revenue, venue_share_due, company_gross_profit, lines },
- *     self_sale:  { ... } (only if has self) ,
- *     total: { revenue, venue_share_due, company_gross_profit } }
  */
-export function settleVenueSales(venueId, salesByProduct) {
-  const store = readStore()
+export async function settleVenueSales(venueId, salesByProduct) {
+  const { data, error } = await supabase
+    .from('venue_pricing')
+    .select('*')
+    .eq('venue_id', venueId)
+  if (error) throw error
+  const byProductKey = {}
+  ;(data || []).forEach(r => { byProductKey[r.product_key] = r })
+
   function calc(map, useSelf) {
     let revenue = 0, totalCost = 0, totalShare = 0, totalProfit = 0
     const lines = []
     Object.entries(map || {}).forEach(([pk, qty]) => {
-      const entry = store[makeKey(venueId, pk)]
+      const entry = byProductKey[pk]
       if (!entry) return
       const q = Number(qty) || 0
-      const r = entry.sale_price * q
-      const c = entry.cost_price * q
-      const s = (useSelf ? (entry.venue_share_self_per_unit || 0) : entry.venue_share_per_unit) * q
-      const p = (useSelf ? (entry.company_profit_self_per_unit || 0) : entry.company_profit_per_unit) * q
+      const r = (entry.sale_price || 0) * q
+      const c = (entry.cost_price || 0) * q
+      const sharePerUnit = useSelf ? (entry.venue_share_self_per_unit || 0) : (entry.venue_share_per_unit || 0)
+      const s = sharePerUnit * q
+      const profitPerUnit = Math.max(0, (entry.sale_price || 0) - (entry.cost_price || 0) - sharePerUnit)
+      const p = profitPerUnit * q
       revenue += r; totalCost += c; totalShare += s; totalProfit += p
       lines.push({ product_key: pk, qty: q, revenue: r, cost: c, venue_share: s, company_profit: p })
     })
     return { revenue, total_cost: totalCost, venue_share_due: totalShare, company_gross_profit: totalProfit, lines }
   }
 
-  // 兼容舊 API：若 salesByProduct 是 flat map，視為大使賣
   let amb, self
   if (salesByProduct && (salesByProduct.ambassador || salesByProduct.self_sale)) {
     amb = calc(salesByProduct.ambassador, false)
@@ -220,12 +186,22 @@ export function settleVenueSales(venueId, salesByProduct) {
   }
 }
 
-// ---------- Backward compat（舊 service 簽名，避免其他頁面崩）----------
-
-export async function listVenueProfitRules() {
-  // 重做後不再使用此 API；回傳空避免崩
-  return []
+function enrichPricing(row) {
+  if (!row) return row
+  const sale = Number(row.sale_price || 0)
+  const cost = Number(row.cost_price || 0)
+  const share = Number(row.venue_share_per_unit || 0)
+  const shareSelf = Number(row.venue_share_self_per_unit || 0)
+  return {
+    ...row,
+    company_profit_per_unit: Math.max(0, sale - cost - share),
+    company_profit_self_per_unit: Math.max(0, sale - cost - shareSelf),
+  }
 }
+
+// ---------- Backward compat ----------
+
+export async function listVenueProfitRules() { return [] }
 export async function getVenueProfitRule() { return null }
 export async function upsertVenueProfitRule() { return { success: false, error: '已改用 venue-pricing 模型' } }
 export async function deactivateVenueProfitRule() { return { success: false, error: '已改用 venue-pricing 模型' } }
@@ -234,7 +210,3 @@ export const SETTLEMENT_TYPES = {}
 export const COMMISSION_BASIS = {}
 export const SETTLEMENT_CYCLES = {}
 export function simulateProfit() { return {} }
-
-export function _clearVenuePricingStore() {
-  if (typeof window !== 'undefined') localStorage.removeItem(STORAGE_KEY)
-}
