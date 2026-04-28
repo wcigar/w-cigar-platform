@@ -13,33 +13,17 @@ export default function PettyCash() {
   const [editingCash, setEditingCash] = useState(null)
   const [cashForm, setCashForm] = useState({ amount: '', method: '', given_by: '', received_by: '', note: '' })
 
-  function startEdit(r) {
-    setEditingCash(r.id)
-    setCashForm({ amount: String(r.amount || ''), method: r.method || '現金', given_by: r.given_by || 'Wilson', received_by: r.received_by || r.employee_name || '', note: r.note || '' })
-  }
-  async function saveEdit(id) {
-    if (!cashForm.amount || +cashForm.amount <= 0) return alert('金額不可為空')
-    await supabase.from('petty_cash').update({ amount: +cashForm.amount, method: cashForm.method, given_by: cashForm.given_by, received_by: cashForm.received_by, note: cashForm.note }).eq('id', id)
-    setEditingCash(null); load()
-  }
-  async function deleteCash(r) {
-    if (!confirm(`確定刪除這筆零用金？金額：$${r.amount.toLocaleString()}`)) return
-    await supabase.from('petty_cash').delete().eq('id', r.id)
-    load()
-  }
+  function startEdit(r) { setEditingCash(r.id); setCashForm({ amount: String(r.amount || ''), method: r.method || '現金', given_by: r.given_by || 'Wilson', received_by: r.received_by || r.employee_name || '', note: r.note || '' }) }
+  async function saveEdit(id) { if (!cashForm.amount || +cashForm.amount <= 0) return alert('金額不可為空'); await supabase.from('petty_cash').update({ amount: +cashForm.amount, method: cashForm.method, given_by: cashForm.given_by, received_by: cashForm.received_by, note: cashForm.note }).eq('id', id); setEditingCash(null); load() }
+  async function deleteCash(r) { if (!confirm(`確定刪除這筆零用金？金額：$${r.amount.toLocaleString()}`)) return; await supabase.from('petty_cash').delete().eq('id', r.id); load() }
   const months = Array.from({ length: 6 }, (_, i) => format(subMonths(new Date(), i), 'yyyy-MM'))
 
   useEffect(() => { load() }, [month])
-
   async function load() {
     setLoading(true)
     const s = month + '-01', e = format(endOfMonth(new Date(month + '-01')), 'yyyy-MM-dd')
-    const [pR, xR] = await Promise.all([
-      supabase.from('petty_cash').select('*').gte('date', s).lte('date', e).order('date', { ascending: false }),
-      supabase.from('expenses').select('*').gte('date', s).lte('date', e).order('date', { ascending: false }),
-    ])
-    setRecords(pR.data || []); setExpenses(xR.data || [])
-    setLoading(false)
+    const [pR, xR] = await Promise.all([ supabase.from('petty_cash').select('*').gte('date', s).lte('date', e).order('date', { ascending: false }), supabase.from('expenses').select('*').gte('date', s).lte('date', e).order('date', { ascending: false }) ])
+    setRecords(pR.data || []); setExpenses(xR.data || []); setLoading(false)
   }
 
   const totalIn = records.reduce((s, r) => s + (r.amount || 0), 0)
@@ -47,168 +31,132 @@ export default function PettyCash() {
   const balance = totalIn - totalOut
   const wilsonIn = records.filter(r => r.given_by === 'Wilson').reduce((s, r) => s + (r.amount || 0), 0)
   const shanIn = records.filter(r => r.given_by === '珊珊').reduce((s, r) => s + (r.amount || 0), 0)
-
-  const byHandler = {}
-  expenses.forEach(x => { const h = x.handler || '未知'; byHandler[h] = (byHandler[h] || 0) + (x.amount || 0) })
+  const byHandler = {}; expenses.forEach(x => { const h = x.handler || '未知'; byHandler[h] = (byHandler[h] || 0) + (x.amount || 0) })
   const handlerList = Object.entries(byHandler).sort((a, b) => b[1] - a[1])
+  const timeline = [...records.map(r => ({ ...r, _type: 'in', _sort: r.created_at || r.date })), ...expenses.map(r => ({ ...r, _type: 'out', _sort: r.created_at || r.date }))].sort((a, b) => b._sort > a._sort ? 1 : -1)
 
-  const timeline = [
-    ...records.map(r => ({ ...r, _type: 'in', _sort: r.created_at || r.date })),
-    ...expenses.map(r => ({ ...r, _type: 'out', _sort: r.created_at || r.date })),
-  ].sort((a, b) => b._sort > a._sort ? 1 : -1)
+  if (loading) return <div>{[1,2,3].map(i => <div key={i} className="loading-shimmer" style={{ height: 60, marginBottom: 8, borderRadius: 14 }} />)}</div>
 
-  if (loading) return <div>{[1,2,3].map(i => <div key={i} className="loading-shimmer" style={{ height: 60, marginBottom: 8 }} />)}</div>
+  const SEP = <div style={{height:1,background:'linear-gradient(90deg,transparent,rgba(196,163,90,.06),transparent)',margin:'12px 0'}}/>
+  const tabStyle = (active) => ({ padding:'7px 14px', borderRadius:8, fontSize:11, fontWeight:600, cursor:'pointer', letterSpacing:1, background:active?'rgba(196,163,90,.15)':'transparent', color:active?'rgba(196,163,90,1)':'#888078', border:active?'1px solid rgba(196,163,90,.3)':'1px solid rgba(196,163,90,.08)' })
+
+  function EditForm({ r }) {
+    return <div>
+      <div style={{fontFamily:'Noto Serif TC,serif',fontSize:13,fontWeight:600,color:'rgba(100,170,100,.8)',marginBottom:10}}>✏️ 編輯撥付紀錄</div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
+        <div><label style={{fontFamily:'Noto Serif TC,serif',fontSize:11,color:'#888078',display:'block',marginBottom:4}}>金額</label><input className="wcb-input" type="number" value={cashForm.amount} onChange={e=>setCashForm(f=>({...f,amount:e.target.value}))} style={{fontFamily:'JetBrains Mono,monospace',fontSize:16}}/></div>
+        <div><label style={{fontFamily:'Noto Serif TC,serif',fontSize:11,color:'#888078',display:'block',marginBottom:4}}>方式</label><select className="wcb-input" value={cashForm.method} onChange={e=>setCashForm(f=>({...f,method:e.target.value}))}><option>現金</option><option>轉帳</option></select></div>
+        <div><label style={{fontFamily:'Noto Serif TC,serif',fontSize:11,color:'#888078',display:'block',marginBottom:4}}>撥付人</label><select className="wcb-input" value={cashForm.given_by} onChange={e=>setCashForm(f=>({...f,given_by:e.target.value}))}><option>Wilson</option><option>珊珊</option></select></div>
+        <div><label style={{fontFamily:'Noto Serif TC,serif',fontSize:11,color:'#888078',display:'block',marginBottom:4}}>經手人</label><input className="wcb-input" value={cashForm.received_by} onChange={e=>setCashForm(f=>({...f,received_by:e.target.value}))}/></div>
+      </div>
+      <div style={{marginBottom:10}}><label style={{fontFamily:'Noto Serif TC,serif',fontSize:11,color:'#888078',display:'block',marginBottom:4}}>備註</label><input className="wcb-input" value={cashForm.note} onChange={e=>setCashForm(f=>({...f,note:e.target.value}))} placeholder="備註"/></div>
+      <div style={{display:'flex',gap:8}}>
+        <button className="wcb-btn-gold" style={{flex:1}} onClick={()=>saveEdit(r.id)}>✅ 儲存</button>
+        <button className="wcb-btn-outline" style={{flex:1}} onClick={()=>setEditingCash(null)}>取消</button>
+      </div>
+    </div>
+  }
+
+  function InRecord({ r, showActions }) {
+    return <>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div><div style={{fontFamily:'Noto Serif TC,serif',fontSize:13,fontWeight:600,color:'rgba(100,170,100,.8)'}}>💰 撥付零用金</div><div style={{fontFamily:'JetBrains Mono,monospace',fontSize:10,color:'rgba(196,163,90,.3)',marginTop:3}}>{r.date} · {r.given_by} · {r.method} · 經手：{r.received_by||r.employee_name} {r.signature_url&&'✍️'}</div></div>
+        <span style={{fontFamily:'JetBrains Mono,monospace',fontSize:18,fontWeight:600,color:'rgba(100,170,100,.8)'}}>+${r.amount.toLocaleString()}</span>
+      </div>
+      {r.note&&<div style={{fontFamily:'Noto Serif TC,serif',fontSize:11,color:'#888078',marginTop:4}}>📝 {r.note}</div>}
+      {r.signature_url&&<img src={r.signature_url} alt="" style={{maxWidth:160,height:50,objectFit:'contain',borderRadius:8,border:'1px solid rgba(196,163,90,.1)',background:'#fff',marginTop:6,cursor:'pointer'}} onClick={()=>setPhotoModal(r.signature_url)}/>}
+      {showActions&&<div style={{display:'flex',gap:6,marginTop:8,justifyContent:'flex-end'}}>
+        <button className="wcb-btn-outline" style={{fontSize:10,padding:'6px 12px'}} onClick={()=>startEdit(r)}>✏️ 編輯</button>
+        <button className="wcb-btn-danger" style={{fontSize:10,padding:'6px 12px'}} onClick={()=>deleteCash(r)}>🗑️ 刪除</button>
+      </div>}
+    </>
+  }
 
   return (
     <div>
-      {photoModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.9)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setPhotoModal(null)}>
-          <div style={{ maxWidth: 500, width: '100%' }} onClick={e => e.stopPropagation()}>
-            <img src={photoModal} alt="" style={{ width: '100%', borderRadius: 12, maxHeight: '80vh', objectFit: 'contain' }} />
-            <button className="btn-outline" style={{ width: '100%', marginTop: 10 }} onClick={() => setPhotoModal(null)}>關閉</button>
-          </div>
-        </div>
-      )}
+      {/* Photo modal */}
+      {photoModal&&<div className="wcb-modal-overlay" style={{alignItems:'center'}} onClick={()=>setPhotoModal(null)}><div style={{maxWidth:500,width:'100%'}} onClick={e=>e.stopPropagation()}><img src={photoModal} alt="" style={{width:'100%',borderRadius:14,maxHeight:'80vh',objectFit:'contain'}}/><button className="wcb-btn-outline" style={{width:'100%',marginTop:10}} onClick={()=>setPhotoModal(null)}>關閉</button></div></div>}
 
-      <div style={{ display: 'flex', gap: 6, marginBottom: 12, overflowX: 'auto' }}>
-        {months.map(m => <button key={m} onClick={() => setMonth(m)} style={{ padding: '6px 10px', borderRadius: 20, fontSize: 11, fontWeight: 500, whiteSpace: 'nowrap', cursor: 'pointer', background: m === month ? 'var(--gold-glow)' : 'transparent', color: m === month ? 'var(--gold)' : 'var(--text-dim)', border: m === month ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>{parseInt(m.slice(5))}月</button>)}
+      {/* Month tabs */}
+      <div style={{display:'flex',gap:6,marginBottom:14,overflowX:'auto'}}>
+        {months.map(m=><button key={m} onClick={()=>setMonth(m)} style={tabStyle(m===month)}>{parseInt(m.slice(5))}月</button>)}
       </div>
 
-      <div className="card" style={{ padding: 14, marginBottom: 8, borderColor: 'var(--border-gold)' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, textAlign: 'center' }}>
-          <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>共用零用金收入</div><div style={{ fontSize: 20, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--green)' }}>${totalIn.toLocaleString()}</div></div>
-          <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>全員總支出</div><div style={{ fontSize: 20, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--red)' }}>${totalOut.toLocaleString()}</div></div>
-          <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>餘額</div><div style={{ fontSize: 20, fontFamily: 'var(--font-mono)', fontWeight: 700, color: balance >= 0 ? 'var(--gold)' : 'var(--red)' }}>${balance.toLocaleString()}</div></div>
+      {/* Summary */}
+      <div className="wcb-card" style={{marginBottom:8}}>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,textAlign:'center'}}>
+          <div><div style={{fontFamily:'JetBrains Mono,monospace',fontSize:9,color:'#888078',letterSpacing:1}}>INCOME</div><div style={{fontFamily:'JetBrains Mono,monospace',fontSize:20,fontWeight:300,color:'rgba(100,170,100,.8)',marginTop:4}}>${totalIn.toLocaleString()}</div></div>
+          <div><div style={{fontFamily:'JetBrains Mono,monospace',fontSize:9,color:'#888078',letterSpacing:1}}>EXPENSE</div><div style={{fontFamily:'JetBrains Mono,monospace',fontSize:20,fontWeight:300,color:'rgba(190,70,60,.8)',marginTop:4}}>${totalOut.toLocaleString()}</div></div>
+          <div><div style={{fontFamily:'JetBrains Mono,monospace',fontSize:9,color:'#888078',letterSpacing:1}}>BALANCE</div><div style={{fontFamily:'JetBrains Mono,monospace',fontSize:20,fontWeight:300,color:balance>=0?'rgba(196,163,90,.8)':'rgba(190,70,60,.8)',marginTop:4}}>${balance.toLocaleString()}</div></div>
         </div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 14 }}>
-        <div className="card" style={{ padding: 8, textAlign: 'center' }}><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Wilson 給</div><div style={{ fontSize: 16, fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--gold)' }}>${wilsonIn.toLocaleString()}</div></div>
-        <div className="card" style={{ padding: 8, textAlign: 'center' }}><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>珊珊 給</div><div style={{ fontSize: 16, fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--gold)' }}>${shanIn.toLocaleString()}</div></div>
+
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:16}}>
+        <div className="wcb-card" style={{padding:10,textAlign:'center',marginBottom:0}}><div style={{fontFamily:'JetBrains Mono,monospace',fontSize:9,color:'#888078',letterSpacing:1}}>Wilson</div><div style={{fontFamily:'JetBrains Mono,monospace',fontSize:16,fontWeight:300,color:'rgba(196,163,90,.7)',marginTop:3}}>${wilsonIn.toLocaleString()}</div></div>
+        <div className="wcb-card" style={{padding:10,textAlign:'center',marginBottom:0}}><div style={{fontFamily:'JetBrains Mono,monospace',fontSize:9,color:'#888078',letterSpacing:1}}>珊珊</div><div style={{fontFamily:'JetBrains Mono,monospace',fontSize:16,fontWeight:300,color:'rgba(196,163,90,.7)',marginTop:3}}>${shanIn.toLocaleString()}</div></div>
       </div>
 
-      {handlerList.length > 0 && (
-        <div className="card" style={{ padding: 14, marginBottom: 14 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--gold)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}><Users size={14} /> 各員工支出明細</div>
-          {handlerList.map(([name, amt]) => {
-            const pct = totalOut > 0 ? Math.round(amt / totalOut * 100) : 0
-            return (
-              <div key={name} style={{ marginBottom: 8 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 3 }}>
-                  <span style={{ fontWeight: 600 }}>{name}</span>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--red)' }}>${amt.toLocaleString()} <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>({pct}%)</span></span>
-                </div>
-                <div style={{ height: 6, background: 'var(--black)', borderRadius: 3, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: pct + '%', background: 'var(--red)', borderRadius: 3 }} />
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      <div style={{ display: 'flex', gap: 4, marginBottom: 14 }}>
-        {[['overview','收支時間軸'],['in','撥付紀錄'],['out','支出紀錄']].map(([v,l]) => (
-          <button key={v} onClick={() => setTab(v)} style={{ padding: '7px 12px', borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: 'pointer', background: tab === v ? 'var(--gold-glow)' : 'transparent', color: tab === v ? 'var(--gold)' : 'var(--text-dim)', border: tab === v ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>{l}</button>
-        ))}
-      </div>
-
-      {tab === 'overview' && (
-        <div>
-          {timeline.length === 0 ? <div className="card" style={{ textAlign: 'center', padding: 30, color: 'var(--text-dim)' }}>本月無紀錄</div> :
-            timeline.map((r, i) => r._type === 'in' ? (
-              <div key={'i' + i} className="card" style={{ padding: 12, marginBottom: 6, borderColor: 'rgba(77,168,108,.2)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div><div style={{ fontSize: 13, fontWeight: 600, color: 'var(--green)' }}>💰 撥付零用金</div><div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{r.date} · {r.given_by} · {r.method} · 經手：{r.received_by || r.employee_name} {r.signature_url && '✍️'}</div></div>
-                  <span style={{ fontSize: 18, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--green)' }}>+${r.amount.toLocaleString()}</span>
-                </div>
-                {r.signature_url && <img src={r.signature_url} alt="" style={{ maxWidth: 160, height: 50, objectFit: 'contain', borderRadius: 6, border: '1px solid var(--border)', background: '#fff', marginTop: 6, cursor: 'pointer' }} onClick={() => setPhotoModal(r.signature_url)} />}
-                <div style={{ display: 'flex', gap: 6, marginTop: 6, justifyContent: 'flex-end' }}>
-                  <button onClick={() => startEdit(r)} style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--black-card)', color: 'var(--gold)', cursor: 'pointer', fontWeight: 600 }}>✏️ 編輯</button>
-                  <button onClick={() => deleteCash(r)} style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(196,77,77,.3)', background: 'rgba(196,77,77,.08)', color: 'var(--red)', cursor: 'pointer', fontWeight: 600 }}>🗑️ 刪除</button>
-                </div>
-              </div>
-            ) : (
-              <div key={'o' + i} className="card" style={{ padding: 12, marginBottom: 6 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>🧀 {r.item || r.category}</div>
-                    <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{r.date} · <strong>{r.handler}</strong> · {r.category} · {r.vendor || ''} · {r.payment}</div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    {r.photo_url && <Image size={14} color="var(--gold)" style={{ cursor: 'pointer' }} onClick={() => setPhotoModal(r.photo_url)} />}
-                    <span style={{ fontSize: 16, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--red)' }}>-${(r.amount || 0).toLocaleString()}</span>
-                  </div>
-                </div>
-              </div>
-            ))
-          }
-          {timeline.length > 0 && (
-            <div className="card" style={{ padding: 12, marginTop: 8, borderColor: 'var(--border-gold)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--gold)' }}>💰 目前餘額</span>
-              <span style={{ fontSize: 22, fontFamily: 'var(--font-mono)', fontWeight: 700, color: balance >= 0 ? 'var(--gold)' : 'var(--red)' }}>${balance.toLocaleString()}</span>
+      {/* Handler breakdown */}
+      {handlerList.length>0&&(
+        <div className="wcb-card" style={{marginBottom:16}}>
+          <div style={{fontFamily:'Noto Serif TC,serif',fontSize:13,fontWeight:600,color:'rgba(196,163,90,.8)',marginBottom:10,display:'flex',alignItems:'center',gap:6}}><Users size={14}/> 各員工支出</div>
+          {handlerList.map(([name,amt])=>{const pct=totalOut>0?Math.round(amt/totalOut*100):0;return(
+            <div key={name} style={{marginBottom:10}}>
+              <div style={{display:'flex',justifyContent:'space-between',fontSize:13,marginBottom:4}}><span style={{fontFamily:'Noto Serif TC,serif',fontWeight:500,color:'var(--bone)'}}>{name}</span><span style={{fontFamily:'JetBrains Mono,monospace',color:'rgba(190,70,60,.7)'}}>${amt.toLocaleString()} <span style={{fontSize:10,color:'#888078'}}>({pct}%)</span></span></div>
+              <div className="wcb-progress-track"><div className="wcb-progress-fill" style={{width:pct+'%',background:'linear-gradient(90deg,rgba(190,70,60,.4),rgba(190,70,60,.8))'}}/></div>
             </div>
-          )}
+          )})}
         </div>
       )}
 
-      {tab === 'in' && (
+      {/* Tab switcher */}
+      <div style={{display:'flex',gap:6,marginBottom:16}}>
+        {[['overview','收支時間軸'],['in','撥付紀錄'],['out','支出紀錄']].map(([v,l])=><button key={v} onClick={()=>setTab(v)} style={tabStyle(tab===v)}>{l}</button>)}
+      </div>
+
+      {/* Timeline */}
+      {tab==='overview'&&(
         <div>
-          {records.length === 0 ? <div className="card" style={{ textAlign: 'center', padding: 30, color: 'var(--text-dim)' }}>本月無撥付</div> :
-            records.map(r => (
-              <div key={r.id} className="card" style={{ padding: 12, marginBottom: 6 }}>
-                {editingCash === r.id ? (
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--green)', marginBottom: 8 }}>✏️ 編輯撥付紀錄</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
-                      <div><div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>金額</div><input type="number" value={cashForm.amount} onChange={e => setCashForm(f => ({ ...f, amount: e.target.value }))} style={{ width: '100%', fontSize: 13, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text)', boxSizing: 'border-box' }} /></div>
-                      <div><div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>撥付方式</div><select value={cashForm.method} onChange={e => setCashForm(f => ({ ...f, method: e.target.value }))} style={{ width: '100%', fontSize: 13, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text)' }}><option>現金</option><option>轉帳</option></select></div>
-                      <div><div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>撥付人</div><select value={cashForm.given_by} onChange={e => setCashForm(f => ({ ...f, given_by: e.target.value }))} style={{ width: '100%', fontSize: 13, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text)' }}><option>Wilson</option><option>珊珊</option></select></div>
-                      <div><div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>經手人</div><input value={cashForm.received_by} onChange={e => setCashForm(f => ({ ...f, received_by: e.target.value }))} style={{ width: '100%', fontSize: 13, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text)', boxSizing: 'border-box' }} /></div>
-                    </div>
-                    <div style={{ marginBottom: 8 }}><div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>備註</div><input value={cashForm.note} onChange={e => setCashForm(f => ({ ...f, note: e.target.value }))} placeholder="備註" style={{ width: '100%', fontSize: 13, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text)', boxSizing: 'border-box' }} /></div>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <button onClick={() => saveEdit(r.id)} style={{ flex: 1, padding: 8, fontSize: 12, fontWeight: 700, borderRadius: 6, border: 'none', background: 'var(--gold)', color: 'var(--black)', cursor: 'pointer' }}>✅ 儲存</button>
-                      <button onClick={() => setEditingCash(null)} style={{ flex: 1, padding: 8, fontSize: 12, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--black-card)', color: 'var(--text-muted)', cursor: 'pointer' }}>取消</button>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                      <div>
-                        <span style={{ fontSize: 14, fontWeight: 600 }}>{r.given_by}</span>
-                        <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 8 }}>{r.method} · 經手：{r.received_by || r.employee_name}</span>
-                      </div>
-                      <span style={{ fontSize: 18, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--green)' }}>+${r.amount.toLocaleString()}</span>
-                    </div>
-                    <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{r.date} {r.note && ' · ' + r.note}</div>
-                    {r.signature_url && <img src={r.signature_url} alt="" style={{ maxWidth: 180, height: 55, objectFit: 'contain', borderRadius: 6, border: '1px solid var(--border)', background: '#fff', marginTop: 6, cursor: 'pointer' }} onClick={() => setPhotoModal(r.signature_url)} />}
-                    <div style={{ display: 'flex', gap: 6, marginTop: 8, justifyContent: 'flex-end' }}>
-                      <button onClick={() => startEdit(r)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--black-card)', color: 'var(--gold)', cursor: 'pointer', fontWeight: 600 }}>✏️ 編輯</button>
-                      <button onClick={() => deleteCash(r)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(196,77,77,.3)', background: 'rgba(196,77,77,.08)', color: 'var(--red)', cursor: 'pointer', fontWeight: 600 }}>🗑️ 刪除</button>
-                    </div>
-                  </>
-                )}
+          {timeline.length===0?<div className="wcb-card" style={{textAlign:'center',padding:30,color:'#888078'}}>本月無紀錄</div>:
+            timeline.map((r,i)=>r._type==='in'?(
+              <div key={'i'+i} className="wcb-card" style={{borderColor:'rgba(100,170,100,.12)'}}>
+                <InRecord r={r} showActions={true}/>
+              </div>
+            ):(
+              <div key={'o'+i} className="wcb-card">
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                  <div style={{flex:1}}><div style={{fontFamily:'Noto Serif TC,serif',fontSize:13,fontWeight:500,color:'var(--bone)'}}>🧀 {r.item||r.category}</div><div style={{fontFamily:'JetBrains Mono,monospace',fontSize:10,color:'rgba(196,163,90,.3)',marginTop:3}}>{r.date} · <b style={{color:'var(--bone)'}}>{r.handler}</b> · {r.category} · {r.vendor||''} · {r.payment}</div></div>
+                  <div style={{display:'flex',alignItems:'center',gap:6}}>{r.photo_url&&<Image size={14} color="rgba(196,163,90,.5)" style={{cursor:'pointer'}} onClick={()=>setPhotoModal(r.photo_url)}/>}<span style={{fontFamily:'JetBrains Mono,monospace',fontSize:16,fontWeight:600,color:'rgba(190,70,60,.7)'}}>-${(r.amount||0).toLocaleString()}</span></div>
+                </div>
+              </div>
+            ))}
+          {timeline.length>0&&<div className="wcb-card" style={{borderColor:'rgba(196,163,90,.2)',display:'flex',justifyContent:'space-between',alignItems:'center'}}><span style={{fontFamily:'Noto Serif TC,serif',fontSize:14,fontWeight:600,color:'rgba(196,163,90,.8)'}}>💰 目前餘額</span><span style={{fontFamily:'JetBrains Mono,monospace',fontSize:22,fontWeight:300,color:balance>=0?'rgba(196,163,90,.8)':'rgba(190,70,60,.8)'}}>${balance.toLocaleString()}</span></div>}
+        </div>
+      )}
+
+      {/* In records */}
+      {tab==='in'&&(
+        <div>
+          {records.length===0?<div className="wcb-card" style={{textAlign:'center',padding:30,color:'#888078'}}>本月無撥付</div>:
+            records.map(r=>(
+              <div key={r.id} className="wcb-card">
+                {editingCash===r.id?<EditForm r={r}/>:<InRecord r={r} showActions={true}/>}
               </div>
             ))}
         </div>
       )}
 
-      {tab === 'out' && (
+      {/* Out records */}
+      {tab==='out'&&(
         <div>
-          {expenses.length === 0 ? <div className="card" style={{ textAlign: 'center', padding: 30, color: 'var(--text-dim)' }}>本月無支出</div> :
-            expenses.map(x => (
-              <div key={x.id} className="card" style={{ padding: 12, marginBottom: 6 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>{x.item || x.category}</div>
-                    <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{x.date} · <strong style={{ color: 'var(--text)' }}>{x.handler}</strong> · {x.category} · {x.vendor || '無廠商'} · {x.payment}</div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    {x.photo_url && <Image size={14} color="var(--gold)" style={{ cursor: 'pointer' }} onClick={() => setPhotoModal(x.photo_url)} />}
-                    <span style={{ fontSize: 16, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--red)' }}>-${(x.amount || 0).toLocaleString()}</span>
-                  </div>
+          {expenses.length===0?<div className="wcb-card" style={{textAlign:'center',padding:30,color:'#888078'}}>本月無支出</div>:
+            expenses.map(x=>(
+              <div key={x.id} className="wcb-card">
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                  <div style={{flex:1}}><div style={{fontFamily:'Noto Serif TC,serif',fontSize:13,fontWeight:500,color:'var(--bone)'}}>{x.item||x.category}</div><div style={{fontFamily:'JetBrains Mono,monospace',fontSize:10,color:'rgba(196,163,90,.3)',marginTop:3}}>{x.date} · <b style={{color:'var(--bone)'}}>{x.handler}</b> · {x.category} · {x.vendor||'無廠商'} · {x.payment}</div></div>
+                  <div style={{display:'flex',alignItems:'center',gap:6}}>{x.photo_url&&<Image size={14} color="rgba(196,163,90,.5)" style={{cursor:'pointer'}} onClick={()=>setPhotoModal(x.photo_url)}/>}<span style={{fontFamily:'JetBrains Mono,monospace',fontSize:16,fontWeight:600,color:'rgba(190,70,60,.7)'}}>-${(x.amount||0).toLocaleString()}</span></div>
                 </div>
-                {x.note && <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>📝 {x.note}</div>}
+                {x.note&&<div style={{fontFamily:'Noto Serif TC,serif',fontSize:11,color:'#888078',marginTop:4}}>📝 {x.note}</div>}
               </div>
             ))}
         </div>
