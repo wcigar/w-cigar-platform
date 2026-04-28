@@ -197,5 +197,14 @@ function AppInner() {
 }
 
 export default function App() {
-  return <ErrorBoundary><AppInner /></ErrorBoundary>
+  return (
+    <ErrorBoundary>
+      <div className="wcb-ambient" />
+      <div className="wcb-smoke"><div className="wcb-sp" /><div className="wcb-sp" /><div className="wcb-sp" /><div className="wcb-sp" /><div className="wcb-sp" /><div className="wcb-sp" /></div>
+      <div className="wcb-grain" />
+      <div style={{ position: 'relative', zIndex: 2 }}>
+        <AppInner />
+      </div>
+    </ErrorBoundary>
+  )
 }
