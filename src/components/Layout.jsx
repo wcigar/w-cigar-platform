@@ -21,6 +21,7 @@ const BOSS_NAV = [
   { path: '/admin/venue-hub', icon: Wine, label: '酒店' },
   { path: '/boss-inventory', icon: Package, label: '庫存' },
   { path: '/commission', icon: TrendingUp, label: '業績' },
+  { path: '/admin/sales-report', icon: BarChart3, label: '報表' },
   { path: '/customers', icon: Users, label: '會員' },
   { path: '/pos', icon: ShoppingCart, label: '收銀' },
   { path: '/settings', icon: Settings, label: '設定' },
