@@ -220,6 +220,20 @@ export default function VenueSalesMatrix() {
     })
   }
 
+  // 點 segment 時自動把當日總額填進對應收款欄位（避免員工以為點 segment 就完成）
+  function handlePaymentStatusClick(k) {
+    setPaymentStatus(k)
+    if (totalSalesAmount <= 0) return  // 沒銷售就不自動填
+    if (k === 'paid') {
+      setCash(totalSalesAmount); setTransfer(0); setMonthly(0); setUnpaid(0)
+    } else if (k === 'unpaid') {
+      setCash(0); setTransfer(0); setMonthly(0); setUnpaid(totalSalesAmount)
+    } else if (k === 'monthly') {
+      setCash(0); setTransfer(0); setMonthly(totalSalesAmount); setUnpaid(0)
+    }
+    // partial: 不動，員工自己分配
+  }
+
   function handleTrySubmit() {
     const errs = validateVenueSalesMatrix({
       saleDate, region, template, venueState,
@@ -363,7 +377,7 @@ export default function VenueSalesMatrix() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
             {Object.entries(PAYMENT_STATUSES).map(([k, v]) => (
-              <RadioTile key={k} active={paymentStatus === k} onClick={() => setPaymentStatus(k)}
+              <RadioTile key={k} active={paymentStatus === k} onClick={() => handlePaymentStatusClick(k)}
                 color={k === 'paid' ? '#10b981' : k === 'partial' ? '#f59e0b' : k === 'monthly' ? '#3b82f6' : '#f87171'}>
                 {v}
               </RadioTile>
