@@ -699,12 +699,13 @@ export function normalizeAmbassadorName(rawName) {
  *       note: string,
  *     }
  *   },
- *   payment: { cash, transfer, monthly, unpaid, paymentStatus },
  *   idempotencyKey: string,
  * }
+ * 註：payment 區塊已移除 — 所有酒店一律月結，submit 時 service 端自動補上
+ *     monthly_settlement_amount = venue_total + payment_status='monthly'
  */
 export function buildVenueSalesMatrixPayload(formState) {
-  const { saleDate, region, topNote, template, ambassadors, venueState, payment, idempotencyKey } = formState
+  const { saleDate, region, topNote, template, ambassadors, venueState, idempotencyKey } = formState
 
   const venuesArr = (template?.venues || []).map(v => {
     const s = venueState[v.id] || {}
@@ -777,13 +778,6 @@ export function buildVenueSalesMatrixPayload(formState) {
     source_type: 'hotel_excel_matrix',
     template_version: TEMPLATE_VERSION,
     venues: venuesArr,
-    payment: {
-      cash_amount: Number(payment.cash) || 0,
-      bank_transfer_amount: Number(payment.transfer) || 0,
-      monthly_settlement_amount: Number(payment.monthly) || 0,
-      unpaid_amount: Number(payment.unpaid) || 0,
-      payment_status: payment.paymentStatus || 'paid',
-    },
     total_sales_amount,
     total_quantity,
     active_venue_count,
@@ -796,7 +790,7 @@ export function buildVenueSalesMatrixPayload(formState) {
 
 export function validateVenueSalesMatrix(formState) {
   const errs = []
-  const { saleDate, region, template, venueState, payment } = formState
+  const { saleDate, region, template, venueState } = formState
 
   if (!saleDate) errs.push('銷售日期必填')
   if (!region) errs.push('地區必填')
@@ -826,26 +820,7 @@ export function validateVenueSalesMatrix(formState) {
     if (Number(s.preShiftAmount || 0) < 0) errs.push(`${v.name}: 上班前銷售金額不可為負`)
   }
 
-  // 收款
-  const pt = Number(payment.cash || 0) + Number(payment.transfer || 0) + Number(payment.monthly || 0) + Number(payment.unpaid || 0)
-  const total = template.venues.reduce((t, v) => {
-    const s = venueState[v.id] || {}
-    if (!s.hasSales) return t
-    let vt = 0
-    for (const p of v.products) vt += (Number(s.quantities?.[p.key]) || 0) * p.price
-    vt += Number(s.preShiftAmount || 0)
-    return t + vt
-  }, 0)
-
-  if (Number(payment.cash) < 0 || Number(payment.transfer) < 0 || Number(payment.monthly) < 0 || Number(payment.unpaid) < 0) {
-    errs.push('收款金額不可為負數')
-  }
-  if (pt > total + 0.01) {
-    errs.push(`收款總額 (NT$ ${pt.toLocaleString()}) 不可超過銷售總額 (NT$ ${total.toLocaleString()})`)
-  }
-  if (total > 0 && pt === 0) {
-    errs.push('有銷售但尚未填任何收款方式（現金/匯款/月結/未收請至少填一種）')
-  }
+  // 收款 / payment 區塊已移除：所有酒店一律月結，由督導每月收款
   return errs
 }
 
@@ -942,7 +917,19 @@ export async function submitVenueSalesMatrix(payload) {
     // venue_sales_daily.idempotency_key UNIQUE：每店一個 row 必須各自 unique，concat venue_id
     idempotency_key: `${withKey.idempotency_key}-${v.venue_id}`,
     submitted_by_name: withKey.submitted_by_name || withKey.created_by_name || null,
-    raw_payload: { matrix_payload: withKey, venue_summary: v },
+    // 所有酒店一律月結（員工只記銷售，督導每月 10 號前收款）
+    // payment 結構保留在 raw_payload 內讓 listVenueSales 讀回顯示
+    raw_payload: {
+      matrix_payload: withKey,
+      venue_summary: v,
+      payment: {
+        cash_amount: 0,
+        bank_transfer_amount: 0,
+        monthly_settlement_amount: v.venue_total,
+        unpaid_amount: 0,
+        payment_status: 'monthly',
+      },
+    },
   }))
 
   const { data, error } = await supabase

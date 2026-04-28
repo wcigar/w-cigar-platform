@@ -15,7 +15,7 @@ import {
 import {
   getVenueSalesMatrixTemplate, getVenueSalesAmbassadors, submitVenueSalesMatrix,
   buildVenueSalesMatrixPayload, validateVenueSalesMatrix,
-  todayISO, PAYMENT_STATUSES, SOURCE_TYPES, REGIONS,
+  todayISO, SOURCE_TYPES, REGIONS,
 } from '../../lib/services/venueSales'
 import { newIdempotencyKey, createOneShot } from '../../lib/services/idempotency'
 import { Card } from '../../components/PageShell'
@@ -39,13 +39,6 @@ export default function VenueSalesMatrix() {
   const [ambassadors, setAmbassadors] = useState([])
   const [venueState, setVenueState] = useState({})
 
-  // ---- payment ----
-  const [cash, setCash] = useState(0)
-  const [transfer, setTransfer] = useState(0)
-  const [monthly, setMonthly] = useState(0)
-  const [unpaid, setUnpaid] = useState(0)
-  const [paymentStatus, setPaymentStatus] = useState('paid')
-
   // ---- UI ----
   const [searchQuery, setSearchQuery] = useState('')
   const [onlyWithSales, setOnlyWithSales] = useState(false)
@@ -66,7 +59,7 @@ export default function VenueSalesMatrix() {
       if (Number(s.preShiftAmount || 0) > 0) return true
       if (s.ambassadorId || s.note || s.preShiftNote) return true
       return false
-    }) || cash || transfer || monthly || unpaid
+    })
     if (hasData && !window.confirm(`切換到「${REGIONS[newRegion]}」會清空當前輸入的資料，確定繼續？`)) return
     setRegion(newRegion)
   }
@@ -91,8 +84,8 @@ export default function VenueSalesMatrix() {
       })
       setVenueState(initState)
       setCollapsed(initCollapsed)
-      setCash(0); setTransfer(0); setMonthly(0); setUnpaid(0)
-      setPaymentStatus('paid'); setErrors([]); setTopNote('')
+      setErrors([])
+      setTopNote('')
       setIdempotencyKey(newIdempotencyKey())
     })
   }, [region])
@@ -140,19 +133,6 @@ export default function VenueSalesMatrix() {
     () => (template?.venues || []).length - activeVenues.length - noSalesVenues.length,
     [template, activeVenues, noSalesVenues]
   )
-
-  const paymentTotal = Number(cash || 0) + Number(transfer || 0) + Number(monthly || 0) + Number(unpaid || 0)
-  const difference = totalSalesAmount - paymentTotal
-
-  const suggestedStatus = useMemo(() => {
-    if (totalSalesAmount <= 0) return 'unpaid'
-    const paidPart = Number(cash || 0) + Number(transfer || 0)
-    if (Number(unpaid || 0) === totalSalesAmount) return 'unpaid'
-    if (Number(monthly || 0) === totalSalesAmount) return 'monthly'
-    if (paidPart === totalSalesAmount) return 'paid'
-    if (paidPart > 0 || Number(monthly || 0) > 0) return 'partial'
-    return 'unpaid'
-  }, [cash, transfer, monthly, unpaid, totalSalesAmount])
 
   // 可見店家（搜尋 + 只看有銷售）
   const visibleVenues = useMemo(() => {
@@ -203,8 +183,8 @@ export default function VenueSalesMatrix() {
       }
     })
     setVenueState(init)
-    setCash(0); setTransfer(0); setMonthly(0); setUnpaid(0)
-    setPaymentStatus('paid'); setErrors([]); setTopNote('')
+    setErrors([])
+    setTopNote('')
     setIdempotencyKey(newIdempotencyKey())
   }
   function copyYesterday() {
@@ -215,29 +195,13 @@ export default function VenueSalesMatrix() {
   function buildCurrentPayload() {
     return buildVenueSalesMatrixPayload({
       saleDate, region, topNote, template, ambassadors, venueState,
-      payment: { cash, transfer, monthly, unpaid, paymentStatus },
       idempotencyKey,
     })
-  }
-
-  // 點 segment 時自動把當日總額填進對應收款欄位（避免員工以為點 segment 就完成）
-  function handlePaymentStatusClick(k) {
-    setPaymentStatus(k)
-    if (totalSalesAmount <= 0) return  // 沒銷售就不自動填
-    if (k === 'paid') {
-      setCash(totalSalesAmount); setTransfer(0); setMonthly(0); setUnpaid(0)
-    } else if (k === 'unpaid') {
-      setCash(0); setTransfer(0); setMonthly(0); setUnpaid(totalSalesAmount)
-    } else if (k === 'monthly') {
-      setCash(0); setTransfer(0); setMonthly(totalSalesAmount); setUnpaid(0)
-    }
-    // partial: 不動，員工自己分配
   }
 
   function handleTrySubmit() {
     const errs = validateVenueSalesMatrix({
       saleDate, region, template, venueState,
-      payment: { cash, transfer, monthly, unpaid },
     })
     setErrors(errs)
     if (errs.length === 0) {
@@ -357,34 +321,7 @@ export default function VenueSalesMatrix() {
         )
       })}
 
-      {/* 收款區 */}
-      <Card style={{ marginBottom: 12 }}>
-        <SectionTitle>收款資料（全日合計）</SectionTitle>
-        <Grid>
-          <Field label="現金 (NT$)"><input type="number" min="0" value={cash || ''} onChange={e => setCash(e.target.value)} style={input()} /></Field>
-          <Field label="匯款 (NT$)"><input type="number" min="0" value={transfer || ''} onChange={e => setTransfer(e.target.value)} style={input()} /></Field>
-          <Field label="月結 (NT$)"><input type="number" min="0" value={monthly || ''} onChange={e => setMonthly(e.target.value)} style={input()} /></Field>
-          <Field label="未收 (NT$)"><input type="number" min="0" value={unpaid || ''} onChange={e => setUnpaid(e.target.value)} style={input()} /></Field>
-        </Grid>
-        <TotalLine label="收款總額" value={paymentTotal} />
-        <TotalLine label="差額（銷售 − 收款）" value={difference}
-          color={difference === 0 ? '#10b981' : difference > 0 ? '#f59e0b' : '#f87171'}
-          note={difference > 0 ? `尚有 NT$ ${difference.toLocaleString()} 未分配到收款方式（可歸為未收）` : (difference < 0 ? `收款超出銷售 NT$ ${Math.abs(difference).toLocaleString()}` : '')}
-        />
-        <div style={{ marginTop: 14 }}>
-          <div style={{ fontSize: 11, color: '#8a8278', marginBottom: 8, letterSpacing: 1 }}>
-            收款狀態　<span style={{ color: '#c9a84c' }}>系統建議：{PAYMENT_STATUSES[suggestedStatus]}</span>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-            {Object.entries(PAYMENT_STATUSES).map(([k, v]) => (
-              <RadioTile key={k} active={paymentStatus === k} onClick={() => handlePaymentStatusClick(k)}
-                color={k === 'paid' ? '#10b981' : k === 'partial' ? '#f59e0b' : k === 'monthly' ? '#3b82f6' : '#f87171'}>
-                {v}
-              </RadioTile>
-            ))}
-          </div>
-        </div>
-      </Card>
+      {/* 收款區已移除：所有酒店都是月結，督導每月 10 號前去收款 */}
 
       {errors.length > 0 && (
         <Card style={{ marginBottom: 12, borderColor: 'rgba(248,113,113,0.35)', background: 'rgba(248,113,113,0.06)' }}>
@@ -414,7 +351,6 @@ export default function VenueSalesMatrix() {
           <Summary label="有銷售" value={`${activeVenues.length} 家`} color="#10b981" />
           <Summary label="無銷售" value={`${noSalesVenues.length} 家`} color="#6b7280" />
           <Summary label="未填" value={`${blankVenues} 家`} color={blankVenues > 0 ? '#f59e0b' : '#6a655c'} />
-          <Summary label="狀態" value={PAYMENT_STATUSES[paymentStatus]} />
           <button onClick={handleTrySubmit} disabled={submitting}
             style={{
               marginLeft: 'auto', padding: '10px 22px', borderRadius: 8, border: 'none',
@@ -633,14 +569,8 @@ function ConfirmModal({ payload, onCancel, onConfirm, submitting }) {
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 11, color: '#8a8278' }}>
             <span>{payload.active_venue_count} 家有銷售 · {payload.no_sales_venue_count} 家無銷售 · {payload.blank_venue_count} 家未填 · 共 {payload.total_quantity} 支</span>
-            <span>狀態：{PAYMENT_STATUSES[payload.payment.payment_status]}</span>
+            <span style={{ color: '#3b82f6' }}>月結（督導每月 10 號收款）</span>
           </div>
-        </div>
-
-        <div style={{ fontSize: 11, color: '#8a8278', marginBottom: 12 }}>
-          收款：現金 NT$ {payload.payment.cash_amount.toLocaleString()} · 匯款 NT$ {payload.payment.bank_transfer_amount.toLocaleString()}
-          {' · '}月結 NT$ {payload.payment.monthly_settlement_amount.toLocaleString()}
-          {' · '}未收 NT$ {payload.payment.unpaid_amount.toLocaleString()}
         </div>
 
         <div style={{ fontSize: 10, color: '#5a554e', fontFamily: 'monospace', marginBottom: 12 }}>
