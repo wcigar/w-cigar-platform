@@ -329,11 +329,15 @@ function AccountingView({ data, from, to, qoq, shipping, inv }) {
     const totalRev = Number(kpi.revenue) || 0
     const cogs = Number(kpi.cogs) || 0
     const grossProfit = totalRev - cogs
+    const laborCost = Number(kpi.labor_cost || 0)        // ⬅ 大使人事成本（含時薪×時數+車資+獎金-扣款）
+    const laborHours = Number(kpi.labor_hours || 0)
+    const operatingProfit = grossProfit - laborCost      // ⬅ 真實營業毛利
     const shipTotal = Number(shipping?.total) || 0
-    const netProfit = grossProfit - shipTotal
+    const netProfit = operatingProfit - shipTotal        // ⬅ 淨利 = 毛利 - 大使薪資 - 運費
     const grossMargin = totalRev > 0 ? grossProfit / totalRev : 0
+    const operatingMargin = totalRev > 0 ? operatingProfit / totalRev : 0
     const netMargin = totalRev > 0 ? netProfit / totalRev : 0
-    return { totalRev, cogs, grossProfit, netProfit, grossMargin, netMargin, shipTotal, byVenue, kpi }
+    return { totalRev, cogs, grossProfit, laborCost, laborHours, operatingProfit, operatingMargin, netProfit, grossMargin, netMargin, shipTotal, byVenue, kpi, payroll: data.payroll }
   }, [data, shipping])
 
   if (!calc) return <div style={{ color: '#8a8278', padding: 20 }}>無資料</div>
@@ -347,6 +351,7 @@ function AccountingView({ data, from, to, qoq, shipping, inv }) {
     lines.push([])
     lines.push(['損益快覽'])
     lines.push(['銷售總額', calc.totalRev], ['銷貨成本', calc.cogs], ['毛利', calc.grossProfit], ['毛利率', (calc.grossMargin*100).toFixed(2)+'%'])
+    lines.push(['大使薪資（' + calc.laborHours.toFixed(1) + ' 小時）', calc.laborCost], ['營業毛利', calc.operatingProfit], ['營業毛利率', (calc.operatingMargin*100).toFixed(2)+'%'])
     lines.push(['本期運費', calc.shipTotal], ['淨利', calc.netProfit], ['淨利率', (calc.netMargin*100).toFixed(2)+'%'])
     if (inv) { lines.push([]); lines.push(['外場存貨資產']); lines.push(['外場總根數', inv.totalQty], ['外場存貨資產(現有)', inv.totalAsset], ['目標滿庫資產', inv.totalTargetAsset]) }
     lines.push([])
@@ -377,19 +382,64 @@ function AccountingView({ data, from, to, qoq, shipping, inv }) {
       {unknownWarn && <div style={{ background: '#1a0c0c', border: '1px solid #7f1d1d', color: '#fca5a5', fontSize: 11, padding: '6px 10px', borderRadius: 6, marginBottom: 12 }}>{unknownWarn}</div>}
 
       <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 12, color: '#8a8278', marginBottom: 8, letterSpacing: 1 }}>1. 損益表 P&amp;L</div>
+        <div style={{ fontSize: 12, color: '#8a8278', marginBottom: 8, letterSpacing: 1 }}>1. 損益表 P&amp;L（含大使人事成本）</div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <Kpi label="銷售總額" value={fmtMoney(calc.totalRev)} accent="#c9a84c" />
           <Kpi label="銷貨成本" value={fmtMoney(calc.cogs)} accent="#fca5a5" />
-          <Kpi label="毛利" value={fmtMoney(calc.grossProfit)} accent="#10b981" />
-          <Kpi label="毛利率" value={fmtPct(calc.grossMargin)} accent="#c9a84c" />
+          <Kpi label="商品毛利" value={fmtMoney(calc.grossProfit)} accent="#10b981" />
+          <Kpi label="商品毛利率" value={fmtPct(calc.grossMargin)} accent="#c9a84c" />
+        </div>
+        <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+          <Kpi label={`大使薪資（${calc.laborHours.toFixed(1)} h）`} value={fmtMoney(calc.laborCost)} accent="#a855f7" />
+          <Kpi label="營業毛利" value={fmtMoney(calc.operatingProfit)} accent={calc.operatingProfit >= 0 ? '#10b981' : '#dc2626'} />
+          <Kpi label="營業毛利率" value={fmtPct(calc.operatingMargin)} accent="#c9a84c" />
         </div>
         <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
           <Kpi label="本期運費" value={fmtMoney(calc.shipTotal)} accent="#fca5a5" />
           <Kpi label="淨利" value={fmtMoney(calc.netProfit)} accent={calc.netProfit >= 0 ? '#10b981' : '#dc2626'} />
           <Kpi label="淨利率" value={fmtPct(calc.netMargin)} />
         </div>
+        <div style={{ marginTop: 6, fontSize: 10, color: '#8a8278', lineHeight: 1.5 }}>
+          公式：銷售總額 − 銷貨成本 = 商品毛利 → 扣大使薪資 = 營業毛利 → 扣運費 = 淨利
+          {' · '}大使薪資自動從「薪資總表」期間內 daily entries 帶入（無 entries 時用月度 summary 按比例攤提）
+        </div>
       </div>
+
+      {calc.payroll && calc.payroll.byAmbassador && calc.payroll.byAmbassador.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 12, color: '#8a8278', marginBottom: 8, letterSpacing: 1 }}>大使人事成本明細</div>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead><tr>
+              <th style={{ ...head, textAlign: 'left' }}>大使</th>
+              <th style={{ ...head, textAlign: 'right' }}>時數</th>
+              <th style={{ ...head, textAlign: 'right' }}>時薪×時</th>
+              <th style={{ ...head, textAlign: 'right' }}>車資</th>
+              <th style={{ ...head, textAlign: 'right' }}>獎金</th>
+              <th style={{ ...head, textAlign: 'right' }}>扣款</th>
+              <th style={{ ...head, textAlign: 'right' }}>合計</th>
+            </tr></thead>
+            <tbody>
+              {calc.payroll.byAmbassador.map((a, i) => (
+                <tr key={i}>
+                  <td style={cell}>{a.name}</td>
+                  <td style={{ ...cell, textAlign: 'right', color: '#3b82f6' }}>{Number(a.hours).toFixed(1)}</td>
+                  <td style={{ ...cell, textAlign: 'right' }}>{fmtMoney(a.base)}</td>
+                  <td style={{ ...cell, textAlign: 'right' }}>{fmtMoney(a.transport)}</td>
+                  <td style={{ ...cell, textAlign: 'right', color: '#10b981' }}>{a.bonuses ? '+' + fmtMoney(a.bonuses) : '—'}</td>
+                  <td style={{ ...cell, textAlign: 'right', color: a.deductions < 0 ? '#dc2626' : '#8a8278' }}>{a.deductions ? fmtMoney(a.deductions) : '—'}</td>
+                  <td style={{ ...cell, textAlign: 'right', color: '#a855f7', fontWeight: 600 }}>{fmtMoney(a.total)}</td>
+                </tr>
+              ))}
+              <tr style={{ borderTop: '2px solid #3a3024' }}>
+                <td style={{ ...cell, fontWeight: 600, color: '#c9a84c' }}>合計（{calc.payroll.byAmbassador.length} 位）</td>
+                <td style={{ ...cell, textAlign: 'right', fontWeight: 600 }}>{calc.laborHours.toFixed(1)}</td>
+                <td colSpan={4}></td>
+                <td style={{ ...cell, textAlign: 'right', color: '#a855f7', fontWeight: 700 }}>{fmtMoney(calc.laborCost)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <OutstandingInventorySection inv={inv} />
       <QuarterComparison qoq={qoq} />

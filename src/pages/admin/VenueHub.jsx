@@ -2,7 +2,7 @@
 // 酒店銷售管理 hub — 7 個快捷一頁集中
 import { useNavigate } from 'react-router-dom'
 import {
-  Wine, BarChart3, Building2, Coins, Package, Truck, Users, Receipt, FileSpreadsheet,
+  Wine, BarChart3, Building2, Coins, Package, Truck, Users, Receipt, FileSpreadsheet, TrendingUp, LineChart,
 } from 'lucide-react'
 import PageShell, { Card } from '../../components/PageShell'
 
@@ -14,7 +14,9 @@ const HUB_ITEMS = [
   { icon: Truck,           label: '補貨單',     sub: '雙人確認 + 列印',       color: '#a855f7', path: '/admin/replenishment' },
   { icon: Users,           label: '大使薪酬',   sub: '時薪 + 門檻獎金',      color: '#ef4444', path: '/admin/compensation-rules' },
   { icon: Receipt,         label: '督導結帳',   sub: '4 督導 · 每月10號前',  color: '#06b6d4', path: '/admin/collections' },
-  { icon: FileSpreadsheet, label: '薪資總表',   sub: '會計視角 · 月度結算',   color: '#22c55e', path: '/admin/payroll-report' },
+  { icon: FileSpreadsheet, label: '薪資總表',   sub: '11 大使月薪明細',       color: '#22c55e', path: '/admin/payroll-report' },
+  { icon: TrendingUp,      label: '會計總表',   sub: '損益+毛利+各店業績',     color: '#14b8a6', path: '/admin/accounting-report' },
+  { icon: LineChart,       label: '銷售儀表板', sub: 'KPI+趨勢+季對比+補貨建議', color: '#ec4899', path: '/admin/sales-report' },
 ]
 
 export default function VenueHub() {
