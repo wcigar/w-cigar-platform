@@ -1,6 +1,7 @@
 // src/lib/services/salesReport.js
-// 銷售儀表板 — 撈 venue_sales_daily 區間，本地端 aggregate（含 COGS 毛利 + 補貨 + 運費 + 季對比 + 即時KPI + 外場存貨資產）
+// 銷售儀表板 — 撈 venue_sales_daily 區間，本地端 aggregate（含 COGS 毛利 + 補貨 + 運費 + 季對比 + 即時KPI + 外場存貨資產 + 大使人事成本）
 import { supabase } from '../supabase'
+import { getPayrollByDateRange, getAmbassadorPayrollMap } from './attendance'
 
 const REGION_LABEL = {
   taipei: '台北', taichung: '台中', taoyuan: '桃園',
@@ -213,7 +214,15 @@ export async function getQuarterComparison() {
         if (c != null) cogs += c * q2
       }
     }
-    return { ...range, revenue, qty, count, cogs, gross_profit: revenue - cogs, venues: venues.size, ambassadors: ambs.size }
+    // 套入大使人事成本
+    let labor = 0
+    try {
+      const p = getPayrollByDateRange(range.start, range.end)
+      labor = p.totalPayroll || 0
+    } catch (e) { /* ignore */ }
+    const grossProfit = revenue - cogs
+    const netProfit = grossProfit - labor
+    return { ...range, revenue, qty, count, cogs, gross_profit: grossProfit, labor_cost: labor, net_profit: netProfit, venues: venues.size, ambassadors: ambs.size }
   }
   const [curStats, prevStats] = await Promise.all([fetchQ(cur), fetchQ(prev)])
   const delta = (a, b) => b > 0 ? ((a - b) / b) : (a > 0 ? 1 : 0)
@@ -223,6 +232,8 @@ export async function getQuarterComparison() {
     deltaQty: delta(curStats.qty, prevStats.qty),
     deltaCount: delta(curStats.count, prevStats.count),
     deltaProfit: delta(curStats.gross_profit, prevStats.gross_profit),
+    deltaNetProfit: delta(curStats.net_profit, prevStats.net_profit),
+    deltaLabor: delta(curStats.labor_cost, prevStats.labor_cost),
   }
 }
 
@@ -297,17 +308,51 @@ export async function getSalesReport(fromDate, toDate) {
     gross_margin: x.revenue > 0 ? ((x.revenue - (x.cogs || 0)) / x.revenue) : 0,
   }))
   const byProductAll = finalize(productMap).sort((a,b) => b.revenue - a.revenue)
+
+  // === 套入大使人事成本，得出真正公司毛利率 ===
+  let payroll = { totalPayroll: 0, totalHours: 0, byAmbassador: [], byDate: [], map: {} }
+  try {
+    payroll = getAmbassadorPayrollMap(fromDate, toDate)
+  } catch (e) {
+    console.warn('[salesReport] payroll fetch failed:', e)
+  }
+
+  // 把大使薪資合進 byAmbassador
+  const byAmbassadorWithPayroll = finalize(ambMap).map(a => {
+    const pay = payroll.map[a.ambassador_id] || payroll.map[a.ambassador_name] || null
+    const labor = pay ? Number(pay.total || 0) : 0
+    const hours = pay ? Number(pay.hours || 0) : 0
+    const netProfit = a.gross_profit - labor
+    const netMargin = a.revenue > 0 ? netProfit / a.revenue : 0
+    return { ...a, labor_cost: labor, work_hours: hours, net_profit: netProfit, net_margin: netMargin }
+  }).sort((x, y) => y.revenue - x.revenue)
+
+  const grossProfit = kpi.revenue - kpi.cogs
+  const totalLabor = payroll.totalPayroll || 0
+  const netProfitTotal = grossProfit - totalLabor
+  const netMargin = kpi.revenue > 0 ? netProfitTotal / kpi.revenue : 0
+
   return {
     kpi: {
       revenue: kpi.revenue, count: kpi.count, qty: kpi.qty,
-      cogs: kpi.cogs, gross_profit: kpi.revenue - kpi.cogs,
-      gross_margin: kpi.revenue > 0 ? (kpi.revenue - kpi.cogs) / kpi.revenue : 0,
+      cogs: kpi.cogs, gross_profit: grossProfit,
+      gross_margin: kpi.revenue > 0 ? grossProfit / kpi.revenue : 0,
+      // ⬇ 真正公司毛利（扣大使薪資）
+      labor_cost: totalLabor,
+      labor_hours: payroll.totalHours || 0,
+      net_profit: netProfitTotal,
+      net_margin: netMargin,
       qty_unknown_cost: kpi.qty_unknown_cost, unknown_products: [...unknownProducts],
       venues: kpi.venues.size, ambassadors: kpi.ambassadors.size,
     },
+    payroll: {
+      total: totalLabor, hours: payroll.totalHours || 0,
+      byAmbassador: payroll.byAmbassador || [],
+      byDate: payroll.byDate || [],
+    },
     byRegion: finalize(regionMap).sort((a,b) => b.revenue - a.revenue),
     byVenue: finalize(venueMap).sort((a,b) => b.revenue - a.revenue),
-    byAmbassador: finalize(ambMap).sort((a,b) => b.revenue - a.revenue),
+    byAmbassador: byAmbassadorWithPayroll,
     byDate: [...dateMap.values()].sort((a,b) => a.sale_date.localeCompare(b.sale_date)),
     byProductAll,
     byProductCapadura: byProductAll.filter(p => p.category === 'capadura'),

@@ -43,6 +43,8 @@ import AdminReplenishmentPrint from './pages/admin/ReplenishmentPrint'
 import AdminCollectionReceipt from './pages/admin/CollectionReceipt'
 import AdminVenueHub from './pages/admin/VenueHub'
 import AdminPayrollReport from './pages/admin/PayrollReport'
+import AdminAccountingReport from './pages/admin/AccountingReport'
+import AdminSalesReport from './pages/admin/SalesReport'
 import AdminReplenishment from './pages/admin/Replenishment'
 import AdminReplenishmentDetail from './pages/admin/ReplenishmentDetail'
 import AdminSupplyRequests from './pages/admin/SupplyRequests'
@@ -154,6 +156,8 @@ function AppInner() {
         <Route path="/admin/replenishment/:id/print" element={<AdminGuard scope="admin"><AdminReplenishmentPrint /></AdminGuard>} />
         <Route path="/admin/venue-hub" element={<AdminGuard scope="admin"><AdminVenueHub /></AdminGuard>} />
         <Route path="/admin/payroll-report" element={<AdminGuard scope="admin"><AdminPayrollReport /></AdminGuard>} />
+        <Route path="/admin/accounting-report" element={<AdminGuard scope="admin"><AdminAccountingReport /></AdminGuard>} />
+        <Route path="/admin/sales-report" element={<AdminGuard scope="admin"><AdminSalesReport /></AdminGuard>} />
 
         <Route path="/admin/collections/receipt/:venueId/:period" element={<AdminGuard scope="supervisor"><AdminCollectionReceipt /></AdminGuard>} />
         <Route path="/admin/replenishment" element={<AdminGuard scope="admin"><AdminReplenishment /></AdminGuard>} />

@@ -262,3 +262,151 @@ export function _reseedHistorical() {
   ensureSeeded()
   return { success: true }
 }
+
+// ============ 與銷售儀表板的閉環 API ============
+// 給定日期區間，回傳大使「人事成本」總額 + 各日/各人明細
+// 用途：銷售儀表板算「真正公司毛利率」= 營業額 - COGS - 大使薪資 - 運費 - 督導抽成
+
+function daysInPeriodMonth(period) {
+  // 'YYYY-MM' → 該月天數
+  const [y, m] = period.split('-').map(Number)
+  return new Date(y, m, 0).getDate()
+}
+
+function dateInRange(d, from, to) {
+  return d >= from && d <= to
+}
+
+function rangeMonths(fromDate, toDate) {
+  // 回傳區間內涵蓋的所有 'YYYY-MM' 字串
+  const out = []
+  const [fy, fm] = fromDate.slice(0, 7).split('-').map(Number)
+  const [ty, tm] = toDate.slice(0, 7).split('-').map(Number)
+  let y = fy, m = fm
+  while (y < ty || (y === ty && m <= tm)) {
+    out.push(`${y}-${String(m).padStart(2, '0')}`)
+    m++; if (m > 12) { m = 1; y++ }
+  }
+  return out
+}
+
+/**
+ * 取得日期區間內大使人事成本（時薪×時數 + 車資 + 獎金 - 扣款）
+ * fromDate / toDate: 'YYYY-MM-DD'
+ *
+ * 策略：
+ *   1. 對區間涵蓋的每個月：
+ *      a. 若有 daily entries → 篩選 entry.date 在 [fromDate, toDate] 區間內，逐筆累加
+ *         monthly_bonuses/deductions 按「區間內天數 / 該月總天數」比例攤提
+ *      b. 若只有 summary（4月 Excel 匯入）→ 按比例攤提整月 total
+ *   2. 加總所有月份
+ */
+export function getPayrollByDateRange(fromDate, toDate) {
+  ensureSeeded()
+  const store = readStore()
+  const rates = readHourly()
+  const months = rangeMonths(fromDate, toDate)
+
+  let totalPayroll = 0
+  let totalHours = 0
+  const byAmbassador = new Map()  // id → { name, hours, base, transport, bonuses, deductions, total }
+  const byDate = new Map()         // date → totalCost
+
+  for (const period of months) {
+    const monthData = store[period] || {}
+    const periodFirstDay = `${period}-01`
+    const periodLastDay = `${period}-${String(daysInPeriodMonth(period)).padStart(2, '0')}`
+    const rangeFirst = fromDate > periodFirstDay ? fromDate : periodFirstDay
+    const rangeLast = toDate < periodLastDay ? toDate : periodLastDay
+    const rangeDays = Math.max(0, (new Date(rangeLast) - new Date(rangeFirst)) / 86400000 + 1)
+    const monthDays = daysInPeriodMonth(period)
+    const proRate = monthDays > 0 ? rangeDays / monthDays : 0
+
+    Object.entries(rates).forEach(([ambId, rateInfo]) => {
+      const data = monthData[ambId]
+      if (!data) return
+      const acc = byAmbassador.get(ambId) || {
+        ambassador_id: ambId, name: rateInfo.name,
+        hours: 0, base: 0, transport: 0, bonuses: 0, deductions: 0, total: 0,
+      }
+
+      const hasEntries = (data.entries || []).length > 0
+      if (hasEntries) {
+        // 用 daily entries 精算
+        for (const e of data.entries) {
+          if (!dateInRange(e.date, fromDate, toDate)) continue
+          const rate = Number(e.hourly_rate_used || rateInfo.current)
+          const hours = Number(e.hours || 0)
+          const base = hours * rate
+          const trans = Number(e.transport || 0)
+          const ded = Number(e.deduct || 0)
+          const cost = base + trans + ded
+          acc.hours += hours
+          acc.base += base
+          acc.transport += trans
+          acc.deductions += ded
+          acc.total += cost
+          totalHours += hours
+          totalPayroll += cost
+          byDate.set(e.date, (byDate.get(e.date) || 0) + cost)
+        }
+        // 月度 bonuses/deductions 按比例攤提
+        const monthlyBonus = (data.monthly_bonuses || []).reduce((s, b) => s + Number(b.amount || 0), 0)
+        const monthlyDeduct = (data.monthly_deductions || []).reduce((s, d) => s + Number(d.amount || 0), 0)
+        acc.bonuses += monthlyBonus * proRate
+        acc.deductions += monthlyDeduct * proRate
+        acc.total += (monthlyBonus + monthlyDeduct) * proRate
+        totalPayroll += (monthlyBonus + monthlyDeduct) * proRate
+      } else if (data.summary) {
+        // 只有月度 summary（4月 Excel）→ 整月按比例攤提
+        const sum = data.summary
+        const baseProrated = Number(sum.base_salary || 0) * proRate
+        const transProrated = Number(sum.transport || 0) * proRate
+        const bonusProrated = Number(sum.bonuses || 0) * proRate
+        const dedProrated = Number(sum.deductions || 0) * proRate
+        const hoursProrated = Number(sum.total_hours || 0) * proRate
+        const cost = baseProrated + transProrated + bonusProrated + dedProrated
+        acc.hours += hoursProrated
+        acc.base += baseProrated
+        acc.transport += transProrated
+        acc.bonuses += bonusProrated
+        acc.deductions += dedProrated
+        acc.total += cost
+        totalHours += hoursProrated
+        totalPayroll += cost
+      }
+      byAmbassador.set(ambId, acc)
+    })
+  }
+
+  return {
+    fromDate, toDate,
+    totalPayroll: Math.round(totalPayroll),
+    totalHours: Math.round(totalHours * 10) / 10,
+    byAmbassador: [...byAmbassador.values()].map(a => ({
+      ...a,
+      base: Math.round(a.base),
+      transport: Math.round(a.transport),
+      bonuses: Math.round(a.bonuses),
+      deductions: Math.round(a.deductions),
+      total: Math.round(a.total),
+    })).sort((x, y) => y.total - x.total),
+    byDate: [...byDate.entries()].map(([d, v]) => ({ date: d, cost: Math.round(v) }))
+      .sort((a, b) => a.date.localeCompare(b.date)),
+  }
+}
+
+/**
+ * 取得單筆大使薪資（依 ambassador_id 對應到 ambassadors 表的 id）
+ * salesReport 用：sales 表 ambassador_id 是 UUID/code，需要對應到 attendance 的 key
+ */
+export function getAmbassadorPayrollMap(fromDate, toDate) {
+  const result = getPayrollByDateRange(fromDate, toDate)
+  const map = {}
+  for (const a of result.byAmbassador) {
+    map[a.ambassador_id] = a
+    // 也用 name 當 alias key（某些 sales 紀錄可能用 name 對應）
+    if (a.name) map[a.name] = a
+  }
+  return { ...result, map }
+}
