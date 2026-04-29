@@ -2,18 +2,19 @@
 // 酒店銷售管理 hub — 7 個快捷一頁集中
 import { useNavigate } from 'react-router-dom'
 import {
-  Wine, BarChart3, Building2, Coins, Package, Truck, Users, Receipt,
+  Wine, BarChart3, Building2, Coins, Package, Truck, Users, Receipt, FileSpreadsheet,
 } from 'lucide-react'
 import PageShell, { Card } from '../../components/PageShell'
 
 const HUB_ITEMS = [
-  { icon: BarChart3, label: 'KEY 銷量',   sub: '員工每天輸入',         color: '#c9a84c', path: '/admin/venue-sales/new' },
-  { icon: Building2, label: '店家管理',   sub: '27 家店 + 大使綁定',   color: '#3b82f6', path: '/admin/venues' },
-  { icon: Coins,     label: '場域定價',   sub: '每店每品成本/利潤',    color: '#10b981', path: '/admin/venue-profit-rules' },
-  { icon: Package,   label: '庫存矩陣',   sub: '警示 + 一鍵補貨',      color: '#f59e0b', path: '/admin/inventory' },
-  { icon: Truck,     label: '補貨單',     sub: '雙人確認 + 列印',       color: '#a855f7', path: '/admin/replenishment' },
-  { icon: Users,     label: '大使薪酬',   sub: '時薪 + 門檻獎金',      color: '#ef4444', path: '/admin/compensation-rules' },
-  { icon: Receipt,   label: '督導結帳',   sub: '4 督導 · 每月10號前',  color: '#06b6d4', path: '/admin/collections' },
+  { icon: BarChart3,       label: 'KEY 銷量',   sub: '員工每天輸入',         color: '#c9a84c', path: '/admin/venue-sales/new' },
+  { icon: Building2,       label: '店家管理',   sub: '27 家店 + 大使綁定',   color: '#3b82f6', path: '/admin/venues' },
+  { icon: Coins,           label: '場域定價',   sub: '每店每品成本/利潤',    color: '#10b981', path: '/admin/venue-profit-rules' },
+  { icon: Package,         label: '庫存矩陣',   sub: '警示 + 一鍵補貨',      color: '#f59e0b', path: '/admin/inventory' },
+  { icon: Truck,           label: '補貨單',     sub: '雙人確認 + 列印',       color: '#a855f7', path: '/admin/replenishment' },
+  { icon: Users,           label: '大使薪酬',   sub: '時薪 + 門檻獎金',      color: '#ef4444', path: '/admin/compensation-rules' },
+  { icon: Receipt,         label: '督導結帳',   sub: '4 督導 · 每月10號前',  color: '#06b6d4', path: '/admin/collections' },
+  { icon: FileSpreadsheet, label: '薪資總表',   sub: '會計視角 · 月度結算',   color: '#22c55e', path: '/admin/payroll-report' },
 ]
 
 export default function VenueHub() {
