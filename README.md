@@ -57,3 +57,4 @@ CREATE POLICY "Allow anon select" ON employees FOR SELECT USING (true);
 
 ## 登入方式
 使用 employees 表的 `employee_id` + `pin` 欄位登入。
+
