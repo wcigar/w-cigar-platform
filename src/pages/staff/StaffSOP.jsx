@@ -163,7 +163,7 @@ function TaskCard({ task: t, def, user, isGrab, checked, onCheck, photo, preview
   return (
     <div className="card" style={{ padding: 0, marginBottom: 6, overflow: 'hidden', borderColor: checked ? 'var(--border-gold)' : t.completed ? 'rgba(77,168,108,.2)' : undefined, background: checked ? 'rgba(201,168,76,.04)' : undefined, opacity: cardOpacity }}>
       <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }} onClick={onExpand}>
-        {canEdit ? <input type="checkbox" checked={!!checked} onChange={e => { e.stopPropagation(); onCheck(e.target.checked) }} style={{ width: 24, height: 24, accentColor: '#c9a84c', flexShrink: 0 }} onClick={e => e.stopPropagation()} />
+        {canEdit ? <input type="checkbox" checked={!!checked} onChange={e => { e.stopPropagation(); onCheck(e.target.checked); if (e.target.checked && !expanded) onExpand() }} style={{ width: 24, height: 24, accentColor: '#c9a84c', flexShrink: 0 }} onClick={e => e.stopPropagation()} />
           : t.completed ? <CheckCircle2 size={22} color="var(--green)" style={{ flexShrink: 0 }} /> : <Circle size={22} color="var(--text-muted)" style={{ flexShrink: 0 }} />}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: t.completed ? 'var(--text-dim)' : 'var(--text)', textDecoration: t.completed ? 'line-through' : 'none' }}>{t.title}</div>
@@ -194,8 +194,8 @@ function TaskCard({ task: t, def, user, isGrab, checked, onCheck, photo, preview
           {needPhoto && (
             <div style={{ marginTop: 8 }}>
               <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={e => onPhoto(e.target.files?.[0] || null)} />
-              <button className="btn-outline" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, padding: '8px 14px', width: '100%', justifyContent: 'center', background: photo ? 'rgba(77,168,108,.08)' : undefined, borderColor: photo ? 'rgba(77,168,108,.3)' : undefined, color: photo ? 'var(--green)' : undefined }} onClick={() => fileRef.current?.click()}>
-                <Camera size={16} /> {photo ? `已選擇 (${Math.round(photo.size / 1024)}KB)` : '拍照 / 選擇照片'}
+              <button style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, padding: '12px 14px', width: '100%', justifyContent: 'center', borderRadius: 10, cursor: 'pointer', fontWeight: 600, background: photo ? 'rgba(77,168,108,.15)' : 'rgba(201,168,76,.1)', border: photo ? '2px solid rgba(77,168,108,.4)' : '2px dashed rgba(201,168,76,.4)', color: photo ? 'var(--green)' : 'var(--gold)' }} onClick={() => fileRef.current?.click()}>
+                <Camera size={18} /> {photo ? `✅ 已選擇 (${Math.round(photo.size / 1024)}KB)` : '📷 點擊拍照上傳'}
               </button>
               {preview && <img src={preview} alt="預覽" style={{ width: '100%', maxHeight: 160, objectFit: 'cover', borderRadius: 10, marginTop: 8, border: '1px solid var(--border-gold)' }} />}
             </div>
