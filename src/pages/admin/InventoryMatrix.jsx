@@ -279,7 +279,7 @@ function ProductCell({ row, venueId, onChangeEntry }) {
   }
 
   return (
-    <div style={{ background: '#0a0a0a', border: `1px solid ${borderColor}`, borderRadius: 6, padding: '6px 6px', textAlign: 'center', fontSize: 10 }}>
+    <div data-product-key={row.product_key} style={{ background: '#0a0a0a', border: `1px solid ${borderColor}`, borderRadius: 6, padding: '6px 6px', textAlign: 'center', fontSize: 10 }}>
       <div style={{ color: '#8a8278', fontSize: 10, lineHeight: 1.2, minHeight: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {row.product_name}
       </div>

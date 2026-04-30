@@ -90,7 +90,8 @@ export function computeStatus(qty, alert, target) {
 
 // === 商品顯示順序（給 Matrix / 補貨單 / 警示清單）===
 // non_cuban (Capadura) 在前，cuban 在後
-// cuban 順序由 Wilson 指定：羅密歐 → 寬丘 → 3T → 蒙特魚雷 → D4 → Robusto → Siglo VI
+// cuban 順序由 Wilson 指定：
+// 羅密歐 → 2號鋁管 → 羅密歐寬丘 → 3T翡翠 → 蒙特二號 → 帕特加斯D4 → COHIBA羅布圖 → COHIBA六號鋁管
 export const PRODUCT_DISPLAY_ORDER = [
   // Capadura 系列
   'capadura_888_robusto',
@@ -100,15 +101,18 @@ export const PRODUCT_DISPLAY_ORDER = [
   'capadura_888_torpedo',
   'capadura_898_torpedo',
   'jinxiong',
-  // 古巴雪茄（Wilson 指定順序）
-  'romeo',
-  'romeo_wide',
-  'trinidad_emerald',
-  'monte_no2',
-  'd4',
-  'robusto',
-  'siglo6_tube',
-  'siglo6_tube_mentor',
+  // 古巴雪茄（Wilson 最終順序）
+  'romeo',              // 羅密歐
+  'siglo2_tube',        // 2號鋁管
+  'romeo_wide',         // 羅密歐寬丘
+  'trinidad_emerald',   // 3T翡翠
+  'monte_no2',          // 蒙特二號
+  'd4',                 // 帕特加斯D4
+  'robusto',            // COHIBA羅布圖
+  'robusto_siglo6',     // COHIBA羅布圖/六號鋁管 (合併品項)
+  'siglo6_tube',        // COHIBA六號鋁管
+  'siglo6_robusto',     // COHIBA六號鋁管/羅布圖 (合併品項)
+  'siglo6_tube_mentor', // COHIBA六號鋁管/導師
 ]
 
 export function sortByDisplayOrder(items, keyField = 'product_key') {
