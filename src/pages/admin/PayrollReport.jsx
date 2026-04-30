@@ -47,7 +47,7 @@ export default function PayrollReport() {
   }
 
   return (
-    <PageShell title="月度薪資總表" subtitle="ADMIN · PAYROLL REPORT">
+    <PageShell title="月度薪資總表" subtitle="ADMIN · PAYROLL REPORT" backTo="/admin/venue-hub" backLabel="酒店銷售管理">
       <Card style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#8a8278' }}>
           <Calendar size={12} /> 期間

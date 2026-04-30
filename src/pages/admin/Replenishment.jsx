@@ -47,7 +47,7 @@ export default function Replenishment() {
   }, [list, tab, q])
 
   return (
-    <PageShell title="補貨單" subtitle="ADMIN · REPLENISHMENT">
+    <PageShell title="補貨單" subtitle="ADMIN · REPLENISHMENT" backTo="/admin/venue-hub" backLabel="酒店銷售管理">
       <Card style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
         {TABS.map(t => {
           const active = tab === t.key

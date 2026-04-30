@@ -70,7 +70,7 @@ export default function VenueProfitRules() {
   }
 
   return (
-    <PageShell title="場域定價" subtitle="ADMIN · VENUE PRICING">
+    <PageShell title="場域定價" subtitle="ADMIN · VENUE PRICING" backTo="/admin/venue-hub" backLabel="酒店銷售管理">
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
         {kpi('店家總數', stats.venues, '#e8e0d0')}
         {kpi('SKU 總數', stats.total, '#3b82f6')}

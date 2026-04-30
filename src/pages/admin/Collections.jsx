@@ -122,7 +122,7 @@ export default function Collections() {
   })()
 
   return (
-    <PageShell title="督導結帳" subtitle="ADMIN · MONTHLY COLLECTIONS">
+    <PageShell title="督導結帳" subtitle="ADMIN · MONTHLY COLLECTIONS" backTo="/admin/venue-hub" backLabel="酒店銷售管理">
       {dueWarning && (
         <Card style={{ background: dueWarning.color + '15', borderLeft: `3px solid ${dueWarning.color}`, marginBottom: 12 }}>
           <div style={{ fontSize: 13, color: dueWarning.color, display: 'flex', alignItems: 'center', gap: 6, fontWeight: 500 }}>

@@ -72,7 +72,7 @@ export default function VenuesAdmin() {
   }
 
   return (
-    <PageShell title="店家管理" subtitle="ADMIN · VENUES">
+    <PageShell title="店家管理" subtitle="ADMIN · VENUES" backTo="/admin/venue-hub" backLabel="酒店銷售管理">
       <SummaryRow stats={stats} />
 
       <Card style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
