@@ -90,8 +90,9 @@ export function computeStatus(qty, alert, target) {
 
 // === 商品顯示順序（給 Matrix / 補貨單 / 警示清單）===
 // non_cuban (Capadura) 在前，cuban 在後
-// cuban 順序由 Wilson 指定：
-// 羅密歐 → 2號鋁管 → 羅密歐寬丘 → 3T翡翠 → 蒙特二號 → 帕特加斯D4 → COHIBA羅布圖 → COHIBA六號鋁管
+// cuban 順序由 Wilson 最終確認（7 項）：
+// 羅密歐二號鋁管 → 羅密歐寬丘 → 3T翡翠 → 蒙特二號 → 帕特加斯D4
+// → COHIBA羅布圖 → COHIBA羅布圖/六號鋁管
 export const PRODUCT_DISPLAY_ORDER = [
   // Capadura 系列
   'capadura_888_robusto',
@@ -101,24 +102,34 @@ export const PRODUCT_DISPLAY_ORDER = [
   'capadura_888_torpedo',
   'capadura_898_torpedo',
   'jinxiong',
-  // 古巴雪茄（Wilson 最終順序）
-  'romeo',              // 羅密歐
-  'siglo2_tube',        // 2號鋁管
+  // 古巴雪茄（Wilson 最終順序，7 項）
+  'romeo',              // 羅密歐二號鋁管
   'romeo_wide',         // 羅密歐寬丘
   'trinidad_emerald',   // 3T翡翠
   'monte_no2',          // 蒙特二號
   'd4',                 // 帕特加斯D4
   'robusto',            // COHIBA羅布圖
   'robusto_siglo6',     // COHIBA羅布圖/六號鋁管 (合併品項)
-  'siglo6_tube',        // COHIBA六號鋁管
-  'siglo6_robusto',     // COHIBA六號鋁管/羅布圖 (合併品項)
-  'siglo6_tube_mentor', // COHIBA六號鋁管/導師
 ]
 
 export function sortByDisplayOrder(items, keyField = 'product_key') {
+  // 容忍價格變體 key（例如 partagas_d4_2200, monte_no2_2200, trinidad_emerald_2200）
+  // 策略：先精確匹配，沒中再用最長 base-key 子字串匹配
   const idx = (k) => {
-    const i = PRODUCT_DISPLAY_ORDER.indexOf(k)
-    return i === -1 ? 999 : i
+    if (!k) return 999
+    const exact = PRODUCT_DISPLAY_ORDER.indexOf(k)
+    if (exact !== -1) return exact
+    // 子字串匹配：找 ORDER 中是 k 的子字串的 base key（取最長 base 優先）
+    let bestIdx = 999
+    let bestLen = 0
+    for (let i = 0; i < PRODUCT_DISPLAY_ORDER.length; i++) {
+      const base = PRODUCT_DISPLAY_ORDER[i]
+      if (k.includes(base) && base.length > bestLen) {
+        bestIdx = i
+        bestLen = base.length
+      }
+    }
+    return bestIdx
   }
   return [...items].sort((a, b) => idx(a[keyField]) - idx(b[keyField]))
 }
