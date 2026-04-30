@@ -326,7 +326,12 @@ const TAIPEI_VENUE_TEMPLATE = [
   },
   { id: 'xiangge',          name: '香閣',        region: 'taipei',
     products: [
-      { key: 'jinxiong',          name: '金熊',              price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_888_robusto', name: 'Capadura 888 Robusto', customer_label: '金熊 888R',  price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_898_robusto', name: 'Capadura 898 Robusto', customer_label: '金熊 898R',  price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_888_toro',    name: 'Capadura 888 TORO',    customer_label: '金熊 888T',  price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_898_toro',    name: 'Capadura 898 TORO',    customer_label: '金熊 898T',  price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_888_torpedo', name: 'Capadura 888 Torpedo', customer_label: '金熊 888Tp', price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_898_torpedo', name: 'Capadura 898 Torpedo', customer_label: '金熊 898Tp', price: 1000, category: 'non_cuban_cigar' },
       { key: 'romeo',             name: '羅密歐二號鋁管',            price: 1500, category: 'cuban_cigar' },
       { key: 'trinidad_emerald', name: '3T翡翠',        price: 2000, category: 'cuban_cigar' },
       { key: 'd4',               name: '帕特加斯D4號',                 price: 2000, category: 'cuban_cigar' },
@@ -337,7 +342,12 @@ const TAIPEI_VENUE_TEMPLATE = [
   },
   { id: 'baida',            name: '百達',        region: 'taipei',
     products: [
-      { key: 'jinxiong',          name: '金熊',              price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_888_robusto', name: 'Capadura 888 Robusto', customer_label: '金熊 888R',  price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_898_robusto', name: 'Capadura 898 Robusto', customer_label: '金熊 898R',  price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_888_toro',    name: 'Capadura 888 TORO',    customer_label: '金熊 888T',  price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_898_toro',    name: 'Capadura 898 TORO',    customer_label: '金熊 898T',  price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_888_torpedo', name: 'Capadura 888 Torpedo', customer_label: '金熊 888Tp', price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_898_torpedo', name: 'Capadura 898 Torpedo', customer_label: '金熊 898Tp', price: 1000, category: 'non_cuban_cigar' },
       { key: 'romeo',             name: '羅密歐二號鋁管',            price: 1500, category: 'cuban_cigar' },
       { key: 'trinidad_emerald', name: '3T翡翠',        price: 2000, category: 'cuban_cigar' },
       { key: 'd4',               name: '帕特加斯D4號',                 price: 2000, category: 'cuban_cigar' },
@@ -348,7 +358,12 @@ const TAIPEI_VENUE_TEMPLATE = [
   },
   { id: 'trans',            name: '特蘭斯',      region: 'taipei',
     products: [
-      { key: 'jinxiong',          name: '金熊',              price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_888_robusto', name: 'Capadura 888 Robusto', customer_label: '金熊 888R',  price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_898_robusto', name: 'Capadura 898 Robusto', customer_label: '金熊 898R',  price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_888_toro',    name: 'Capadura 888 TORO',    customer_label: '金熊 888T',  price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_898_toro',    name: 'Capadura 898 TORO',    customer_label: '金熊 898T',  price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_888_torpedo', name: 'Capadura 888 Torpedo', customer_label: '金熊 888Tp', price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_898_torpedo', name: 'Capadura 898 Torpedo', customer_label: '金熊 898Tp', price: 1000, category: 'non_cuban_cigar' },
       { key: 'romeo',             name: '羅密歐二號鋁管',            price: 1500, category: 'cuban_cigar' },
       { key: 'trinidad_emerald', name: '3T翡翠',        price: 2000, category: 'cuban_cigar' },
       { key: 'd4',               name: '帕特加斯D4號',                 price: 2000, category: 'cuban_cigar' },
@@ -370,7 +385,12 @@ const TAIPEI_VENUE_TEMPLATE = [
   },
   { id: 'xiangshui',        name: '香水',        region: 'taipei',
     products: [
-      { key: 'jinxiong',          name: '金熊',              price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_888_robusto', name: 'Capadura 888 Robusto', customer_label: '金熊 888R',  price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_898_robusto', name: 'Capadura 898 Robusto', customer_label: '金熊 898R',  price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_888_toro',    name: 'Capadura 888 TORO',    customer_label: '金熊 888T',  price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_898_toro',    name: 'Capadura 898 TORO',    customer_label: '金熊 898T',  price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_888_torpedo', name: 'Capadura 888 Torpedo', customer_label: '金熊 888Tp', price: 1000, category: 'non_cuban_cigar' },
+      { key: 'capadura_898_torpedo', name: 'Capadura 898 Torpedo', customer_label: '金熊 898Tp', price: 1000, category: 'non_cuban_cigar' },
       { key: 'romeo',             name: '羅密歐二號鋁管',            price: 1500, category: 'cuban_cigar' },
       { key: 'trinidad_emerald', name: '3T翡翠',        price: 2000, category: 'cuban_cigar' },
       { key: 'd4',               name: '帕特加斯D4號',                 price: 2000, category: 'cuban_cigar' },
@@ -686,7 +706,11 @@ export function buildVenueSalesMatrixPayload(formState) {
       if (qty > 0) {
         const sub = qty * p.price
         products.push({
-          product_key: p.key, product_name: p.name,
+          product_key: p.key,
+          // 對外（大使端、銷售報表、收據）顯示 customer_label，內部稽核用 name
+          product_name: p.customer_label || p.name,
+          internal_name: p.name,
+          customer_label: p.customer_label || null,
           category: p.category,
           unit_price: p.price, quantity: qty, subtotal: sub,
         })

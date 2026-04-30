@@ -435,7 +435,10 @@ function VenueMatrixCard({
                         <th style={cellHead()}>商品</th>
                         {venue.products.map(p => (
                           <th key={p.key} style={cellHead(true)}>
-                            <div style={{ color: '#e8e0d0', fontWeight: 500 }}>{p.name}</div>
+                            <div style={{ color: '#e8e0d0', fontWeight: 500 }}>{p.customer_label || p.name}</div>
+                            {p.customer_label && (
+                              <div style={{ color: '#6a655c', fontSize: 9, marginTop: 1 }}>內部：{p.name}</div>
+                            )}
                             <div style={{ color: '#c9a84c', fontSize: 10, marginTop: 2 }}>NT$ {p.price.toLocaleString()}</div>
                             {p.note && <div style={{ color: '#8a8278', fontSize: 9, marginTop: 2 }}>{p.note}</div>}
                           </th>
