@@ -549,7 +549,7 @@ export default function SalesReport() {
   const replenBtn = showReplen ? { ...btnStyle, background: replenLowCount > 0 ? '#dc2626' : '#10b981', color: '#fff', border: '1px solid transparent', fontWeight: 500 } : { ...btnStyle, border: '1px solid ' + (replenLowCount > 0 ? '#dc2626' : '#10b981'), color: replenLowCount > 0 ? '#dc2626' : '#10b981' }
 
   return (
-    <PageShell title="銷售儀表板" subtitle="ADMIN · SALES REPORT">
+    <PageShell title="銷售儀表板" subtitle="ADMIN · SALES REPORT" backTo="/admin/venue-hub" backLabel="酒店銷售管理">
       <style>{printStyle}</style>
       <Card style={{ marginBottom: 12, padding: 12 }} className="no-print">
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>

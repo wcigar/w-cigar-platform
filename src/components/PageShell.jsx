@@ -1,12 +1,35 @@
 // src/components/PageShell.jsx
-// 共用黑金頁框 + 標題 + 空狀態占位
-export default function PageShell({ title, subtitle, actions, children }) {
+// 共用黑金頁框 + 標題 + 空狀態占位 + 可選返回鍵
+import { useNavigate } from 'react-router-dom'
+import { ChevronLeft } from 'lucide-react'
+
+export default function PageShell({ title, subtitle, actions, children, backTo, backLabel }) {
+  const navigate = useNavigate()
+  const handleBack = () => {
+    if (backTo === true || backTo === -1) navigate(-1)
+    else if (typeof backTo === 'string') navigate(backTo)
+  }
   return (
     <div style={{ padding: '18px 16px 24px', maxWidth: 1100, margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
-        <div>
-          {subtitle && <div style={{ fontSize: 10, color: '#8a8278', letterSpacing: 3, marginBottom: 4 }}>{subtitle}</div>}
-          <h1 style={{ fontSize: 20, fontWeight: 600, color: '#e8e0d0', margin: 0, letterSpacing: 1 }}>{title}</h1>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
+          {backTo && (
+            <button onClick={handleBack} title={backLabel || '返回'} style={{
+              background: 'rgba(201,168,76,0.08)', border: '1px solid rgba(201,168,76,0.3)',
+              color: '#c9a84c', borderRadius: 8, padding: '6px 10px', cursor: 'pointer',
+              display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12,
+              transition: 'background 0.15s, border-color 0.15s',
+            }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(201,168,76,0.18)'; e.currentTarget.style.borderColor = '#c9a84c' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(201,168,76,0.08)'; e.currentTarget.style.borderColor = 'rgba(201,168,76,0.3)' }}
+            >
+              <ChevronLeft size={14} /> {backLabel || '返回'}
+            </button>
+          )}
+          <div>
+            {subtitle && <div style={{ fontSize: 10, color: '#8a8278', letterSpacing: 3, marginBottom: 4 }}>{subtitle}</div>}
+            <h1 style={{ fontSize: 20, fontWeight: 600, color: '#e8e0d0', margin: 0, letterSpacing: 1 }}>{title}</h1>
+          </div>
         </div>
         {actions}
       </div>

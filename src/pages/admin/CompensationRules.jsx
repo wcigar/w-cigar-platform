@@ -43,7 +43,7 @@ export default function CompensationRules() {
   }
 
   return (
-    <PageShell title="大使薪酬規則" subtitle="ADMIN · COMPENSATION">
+    <PageShell title="大使薪酬規則" subtitle="ADMIN · COMPENSATION" backTo="/admin/venue-hub" backLabel="酒店銷售管理">
       {loading ? <Card>載入中…</Card> : (
         <>
           <ThresholdSection
