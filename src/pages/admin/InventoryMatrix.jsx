@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { Search, Zap, Settings, AlertTriangle } from 'lucide-react'
 import { listVenues, upsertVenue, REGION_OPTIONS as REGIONS } from '../../lib/services/venues'
 import {
-  buildInventoryMatrix, upsertInventoryEntry,
+  buildInventoryMatrix, upsertInventoryEntry, sortByDisplayOrder,
 } from '../../lib/services/inventory'
 import { createRunFromAlerts } from '../../lib/services/replenishment'
 import PageShell, { Card } from '../../components/PageShell'
@@ -65,7 +65,7 @@ export default function InventoryMatrix() {
     }
   }, [matrix])
 
-  const alertItems = useMemo(() => matrix.flatMap(v => v.rows
+  const alertItems = useMemo(() => sortByDisplayOrder(matrix.flatMap(v => v.rows
     .filter(r => r.status === 'red' || r.status === 'yellow')
     .map(r => ({
       venue_id: v.venue_id, venue_name: v.venue_name, region: v.region,
@@ -76,7 +76,7 @@ export default function InventoryMatrix() {
       suggested_qty: Math.max(0, r.target_quantity - r.current_qty),
       status: r.status,
     }))
-  ), [matrix])
+  )), [matrix])
 
   async function handleGenerateRun() {
     if (alertItems.length === 0) {
@@ -148,8 +148,8 @@ export default function InventoryMatrix() {
 
       <div style={{ display: 'flex', gap: 10, fontSize: 11, color: '#8a8278', marginBottom: 8, paddingLeft: 4 }}>
         圖例：
-        <span style={{ color: '#ef4444' }}>● 紅 (≤閾值)</span>
-        <span style={{ color: '#f59e0b' }}>● 黃 (≤閾值+2)</span>
+        <span style={{ color: '#ef4444' }}>● 紅 (&lt; 閾值)</span>
+        <span style={{ color: '#f59e0b' }}>● 黃 (= 閾值~+30%)</span>
         <span style={{ color: '#10b981' }}>● 綠 (充足)</span>
       </div>
 
@@ -228,7 +228,7 @@ function VenueInventoryCard({ venue, onChangeEntry, onChangeDefaultAlert }) {
             ) : (
               <button onClick={() => { setDefaultDraft(String(venue.venue_default_alert)); setEditingDefault(true) }}
                 style={{ background: 'transparent', border: '1px dashed #2a2520', color: '#c9a84c', padding: '1px 6px', borderRadius: 4, fontSize: 11, cursor: 'pointer' }}>
-                ≤ {venue.venue_default_alert}
+                &lt; {venue.venue_default_alert}
               </button>
             )}
           </span>
@@ -288,7 +288,7 @@ function ProductCell({ row, venueId, onChangeEntry }) {
         valueColor={color} valueSize={16} />
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 2, marginTop: 4, fontSize: 9, color: '#5a554e' }}>
         <button onClick={() => startEdit('alert', row.alert_threshold)}
-          title="閾值（≤ 紅）"
+          title="閾值（&lt; 紅）"
           style={{ flex: 1, background: 'transparent', border: '1px dashed #2a2520', padding: '1px 0', borderRadius: 3, color: '#8a8278', fontSize: 9, cursor: 'pointer' }}>
           {editing === 'alert'
             ? <input type="number" min="0" value={draft} onChange={e => setDraft(e.target.value)} onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') commit() }}

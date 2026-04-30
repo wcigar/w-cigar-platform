@@ -82,9 +82,41 @@ async function fetchAllBalances() {
 }
 
 export function computeStatus(qty, alert, target) {
-  if (qty <= alert) return 'red'
+  // 嚴格小於閥值才跳紅（等於閥值算黃色提醒）
+  if (qty < alert) return 'red'
   if (qty <= alert + Math.ceil((target - alert) * 0.3)) return 'yellow'
   return 'green'
+}
+
+// === 商品顯示順序（給 Matrix / 補貨單 / 警示清單）===
+// non_cuban (Capadura) 在前，cuban 在後
+// cuban 順序由 Wilson 指定：羅密歐 → 寬丘 → 3T → 蒙特魚雷 → D4 → Robusto → Siglo VI
+export const PRODUCT_DISPLAY_ORDER = [
+  // Capadura 系列
+  'capadura_888_robusto',
+  'capadura_898_robusto',
+  'capadura_888_toro',
+  'capadura_898_toro',
+  'capadura_888_torpedo',
+  'capadura_898_torpedo',
+  'jinxiong',
+  // 古巴雪茄（Wilson 指定順序）
+  'romeo',
+  'romeo_wide',
+  'trinidad_emerald',
+  'monte_no2',
+  'd4',
+  'robusto',
+  'siglo6_tube',
+  'siglo6_tube_mentor',
+]
+
+export function sortByDisplayOrder(items, keyField = 'product_key') {
+  const idx = (k) => {
+    const i = PRODUCT_DISPLAY_ORDER.indexOf(k)
+    return i === -1 ? 999 : i
+  }
+  return [...items].sort((a, b) => idx(a[keyField]) - idx(b[keyField]))
 }
 
 export async function listAlertItems(venueId) {
@@ -111,7 +143,7 @@ export async function listAlertItems(venueId) {
       })
     }
   })
-  return result
+  return sortByDisplayOrder(result)
 }
 
 export async function buildInventoryMatrix() {
@@ -123,7 +155,7 @@ export async function buildInventoryMatrix() {
     const tpl = tplMap[v.id] || { products: [] }
     const defaultAlert = defaultAlertMap[v.id] ?? 3
     const products = tpl.products || []
-    const rows = products.map(p => {
+    const rawRows = products.map(p => {
       const key = v.id + ':' + p.key
       const entry = balances[key] || {
         current_qty: 0,
@@ -141,6 +173,7 @@ export async function buildInventoryMatrix() {
         status,
       }
     })
+    const rows = sortByDisplayOrder(rawRows)
     const alertCount = rows.filter(r => r.status === 'red' || r.status === 'yellow').length
     const redCount = rows.filter(r => r.status === 'red').length
     const reorderTotal = rows
