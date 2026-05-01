@@ -33,7 +33,6 @@ import MarketingPage from './pages/marketing/MarketingPage'
 import QRCodePage from './pages/members/QRCodePage'
 import CRMDashboard from './pages/crm/CRMDashboard'
 
-// ========== feat/ambassador-supply-chain ==========
 import AdminVenueSales from './pages/admin/VenueSales'
 import AdminVenueSalesNew from './pages/admin/VenueSalesNew'
 import AdminVenues from './pages/admin/Venues'
@@ -57,7 +56,6 @@ import WHShipmentDetail from './pages/warehouse/ShipmentDetail'
 import WHSupplyPickLists from './pages/warehouse/SupplyPickLists'
 import WHSupplyShipments from './pages/warehouse/SupplyShipments'
 import BossWarRoom from './pages/boss/WarRoom'
-// --- Phase 3: payroll + onboarding ---
 import AdminAmbassadorPayroll from './pages/admin/AmbassadorPayroll'
 import AdminAmbassadorPayrollDetail from './pages/admin/AmbassadorPayrollDetail'
 import AdminCompensationRules from './pages/admin/CompensationRules'
@@ -66,55 +64,22 @@ import AdminAccountingPayrollReports from './pages/admin/AccountingPayrollReport
 import AdminOnboarding from './pages/admin/Onboarding'
 import AdminOnboardingNew from './pages/admin/OnboardingNew'
 import AdminOnboardingDetail from './pages/admin/OnboardingDetail'
-// ===================================================
+import AdminCustoms from './pages/admin/Customs'
 
 function AppInner() {
   const { user, loading } = useAuth()
-
-  useEffect(() => {
-    if (user) seedTodayTasks().catch(console.error)
-  }, [user])
-
-  if (loading) return (
-    <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a0a' }}>
-      <div className="loading-shimmer" style={{ width: 120, height: 120, borderRadius: '50%' }} />
-    </div>
-  )
-
-  // Public pages (no auth required)
+  useEffect(() => { if (user) seedTodayTasks().catch(console.error) }, [user])
+  if (loading) return (<div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a0a' }}><div className="loading-shimmer" style={{ width: 120, height: 120, borderRadius: '50%' }} /></div>)
   if (window.location.pathname.startsWith('/join')) return <JoinPage />
   if (window.location.pathname.startsWith('/qrcode')) return <QRCodePage />
-
-  // VIP Cellar has its own auth
-  if (window.location.pathname.startsWith('/vip-cellar')) return (
-    <Routes>
-      <Route path="/vip-cellar/*" element={<VipCellar />} />
-    </Routes>
-  )
-
-  // POS App has its own auth (12h session, independent)
-  if (window.location.pathname.startsWith('/pos-app')) return (
-    <Routes>
-      <Route path="/pos-app/*" element={<PosApp />} />
-    </Routes>
-  )
-
-  // Ambassador subsystem — fully independent (ambassador_session)
-  // 大使不共用員工 auth；AmbassadorApp 內部自帶 Guard
-  if (window.location.pathname.startsWith('/ambassador')) return (
-    <Routes>
-      <Route path="/ambassador/*" element={<AmbassadorApp />} />
-    </Routes>
-  )
-
+  if (window.location.pathname.startsWith('/vip-cellar')) return (<Routes><Route path="/vip-cellar/*" element={<VipCellar />} /></Routes>)
+  if (window.location.pathname.startsWith('/pos-app')) return (<Routes><Route path="/pos-app/*" element={<PosApp />} /></Routes>)
+  if (window.location.pathname.startsWith('/ambassador')) return (<Routes><Route path="/ambassador/*" element={<AmbassadorApp />} /></Routes>)
   if (!user) return <Login />
-
   const isBoss = user.role === 'boss'
-
   return (
     <Layout>
       <Routes>
-        {/* --- 既有員工主平台路由 --- */}
         {isBoss ? (
           <>
             <Route path="/" element={<BossHome />} />
@@ -145,9 +110,6 @@ function AppInner() {
             <Route path="/meeting" element={<StaffMeeting />} />
           </>
         )}
-
-        {/* --- feat/ambassador-supply-chain --- */}
-        {/* HQ / Staff 後台（boss + staff 都可進；供應鏈業務） */}
         <Route path="/admin/venue-sales" element={<AdminGuard scope="admin"><AdminVenueSales /></AdminGuard>} />
         <Route path="/admin/venue-sales/new" element={<AdminGuard scope="admin"><AdminVenueSalesNew /></AdminGuard>} />
         <Route path="/admin/venues" element={<AdminGuard scope="admin"><AdminVenues /></AdminGuard>} />
@@ -158,7 +120,6 @@ function AppInner() {
         <Route path="/admin/payroll-report" element={<AdminGuard scope="admin"><AdminPayrollReport /></AdminGuard>} />
         <Route path="/admin/accounting-report" element={<AdminGuard scope="admin"><AdminAccountingReport /></AdminGuard>} />
         <Route path="/admin/sales-report" element={<AdminGuard scope="admin"><AdminSalesReport /></AdminGuard>} />
-
         <Route path="/admin/collections/receipt/:venueId/:period" element={<AdminGuard scope="supervisor"><AdminCollectionReceipt /></AdminGuard>} />
         <Route path="/admin/replenishment" element={<AdminGuard scope="admin"><AdminReplenishment /></AdminGuard>} />
         <Route path="/admin/replenishment/:id" element={<AdminGuard scope="admin"><AdminReplenishmentDetail /></AdminGuard>} />
@@ -166,18 +127,12 @@ function AppInner() {
         <Route path="/admin/supply-requests/:id" element={<AdminGuard scope="admin"><AdminSupplyRequestDetail /></AdminGuard>} />
         <Route path="/admin/collections" element={<AdminGuard scope="supervisor"><AdminCollections /></AdminGuard>} />
         <Route path="/admin/exceptions" element={<AdminGuard scope="admin"><AdminExceptions /></AdminGuard>} />
-
-        {/* Warehouse 總倉 */}
         <Route path="/warehouse/pick-lists" element={<AdminGuard scope="warehouse"><WHPickLists /></AdminGuard>} />
         <Route path="/warehouse/shipments" element={<AdminGuard scope="warehouse"><WHShipments /></AdminGuard>} />
         <Route path="/warehouse/shipments/:id" element={<AdminGuard scope="warehouse"><WHShipmentDetail /></AdminGuard>} />
         <Route path="/warehouse/supply-pick-lists" element={<AdminGuard scope="warehouse"><WHSupplyPickLists /></AdminGuard>} />
         <Route path="/warehouse/supply-shipments" element={<AdminGuard scope="warehouse"><WHSupplyShipments /></AdminGuard>} />
-
-        {/* Boss 戰情室 */}
         <Route path="/boss/war-room" element={<AdminGuard scope="boss"><BossWarRoom /></AdminGuard>} />
-
-        {/* Phase 3: 薪資 / 獎金 */}
         <Route path="/admin/ambassador-payroll" element={<AdminGuard scope="boss"><AdminAmbassadorPayroll /></AdminGuard>} />
         <Route path="/admin/ambassador-payroll/:periodId" element={<AdminGuard scope="boss"><AdminAmbassadorPayrollDetail /></AdminGuard>} />
         <Route path="/admin/ambassador-payroll/:periodId/:ambassadorId" element={<AdminGuard scope="boss"><AdminAmbassadorPayrollDetail /></AdminGuard>} />
@@ -186,8 +141,6 @@ function AppInner() {
         <Route path="/admin/venue-profit-rules" element={<AdminGuard scope="admin"><AdminVenueProfitRules /></AdminGuard>} />
         <Route path="/admin/accounting-payroll-reports" element={<AdminGuard scope="boss"><AdminAccountingPayrollReports /></AdminGuard>} />
         <Route path="/admin/accounting-payroll-reports/:reportId" element={<AdminGuard scope="boss"><AdminAccountingPayrollReports /></AdminGuard>} />
-
-        {/* Phase 3: 新進人員 */}
         <Route path="/admin/onboarding" element={<AdminGuard scope="admin"><AdminOnboarding /></AdminGuard>} />
         <Route path="/admin/onboarding/new" element={<AdminGuard scope="admin"><AdminOnboardingNew /></AdminGuard>} />
         <Route path="/admin/onboarding/:id" element={<AdminGuard scope="admin"><AdminOnboardingDetail /></AdminGuard>} />
@@ -195,8 +148,7 @@ function AppInner() {
         <Route path="/admin/onboarding/:id/tasks" element={<AdminGuard scope="admin"><AdminOnboardingDetail /></AdminGuard>} />
         <Route path="/admin/onboarding/:id/provisioning" element={<AdminGuard scope="admin"><AdminOnboardingDetail /></AdminGuard>} />
         <Route path="/admin/onboarding/:id/compensation" element={<AdminGuard scope="admin"><AdminOnboardingDetail /></AdminGuard>} />
-
-        {/* 兜底 */}
+        <Route path="/admin/customs" element={<AdminGuard scope="boss"><AdminCustoms /></AdminGuard>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>
@@ -215,3 +167,4 @@ export default function App() {
     </ErrorBoundary>
   )
 }
+
