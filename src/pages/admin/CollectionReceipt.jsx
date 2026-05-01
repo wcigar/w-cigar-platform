@@ -29,7 +29,26 @@ export default function CollectionReceipt() {
       const venueTpl = tpl.venues.find(x => x.id === venueId)
       const ps = venueTpl?.products || []
       setProducts(ps)
-      const c = await getMonthlyCollection(period, venueId, {}, !!v.has_self_sale)
+
+      // 累計當月 venue_sales_daily 的大使銷量（is_self_sale = false）
+      const [py, pm] = period.split('-').map(Number)
+      const startDate = `${py}-${String(pm).padStart(2, '0')}-01`
+      const lastDay = new Date(py, pm, 0).getDate()
+      const endDate = `${py}-${String(pm).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+      const { data: salesRows } = await supabase
+        .from('venue_sales_daily')
+        .select('items, is_self_sale')
+        .eq('venue_id', venueId)
+        .gte('sale_date', startDate)
+        .lte('sale_date', endDate)
+      const ambassadorMap = {}
+      ;(salesRows || []).filter(r => !r.is_self_sale).forEach(row => {
+        Object.entries(row.items || {}).forEach(([key, qty]) => {
+          ambassadorMap[key] = (ambassadorMap[key] || 0) + Number(qty || 0)
+        })
+      })
+
+      const c = await getMonthlyCollection(period, venueId, ambassadorMap, !!v.has_self_sale)
       setCollection({ ...c, products: ps, venue_name: v.name, venue_region: v.region })
 
       // 系統庫存：用於「應剩 vs 實剩」推算自賣
