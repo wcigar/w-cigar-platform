@@ -144,7 +144,7 @@ function SOPView() {
           onRecall={() => recallTask(t)} />)}
       </>)}
 
-      <button className="btn-gold" style={{ width: '100%', fontSize: 18, marginTop: 20, padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: submitting ? .6 : 1 }} onClick={handleSubmit} disabled={submitting}>
+      <button onClick={handleSubmit} disabled={submitting} style={{ width: '100%', fontSize: 18, marginTop: 20, padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: submitting ? .6 : 1, background: 'linear-gradient(135deg, #c9a84c, #8b7a3e)', color: '#0a0a0a', fontWeight: 700, border: 'none', borderRadius: 10, cursor: 'pointer', letterSpacing: 2 }}>
         <Send size={18} /> {submitting ? '上傳中...' : '批次送出已勾選任務'}
       </button>
       {tasks.length === 0 && <div className="card" style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)', marginTop: 20 }}>今日尚無 SOP 任務</div>}
