@@ -61,14 +61,14 @@ export function makePackingList({ supplier, shipment }) {
   const items = shipment.items || []
   autoTable(doc, {
     startY: exporterY + 35,
-    head: [['DESCRIPTION', 'BUNDLES', 'PCS/BUNDLE', 'TOTAL PCS', 'PACKAGE TYPE']],
-    body: items.map(it => [it.name, it.qty_bundles, it.pcs_per_bundle, it.total_pcs, it.package_type || 'Bundle']),
-    foot: [['TOTAL', shipment.total_bundles, '', shipment.total_sticks, `${shipment.total_bundles} ${items[0]?.package_type || 'Bundles'}`]],
+    head: [['DESCRIPTION', 'HS CODE', 'BUNDLES', 'PCS/BUNDLE', 'TOTAL PCS', 'PACKAGE TYPE']],
+    body: items.map(it => [it.name, it.hs_code || shipment.hs_code || '2402.10.00.00-8', it.qty_bundles, it.pcs_per_bundle, it.total_pcs, it.package_type || 'Bundle']),
+    foot: [['TOTAL', '', shipment.total_bundles, '', shipment.total_sticks, `${shipment.total_bundles} ${items[0]?.package_type || 'Bundles'}`]],
     theme: 'grid',
-    styles: { fontSize: 9, cellPadding: 2.5, halign: 'center' },
+    styles: { fontSize: 8.5, cellPadding: 2, halign: 'center' },
     headStyles: { fillColor: [70, 70, 70], textColor: 255, fontStyle: 'bold' },
     footStyles: { fillColor: [220, 220, 220], textColor: 20, fontStyle: 'bold' },
-    columnStyles: { 0: { halign: 'left', cellWidth: 60 } },
+    columnStyles: { 0: { halign: 'left', cellWidth: 50 }, 1: { fontSize: 7 } },
   })
   const wY = doc.lastAutoTable.finalY + 8
   infoBlock(doc, 'Total Net Weight', shipment.total_net_weight_kg || 'TO BE VERIFIED', 30, wY, 50)
@@ -140,6 +140,7 @@ export function makeCommercialInvoice({ supplier, shipment }) {
     ['Export Invoice No.', shipment.shipment_no || ''],
     ['Incoterms', shipment.invoice_terms || 'FOB, ex-Factory'],
     ['Invoice Date', formatDate(shipment.shipment_date)],
+    ['HS Code', shipment.hs_code || '2402.10.00.00-8'],
     ['Country of Origin', supplier?.country || 'Dominican Republic'],
     ['Final Destination', 'Taiwan'],
   ]
@@ -148,35 +149,38 @@ export function makeCommercialInvoice({ supplier, shipment }) {
     doc.setFont('helvetica', 'normal'); doc.text(String(v), 188, iy, { align: 'right' })
     iy += 5
   })
-  if (shipment.notify_to) partyBlock(doc, 'Notify To', [shipment.notify_to], 20, y + 40, 170)
+  if (shipment.notify_to) partyBlock(doc, 'Notify To', [shipment.notify_to], 20, y + 45, 170)
   const items = shipment.items || []
-  const startY = (shipment.notify_to ? y + 65 : y + 50)
+  const startY = (shipment.notify_to ? y + 70 : y + 55)
   autoTable(doc, {
     startY,
-    head: [['DESCRIPTION', '# STICKS', 'PRICE / STICK', 'BOX/BUNDLE (QTY)', 'TOTAL US$']],
+    head: [['DESCRIPTION', 'HS CODE', '# STICKS', 'PRICE/STICK', 'BOX/BUNDLE (QTY)', 'TOTAL US$']],
     body: items.map(it => [
-      it.name, it.total_pcs,
+      it.name,
+      it.hs_code || shipment.hs_code || '2402.10.00.00-8',
+      it.total_pcs,
       `$${Number(it.unit_price_usd || 0).toFixed(2)}`,
       `${it.package_type || 'Box'} x ${it.pcs_per_bundle} (QTY ${it.qty_bundles})`,
       `$${Number(it.subtotal || 0).toFixed(2)}`,
     ]),
-    foot: [['TOTAL', shipment.total_sticks, '', '', `$${Number(shipment.total_amount_usd || 0).toFixed(2)}`]],
-    theme: 'grid', styles: { fontSize: 8.5, cellPadding: 2 },
+    foot: [['TOTAL', '', shipment.total_sticks, '', '', `$${Number(shipment.total_amount_usd || 0).toFixed(2)}`]],
+    theme: 'grid', styles: { fontSize: 8, cellPadding: 1.8 },
     headStyles: { fillColor: [70, 70, 70], textColor: 255, fontStyle: 'bold', halign: 'center' },
     footStyles: { fillColor: [220, 220, 220], textColor: 20, fontStyle: 'bold', halign: 'right' },
     columnStyles: {
-      0: { halign: 'left', cellWidth: 70 },
-      1: { halign: 'center', cellWidth: 18 },
-      2: { halign: 'right', cellWidth: 25 },
-      3: { halign: 'center' },
-      4: { halign: 'right', cellWidth: 25 },
+      0: { halign: 'left', cellWidth: 60 },
+      1: { halign: 'center', cellWidth: 26, fontSize: 7 },
+      2: { halign: 'center', cellWidth: 16 },
+      3: { halign: 'right', cellWidth: 20 },
+      4: { halign: 'center' },
+      5: { halign: 'right', cellWidth: 22 },
     },
   })
   let fy = doc.lastAutoTable.finalY + 6
   doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(30, 30, 30)
   doc.text(`No. of pieces shipped: ${shipment.total_sticks} sticks (${shipment.total_bundles} boxes/bundles).`, 20, fy); fy += 5
   doc.text(`Please pay to ${supplier?.name || ''} directly. No reclaims 30 days after shipping date.`, 20, fy); fy += 5
-  doc.text(`Country of Origin: ${supplier?.country || 'Dominican Republic'}.    Final Destination: Taiwan.`, 20, fy); fy += 10
+  doc.text(`Country of Origin: ${supplier?.country || 'Dominican Republic'}.    Final Destination: Taiwan.    HS Code: ${shipment.hs_code || '2402.10.00.00-8'}`, 20, fy); fy += 10
   doc.setFillColor(245, 245, 245); doc.rect(20, fy, 170, 28, 'F')
   doc.setFont('helvetica', 'bold'); doc.setFontSize(10)
   doc.text('Wire Instruction / Bank Information', 25, fy + 6)
@@ -236,3 +240,4 @@ export function computeShipmentTotals(items) {
     total_net_weight_kg: +(total_net_weight_g / 1000).toFixed(3),
   }
 }
+
