@@ -8,6 +8,13 @@
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
+// Strip non-Latin1 characters (jsPDF default Helvetica only supports Latin1)
+// Chinese / CJK characters get replaced with placeholder to avoid garbage output
+function ascii(s) {
+  if (s === null || s === undefined) return ''
+  return String(s).replace(/[^\x00-\xFF]/g, '')
+}
+
 function formatDate(d) {
   if (!d) return ''
   const dt = typeof d === 'string' ? new Date(d) : d
@@ -19,12 +26,7 @@ function drawLogo(doc, centerX, topY) {
   const logoW = 80
   const x = centerX - logoW / 2
   const y = topY
-
-  // ── TDE box (left side) ──
-  const boxX = x
-  const boxY = y + 1
-  const boxW = 22
-  const boxH = 14
+  const boxX = x, boxY = y + 1, boxW = 22, boxH = 14
   doc.setDrawColor(20, 20, 20)
   doc.setLineWidth(0.6)
   doc.rect(boxX, boxY, boxW, boxH)
@@ -32,13 +34,9 @@ function drawLogo(doc, centerX, topY) {
   doc.setFontSize(17)
   doc.setTextColor(20, 20, 20)
   doc.text('TDE', boxX + boxW / 2, boxY + boxH / 2 + 2.4, { align: 'center' })
-
-  // ── Vertical separator ──
   const sepX = boxX + boxW + 3
   doc.setLineWidth(0.4)
   doc.line(sepX, y + 1, sepX, y + 15)
-
-  // ── Right side text ──
   const textX = sepX + 3
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8)
@@ -53,8 +51,8 @@ function header(doc, supplier) {
   drawLogo(doc, 105, 8)
   doc.setDrawColor(180, 180, 180); doc.setLineWidth(0.3); doc.line(20, 28, 190, 28)
   doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(80, 80, 80)
-  doc.text(supplier?.address || '', 105, 33, { align: 'center' })
-  const contact = [supplier?.tel ? `Tel: ${supplier.tel}` : '', supplier?.email ? `Email: ${supplier.email}` : ''].filter(Boolean).join('   ')
+  doc.text(ascii(supplier?.address || ''), 105, 33, { align: 'center' })
+  const contact = [supplier?.tel ? `Tel: ${ascii(supplier.tel)}` : '', supplier?.email ? `Email: ${ascii(supplier.email)}` : ''].filter(Boolean).join('   ')
   doc.text(contact, 105, 38, { align: 'center' })
 }
 
@@ -68,7 +66,7 @@ function infoBlock(doc, label, value, x, y, w = 50) {
   doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(60, 60, 60)
   doc.text(label, x + w / 2, y + 5.5, { align: 'center' })
   doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(20, 20, 20)
-  doc.text(String(value ?? ''), x + w / 2, y + 14, { align: 'center', maxWidth: w - 4 })
+  doc.text(ascii(String(value ?? '')), x + w / 2, y + 14, { align: 'center', maxWidth: w - 4 })
 }
 
 function partyBlock(doc, label, lines, x, y, w = 80) {
@@ -77,7 +75,7 @@ function partyBlock(doc, label, lines, x, y, w = 80) {
   doc.text(label, x + w / 2, y + 5.5, { align: 'center' })
   doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(30, 30, 30)
   let cy = y + 13
-  lines.filter(Boolean).forEach((ln) => { doc.text(String(ln), x + 2, cy, { maxWidth: w - 4 }); cy += 4.5 })
+  lines.filter(Boolean).forEach((ln) => { doc.text(ascii(String(ln)), x + 2, cy, { maxWidth: w - 4 }); cy += 4.5 })
 }
 
 // ===== 1) Packing List =====
@@ -95,7 +93,7 @@ export function makePackingList({ supplier, shipment }) {
   autoTable(doc, {
     startY: exporterY + 35,
     head: [['DESCRIPTION', 'HS CODE', 'BUNDLES', 'PCS/BUNDLE', 'TOTAL PCS', 'PACKAGE TYPE']],
-    body: items.map(it => [it.name, it.hs_code || shipment.hs_code || '2402.10.00.00-8', it.qty_bundles, it.pcs_per_bundle, it.total_pcs, it.package_type || 'Bundle']),
+    body: items.map(it => [ascii(it.name), it.hs_code || shipment.hs_code || '2402.10.00.00-8', it.qty_bundles, it.pcs_per_bundle, it.total_pcs, it.package_type || 'Bundle']),
     foot: [['TOTAL', '', shipment.total_bundles, '', shipment.total_sticks, `${shipment.total_bundles} ${items[0]?.package_type || 'Bundles'}`]],
     theme: 'grid',
     styles: { fontSize: 8.5, cellPadding: 2, halign: 'center' },
@@ -120,37 +118,37 @@ export function makeCertificateOfOrigin({ supplier, shipment }) {
   doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(30, 30, 30)
   let y = 60
   doc.text('To Whom It May Concern:', 20, y); y += 8
-  const para1 = `We, ${supplier?.name || ''}, hereby declare and certify that the following cigar products were manufactured and packed in the ${supplier?.country || 'Dominican Republic'}, and are of ${supplier?.country || 'Dominican Republic'} origin.`
+  const para1 = `We, ${ascii(supplier?.name || '')}, hereby declare and certify that the following cigar products were manufactured and packed in the ${supplier?.country || 'Dominican Republic'}, and are of ${supplier?.country || 'Dominican Republic'} origin.`
   doc.text(doc.splitTextToSize(para1, 170), 20, y); y += 14
   const para2 = 'All cigars listed below are handmade, long-filler cigars produced by our factory under private branding. These products are not manufactured in Cuba and are not affiliated with, endorsed by, or produced by Habanos S.A. or any Cuban entity.'
   doc.text(doc.splitTextToSize(para2, 170), 20, y); y += 14
   doc.setFont('helvetica', 'bold'); doc.text('Packaging Clarification:', 20, y); y += 5
   doc.setFont('helvetica', 'normal')
-  const para3 = "Certain packaging elements may contain references such as 'Habana, Cuba' or 'Habanos S.A.' for stylistic or nostalgic design purposes only. We confirm that all cigars listed in this document were manufactured, hand-rolled, and packed by " + (supplier?.name || '') + " in the " + (supplier?.country || 'Dominican Republic') + ", and are not produced, endorsed by, or associated with Habanos S.A. or any Cuban entity."
+  const para3 = ascii("Certain packaging elements may contain references such as 'Habana, Cuba' or 'Habanos S.A.' for stylistic or nostalgic design purposes only. We confirm that all cigars listed in this document were manufactured, hand-rolled, and packed by " + (supplier?.name || '') + " in the " + (supplier?.country || 'Dominican Republic') + ", and are not produced, endorsed by, or associated with Habanos S.A. or any Cuban entity.")
   doc.text(doc.splitTextToSize(para3, 170), 20, y); y += 22
   doc.setFont('helvetica', 'bold'); doc.text('Product Details:', 20, y); y += 3
   const items = shipment.items || []
   autoTable(doc, {
     startY: y,
     head: [['DESCRIPTION', 'BOX QTY', 'PCS/BOX', 'TOTAL PCS']],
-    body: items.map(it => [it.name, it.qty_bundles, it.pcs_per_bundle, it.total_pcs]),
+    body: items.map(it => [ascii(it.name), it.qty_bundles, it.pcs_per_bundle, it.total_pcs]),
     theme: 'grid', styles: { fontSize: 9, cellPadding: 2.2 },
     headStyles: { fillColor: [70, 70, 70], textColor: 255, fontStyle: 'bold', halign: 'center' },
     columnStyles: { 0: { halign: 'left', cellWidth: 95 }, 1: { halign: 'center' }, 2: { halign: 'center' }, 3: { halign: 'center' } },
   })
   let fy = doc.lastAutoTable.finalY + 6
   doc.setFont('helvetica', 'bold'); doc.setFontSize(10)
-  doc.text(`Total Bundles: ${shipment.total_bundles}    Total Sticks: ${shipment.total_sticks}`, 20, fy); fy += 6
+  doc.text(ascii(`Total Bundles: ${shipment.total_bundles}    Total Sticks: ${shipment.total_sticks}`), 20, fy); fy += 6
   doc.setFont('helvetica', 'normal')
-  doc.text(`Origin: ${supplier?.country || 'Dominican Republic'}`, 20, fy); fy += 5
-  doc.text(`Factory: ${supplier?.name || ''}`, 20, fy); fy += 5
-  doc.text(`Address: ${supplier?.address || ''}`, 20, fy); fy += 8
+  doc.text(ascii(`Origin: ${supplier?.country || 'Dominican Republic'}`), 20, fy); fy += 5
+  doc.text(ascii(`Factory: ${supplier?.name || ''}`), 20, fy); fy += 5
+  doc.text(ascii(`Address: ${supplier?.address || ''}`), 20, fy); fy += 8
   const para4 = `We further declare that the above products were produced in the ${supplier?.country || 'Dominican Republic'}, and this document is issued by the manufacturer in support of customs review and origin clarification.`
   doc.text(doc.splitTextToSize(para4, 170), 20, fy); fy += 12
   doc.text(`Date: ${formatDate(shipment.shipment_date)}    Location: Santiago, ${supplier?.country || 'Dominican Republic'}`, 20, fy); fy += 18
   doc.setDrawColor(80, 80, 80); doc.line(125, fy, 185, fy)
   doc.setFontSize(9); doc.text('Authorized Signature:', 125, fy - 3); fy += 6
-  doc.setFont('helvetica', 'bold'); doc.text(`${supplier?.authorized_name || ''}    ${supplier?.authorized_title || ''}`, 20, fy)
+  doc.setFont('helvetica', 'bold'); doc.text(ascii(`${supplier?.authorized_name || ''}    ${supplier?.authorized_title || ''}`), 20, fy)
   return doc
 }
 
@@ -159,8 +157,8 @@ export function makeCommercialInvoice({ supplier, shipment }) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   header(doc, supplier)
   doc.setFontSize(8); doc.setTextColor(80, 80, 80)
-  doc.text(`RNC: ${supplier?.rnc || ''}`, 20, 44)
-  doc.text(`Email: ${supplier?.email || ''}`, 20, 48)
+  doc.text(`RNC: ${ascii(supplier?.rnc || '')}`, 20, 44)
+  doc.text(`Email: ${ascii(supplier?.email || '')}`, 20, 48)
   titleBar(doc, 'EXPORT INVOICE', 56)
   let y = 62
   partyBlock(doc, 'Bill-to-party', [shipment.buyer_name, shipment.buyer_address], 20, y, 95)
@@ -170,7 +168,7 @@ export function makeCommercialInvoice({ supplier, shipment }) {
   doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(30, 30, 30)
   let iy = y + 13
   const rows = [
-    ['Export Invoice No.', shipment.shipment_no || ''],
+    ['Export Invoice No.', ascii(shipment.shipment_no || '')],
     ['Incoterms', shipment.invoice_terms || 'FOB, ex-Factory'],
     ['Invoice Date', formatDate(shipment.shipment_date)],
     ['HS Code', shipment.hs_code || '2402.10.00.00-8'],
@@ -182,14 +180,14 @@ export function makeCommercialInvoice({ supplier, shipment }) {
     doc.setFont('helvetica', 'normal'); doc.text(String(v), 188, iy, { align: 'right' })
     iy += 5
   })
-  if (shipment.notify_to) partyBlock(doc, 'Notify To', [shipment.notify_to], 20, y + 45, 170)
+  if (shipment.notify_to) partyBlock(doc, 'Notify To', [ascii(shipment.notify_to)], 20, y + 45, 170)
   const items = shipment.items || []
   const startY = (shipment.notify_to ? y + 70 : y + 55)
   autoTable(doc, {
     startY,
     head: [['DESCRIPTION', 'HS CODE', '# STICKS', 'PRICE/STICK', 'BOX/BUNDLE (QTY)', 'TOTAL US$']],
     body: items.map(it => [
-      it.name,
+      ascii(it.name),
       it.hs_code || shipment.hs_code || '2402.10.00.00-8',
       it.total_pcs,
       `$${Number(it.unit_price_usd || 0).toFixed(2)}`,
@@ -211,20 +209,20 @@ export function makeCommercialInvoice({ supplier, shipment }) {
   })
   let fy = doc.lastAutoTable.finalY + 6
   doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(30, 30, 30)
-  doc.text(`No. of pieces shipped: ${shipment.total_sticks} sticks (${shipment.total_bundles} boxes/bundles).`, 20, fy); fy += 5
-  doc.text(`Please pay to ${supplier?.name || ''} directly. No reclaims 30 days after shipping date.`, 20, fy); fy += 5
-  doc.text(`Country of Origin: ${supplier?.country || 'Dominican Republic'}.    Final Destination: Taiwan.    HS Code: ${shipment.hs_code || '2402.10.00.00-8'}`, 20, fy); fy += 10
+  doc.text(ascii(`No. of pieces shipped: ${shipment.total_sticks} sticks (${shipment.total_bundles} boxes/bundles).`), 20, fy); fy += 5
+  doc.text(ascii(`Please pay to ${supplier?.name || ''} directly. No reclaims 30 days after shipping date.`), 20, fy); fy += 5
+  doc.text(ascii(`Country of Origin: ${supplier?.country || 'Dominican Republic'}.    Final Destination: Taiwan.    HS Code: ${shipment.hs_code || '2402.10.00.00-8'}`), 20, fy); fy += 10
   doc.setFillColor(245, 245, 245); doc.rect(20, fy, 170, 28, 'F')
   doc.setFont('helvetica', 'bold'); doc.setFontSize(10)
   doc.text('Wire Instruction / Bank Information', 25, fy + 6)
   doc.setFont('helvetica', 'normal'); doc.setFontSize(9)
-  doc.text(`Account Name: ${supplier?.bank_account_name || ''}`, 25, fy + 12)
-  doc.text(`Bank Name:    ${supplier?.bank_name || ''}`, 25, fy + 17)
-  doc.text(`Account #:    ${supplier?.bank_account || ''}`, 25, fy + 22)
-  doc.text(`SWIFT:        ${supplier?.bank_swift || ''}`, 25, fy + 27)
+  doc.text(ascii(`Account Name: ${supplier?.bank_account_name || ''}`), 25, fy + 12)
+  doc.text(ascii(`Bank Name:    ${supplier?.bank_name || ''}`), 25, fy + 17)
+  doc.text(`Account #:    ${ascii(supplier?.bank_account || '')}`, 25, fy + 22)
+  doc.text(`SWIFT:        ${ascii(supplier?.bank_swift || '')}`, 25, fy + 27)
   fy += 36
   doc.setFontSize(9)
-  doc.text(`Sent by: ${supplier?.name || ''}`, 20, fy)
+  doc.text(ascii(`Sent by: ${supplier?.name || ''}`), 20, fy)
   doc.text(`Prepared by: Lic. Claribel Paulino`, 110, fy)
   return doc
 }
