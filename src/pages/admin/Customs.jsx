@@ -5,7 +5,7 @@
 // ============================================================
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { FileText, Plus, Trash2, Download, Share2, Package, Edit3, X, ChevronRight } from 'lucide-react'
+import { FileText, Plus, Trash2, Download, Share2, Package, Edit3, X, ChevronRight, ChevronDown, ChevronUp, FileBadge } from 'lucide-react'
 import {
   generateAllDocs, downloadPdf, sharePdfFiles, computeShipmentTotals,
 } from '../../lib/services/customsPdf'
@@ -17,6 +17,7 @@ export default function Customs() {
   const [buyers, setBuyers] = useState([])
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
+  const [expandedId, setExpandedId] = useState(null)
 
   // 新單草稿
   const [draft, setDraft] = useState(newDraft())
@@ -43,7 +44,7 @@ export default function Customs() {
       supabase.from('customs_suppliers').select('*').eq('is_default', true).limit(1).single(),
       supabase.from('customs_buyers').select('*').order('is_default', { ascending: false }),
       supabase.from('customs_products').select('*').eq('enabled', true).order('sort_order'),
-      supabase.from('customs_shipments').select('*').order('created_at', { ascending: false }).limit(50),
+      supabase.from('customs_shipments').select('*').order('shipment_date', { ascending: false }).limit(100),
     ])
     setSupplier(sR.data || null)
     setBuyers(bR.data || [])
@@ -176,31 +177,89 @@ export default function Customs() {
               </button>
             </div>
           )}
-          {shipments.map(sh => (
-            <div key={sh.id} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid #2a2a2a', borderRadius: 10, padding: 12, marginBottom: 10 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 700, color: 'var(--gold)' }}>{sh.shipment_no || '(未編號)'}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{sh.shipment_date} · {sh.buyer_name}</div>
-                  <div style={{ fontSize: 12, marginTop: 6 }}>
-                    <Package size={12} style={{ verticalAlign: -2 }} /> {sh.total_bundles} 束 / {sh.total_sticks} 支
-                    <span style={{ marginLeft: 12, color: '#4ade80' }}>${sh.total_amount_usd}</span>
+          {shipments.map(sh => {
+            const cleared = sh.status === 'cleared'
+            const expanded = expandedId === sh.id
+            return (
+              <div key={sh.id} style={{ background: 'rgba(255,255,255,0.03)', border: cleared ? '1px solid rgba(74,222,128,0.3)' : '1px solid #2a2a2a', borderRadius: 10, padding: 12, marginBottom: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ fontWeight: 700, color: 'var(--gold)' }}>{sh.shipment_no || '(未編號)'}</div>
+                      {cleared && (
+                        <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: 'rgba(74,222,128,0.15)', color: '#4ade80', fontWeight: 600 }}>已清關 ✓</span>
+                      )}
+                    </div>
+                    {sh.declaration_no && (
+                      <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2, fontFamily: 'monospace' }}>
+                        <FileBadge size={10} style={{ verticalAlign: -1, marginRight: 3 }} />
+                        報單 {sh.declaration_no}
+                      </div>
+                    )}
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{sh.shipment_date} · {sh.buyer_name}</div>
+                    <div style={{ fontSize: 12, marginTop: 6 }}>
+                      <Package size={12} style={{ verticalAlign: -2 }} /> {sh.total_bundles} 束 / {sh.total_sticks} 支
+                      <span style={{ marginLeft: 8, color: '#4ade80' }}>USD${sh.total_amount_usd}</span>
+                      {sh.tariff_twd && (
+                        <span style={{ marginLeft: 8, color: '#fb923c' }}>進口稅 NT${Number(sh.tariff_twd).toLocaleString()}</span>
+                      )}
+                    </div>
                   </div>
                 </div>
+                {expanded && (
+                  <div style={{ marginTop: 10, padding: 10, background: 'rgba(0,0,0,0.3)', borderRadius: 6, fontSize: 11, color: '#d1d5db', lineHeight: 1.7 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                      {sh.hs_code && <div><b>HS Code:</b> {sh.hs_code}</div>}
+                      {sh.master_awb && <div><b>主提單:</b> {sh.master_awb}</div>}
+                      {sh.exchange_rate && <div><b>匯率:</b> {sh.exchange_rate}</div>}
+                      {sh.fob_usd && <div><b>FOB:</b> USD${sh.fob_usd}</div>}
+                      {sh.cif_usd && <div><b>CIF:</b> USD${sh.cif_usd}</div>}
+                      {sh.cif_twd && <div><b>CIF TWD:</b> ${Number(sh.cif_twd).toLocaleString()}</div>}
+                      {sh.gross_weight_kg && <div><b>毛重:</b> {sh.gross_weight_kg} kg</div>}
+                      {sh.total_net_weight_kg && <div><b>淨重:</b> {sh.total_net_weight_kg} kg</div>}
+                    </div>
+                    {(sh.tariff_twd || sh.total_tax_twd) && (
+                      <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed #444' }}>
+                        <div style={{ fontWeight: 700, color: '#fb923c', marginBottom: 4 }}>稅費明細 (TWD)</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: 11 }}>
+                          {sh.tariff_twd && <div>進口稅 <span style={{ float: 'right' }}>${Number(sh.tariff_twd).toLocaleString()}</span></div>}
+                          {sh.business_tax_twd && <div>營業稅 <span style={{ float: 'right' }}>${Number(sh.business_tax_twd).toLocaleString()}</span></div>}
+                          {sh.tobacco_tax_twd && <div>菸酒稅 <span style={{ float: 'right' }}>${Number(sh.tobacco_tax_twd).toLocaleString()}</span></div>}
+                          {sh.health_tax_twd && <div>健康捐 <span style={{ float: 'right' }}>${Number(sh.health_tax_twd).toLocaleString()}</span></div>}
+                        </div>
+                        {sh.total_tax_twd && (
+                          <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px dashed #444', fontWeight: 700, color: '#fb923c' }}>
+                            稅費合計 <span style={{ float: 'right' }}>${Number(sh.total_tax_twd).toLocaleString()}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {sh.freight_forwarder && (
+                      <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed #444', color: 'var(--text-muted)' }}>
+                        報關行: {sh.freight_forwarder} · {sh.broker_name}
+                      </div>
+                    )}
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+                  <button onClick={() => regenDocs(sh, 'share')} style={{ flex: 1, padding: '8px', borderRadius: 6, background: 'var(--gold)', color: '#000', border: 'none', fontWeight: 600, fontSize: 13 }}>
+                    <Share2 size={14} style={{ verticalAlign: -2 }} /> 分享 LINE
+                  </button>
+                  <button onClick={() => regenDocs(sh, 'download')} style={{ flex: 1, padding: '8px', borderRadius: 6, background: '#2a2a2a', color: '#fff', border: 'none', fontSize: 13 }}>
+                    <Download size={14} style={{ verticalAlign: -2 }} /> 下載
+                  </button>
+                  {(sh.declaration_no || sh.tariff_twd) && (
+                    <button onClick={() => setExpandedId(expanded ? null : sh.id)} style={{ padding: '8px 10px', borderRadius: 6, background: 'rgba(251,146,60,0.15)', color: '#fb923c', border: '1px solid rgba(251,146,60,0.3)', fontSize: 13 }}>
+                      {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                    </button>
+                  )}
+                  <button onClick={() => deleteShipment(sh.id)} style={{ padding: '8px 10px', borderRadius: 6, background: 'transparent', color: '#ef4444', border: '1px solid #ef4444', fontSize: 13 }}>
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </div>
-              <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
-                <button onClick={() => regenDocs(sh, 'share')} style={{ flex: 1, padding: '8px', borderRadius: 6, background: 'var(--gold)', color: '#000', border: 'none', fontWeight: 600, fontSize: 13 }}>
-                  <Share2 size={14} style={{ verticalAlign: -2 }} /> 分享 LINE
-                </button>
-                <button onClick={() => regenDocs(sh, 'download')} style={{ flex: 1, padding: '8px', borderRadius: 6, background: '#2a2a2a', color: '#fff', border: 'none', fontSize: 13 }}>
-                  <Download size={14} style={{ verticalAlign: -2 }} /> 下載
-                </button>
-                <button onClick={() => deleteShipment(sh.id)} style={{ padding: '8px 12px', borderRadius: 6, background: 'transparent', color: '#ef4444', border: '1px solid #ef4444', fontSize: 13 }}>
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
@@ -381,4 +440,3 @@ function ProductManager({ products, onChange }) {
     </div>
   )
 }
-
