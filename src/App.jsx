@@ -65,6 +65,7 @@ import AdminOnboarding from './pages/admin/Onboarding'
 import AdminOnboardingNew from './pages/admin/OnboardingNew'
 import AdminOnboardingDetail from './pages/admin/OnboardingDetail'
 import AdminCustoms from './pages/admin/Customs'
+import FactorySubmit from './pages/customs/FactorySubmit'
 
 function AppInner() {
   const { user, loading } = useAuth()
@@ -72,6 +73,7 @@ function AppInner() {
   if (loading) return (<div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a0a' }}><div className="loading-shimmer" style={{ width: 120, height: 120, borderRadius: '50%' }} /></div>)
   if (window.location.pathname.startsWith('/join')) return <JoinPage />
   if (window.location.pathname.startsWith('/qrcode')) return <QRCodePage />
+  if (window.location.pathname.startsWith('/customs/submit')) return <FactorySubmit />
   if (window.location.pathname.startsWith('/vip-cellar')) return (<Routes><Route path="/vip-cellar/*" element={<VipCellar />} /></Routes>)
   if (window.location.pathname.startsWith('/pos-app')) return (<Routes><Route path="/pos-app/*" element={<PosApp />} /></Routes>)
   if (window.location.pathname.startsWith('/ambassador')) return (<Routes><Route path="/ambassador/*" element={<AmbassadorApp />} /></Routes>)
