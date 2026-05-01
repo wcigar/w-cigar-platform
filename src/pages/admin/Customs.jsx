@@ -5,13 +5,13 @@
 // ============================================================
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { FileText, Plus, Trash2, Download, Share2, Package, Edit3, X, ChevronRight, ChevronDown, ChevronUp, FileBadge } from 'lucide-react'
+import { FileText, Plus, Trash2, Download, Share2, Package, Edit3, X, ChevronRight, ChevronDown, ChevronUp, FileBadge, Link2, Copy, Check } from 'lucide-react'
 import {
   generateAllDocs, downloadPdf, sharePdfFiles, computeShipmentTotals,
 } from '../../lib/services/customsPdf'
 
 export default function Customs() {
-  const [tab, setTab] = useState('list')           // list | new | products
+  const [tab, setTab] = useState('list')
   const [shipments, setShipments] = useState([])
   const [supplier, setSupplier] = useState(null)
   const [buyers, setBuyers] = useState([])
@@ -19,7 +19,6 @@ export default function Customs() {
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState(null)
 
-  // 新單草稿
   const [draft, setDraft] = useState(newDraft())
 
   function newDraft() {
@@ -150,6 +149,9 @@ export default function Customs() {
           選產品 → 自動產生 Packing List / Certificate of Origin / Commercial Invoice
         </div>
       </div>
+
+      <FactoryLinkBanner />
+
       <div style={{ display: 'flex', gap: 6, marginBottom: 16, borderBottom: '1px solid #2a2a2a' }}>
         {[
           { k: 'list',     label: '貨件記錄',  c: shipments.length },
@@ -180,29 +182,26 @@ export default function Customs() {
           {shipments.map(sh => {
             const cleared = sh.status === 'cleared'
             const expanded = expandedId === sh.id
+            const fromFactory = sh.source === 'factory_link'
             return (
               <div key={sh.id} style={{ background: 'rgba(255,255,255,0.03)', border: cleared ? '1px solid rgba(74,222,128,0.3)' : '1px solid #2a2a2a', borderRadius: 10, padding: 12, marginBottom: 10 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                       <div style={{ fontWeight: 700, color: 'var(--gold)' }}>{sh.shipment_no || '(未編號)'}</div>
-                      {cleared && (
-                        <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: 'rgba(74,222,128,0.15)', color: '#4ade80', fontWeight: 600 }}>已清關 ✓</span>
-                      )}
+                      {cleared && (<span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: 'rgba(74,222,128,0.15)', color: '#4ade80', fontWeight: 600 }}>已清關 ✓</span>)}
+                      {fromFactory && (<span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: 'rgba(99,102,241,0.15)', color: '#818cf8', fontWeight: 600 }}>🏭 工廠提交</span>)}
                     </div>
                     {sh.declaration_no && (
                       <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2, fontFamily: 'monospace' }}>
-                        <FileBadge size={10} style={{ verticalAlign: -1, marginRight: 3 }} />
-                        報單 {sh.declaration_no}
+                        <FileBadge size={10} style={{ verticalAlign: -1, marginRight: 3 }} /> 報單 {sh.declaration_no}
                       </div>
                     )}
                     <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{sh.shipment_date} · {sh.buyer_name}</div>
                     <div style={{ fontSize: 12, marginTop: 6 }}>
                       <Package size={12} style={{ verticalAlign: -2 }} /> {sh.total_bundles} 束 / {sh.total_sticks} 支
                       <span style={{ marginLeft: 8, color: '#4ade80' }}>USD${sh.total_amount_usd}</span>
-                      {sh.tariff_twd && (
-                        <span style={{ marginLeft: 8, color: '#fb923c' }}>進口稅 NT${Number(sh.tariff_twd).toLocaleString()}</span>
-                      )}
+                      {sh.tariff_twd && (<span style={{ marginLeft: 8, color: '#fb923c' }}>進口稅 NT${Number(sh.tariff_twd).toLocaleString()}</span>)}
                     </div>
                   </div>
                 </div>
@@ -227,35 +226,17 @@ export default function Customs() {
                           {sh.tobacco_tax_twd && <div>菸酒稅 <span style={{ float: 'right' }}>${Number(sh.tobacco_tax_twd).toLocaleString()}</span></div>}
                           {sh.health_tax_twd && <div>健康捐 <span style={{ float: 'right' }}>${Number(sh.health_tax_twd).toLocaleString()}</span></div>}
                         </div>
-                        {sh.total_tax_twd && (
-                          <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px dashed #444', fontWeight: 700, color: '#fb923c' }}>
-                            稅費合計 <span style={{ float: 'right' }}>${Number(sh.total_tax_twd).toLocaleString()}</span>
-                          </div>
-                        )}
+                        {sh.total_tax_twd && (<div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px dashed #444', fontWeight: 700, color: '#fb923c' }}>稅費合計 <span style={{ float: 'right' }}>${Number(sh.total_tax_twd).toLocaleString()}</span></div>)}
                       </div>
                     )}
-                    {sh.freight_forwarder && (
-                      <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed #444', color: 'var(--text-muted)' }}>
-                        報關行: {sh.freight_forwarder} · {sh.broker_name}
-                      </div>
-                    )}
+                    {sh.freight_forwarder && (<div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed #444', color: 'var(--text-muted)' }}>報關行: {sh.freight_forwarder} · {sh.broker_name}</div>)}
                   </div>
                 )}
                 <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
-                  <button onClick={() => regenDocs(sh, 'share')} style={{ flex: 1, padding: '8px', borderRadius: 6, background: 'var(--gold)', color: '#000', border: 'none', fontWeight: 600, fontSize: 13 }}>
-                    <Share2 size={14} style={{ verticalAlign: -2 }} /> 分享 LINE
-                  </button>
-                  <button onClick={() => regenDocs(sh, 'download')} style={{ flex: 1, padding: '8px', borderRadius: 6, background: '#2a2a2a', color: '#fff', border: 'none', fontSize: 13 }}>
-                    <Download size={14} style={{ verticalAlign: -2 }} /> 下載
-                  </button>
-                  {(sh.declaration_no || sh.tariff_twd) && (
-                    <button onClick={() => setExpandedId(expanded ? null : sh.id)} style={{ padding: '8px 10px', borderRadius: 6, background: 'rgba(251,146,60,0.15)', color: '#fb923c', border: '1px solid rgba(251,146,60,0.3)', fontSize: 13 }}>
-                      {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                    </button>
-                  )}
-                  <button onClick={() => deleteShipment(sh.id)} style={{ padding: '8px 10px', borderRadius: 6, background: 'transparent', color: '#ef4444', border: '1px solid #ef4444', fontSize: 13 }}>
-                    <Trash2 size={14} />
-                  </button>
+                  <button onClick={() => regenDocs(sh, 'share')} style={{ flex: 1, padding: '8px', borderRadius: 6, background: 'var(--gold)', color: '#000', border: 'none', fontWeight: 600, fontSize: 13 }}><Share2 size={14} style={{ verticalAlign: -2 }} /> 分享 LINE</button>
+                  <button onClick={() => regenDocs(sh, 'download')} style={{ flex: 1, padding: '8px', borderRadius: 6, background: '#2a2a2a', color: '#fff', border: 'none', fontSize: 13 }}><Download size={14} style={{ verticalAlign: -2 }} /> 下載</button>
+                  {(sh.declaration_no || sh.tariff_twd) && (<button onClick={() => setExpandedId(expanded ? null : sh.id)} style={{ padding: '8px 10px', borderRadius: 6, background: 'rgba(251,146,60,0.15)', color: '#fb923c', border: '1px solid rgba(251,146,60,0.3)', fontSize: 13 }}>{expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}</button>)}
+                  <button onClick={() => deleteShipment(sh.id)} style={{ padding: '8px 10px', borderRadius: 6, background: 'transparent', color: '#ef4444', border: '1px solid #ef4444', fontSize: 13 }}><Trash2 size={14} /></button>
                 </div>
               </div>
             )
@@ -272,12 +253,7 @@ export default function Customs() {
           <Section title="收貨人 (Consignee)">
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
               {buyers.map(b => (
-                <button key={b.id} onClick={() => pickBuyer(b)} style={{
-                  padding: '6px 10px', borderRadius: 16, fontSize: 12,
-                  background: draft.buyer_name === b.name ? 'var(--gold)' : 'transparent',
-                  color: draft.buyer_name === b.name ? '#000' : '#fff',
-                  border: '1px solid #444', cursor: 'pointer',
-                }}>{b.name}</button>
+                <button key={b.id} onClick={() => pickBuyer(b)} style={{ padding: '6px 10px', borderRadius: 16, fontSize: 12, background: draft.buyer_name === b.name ? 'var(--gold)' : 'transparent', color: draft.buyer_name === b.name ? '#000' : '#fff', border: '1px solid #444', cursor: 'pointer' }}>{b.name}</button>
               ))}
             </div>
             <Field label="買家名稱"><input value={draft.buyer_name} onChange={e => setDraft(d => ({ ...d, buyer_name: e.target.value }))} /></Field>
@@ -296,22 +272,15 @@ export default function Customs() {
                   <FieldSmall label="支/束"><input type="number" min="0" value={it.pcs_per_bundle} onChange={e => updateItem(idx, 'pcs_per_bundle', +e.target.value || 0)} /></FieldSmall>
                   <FieldSmall label="單價 USD"><input type="number" step="0.01" min="0" value={it.unit_price_usd} onChange={e => updateItem(idx, 'unit_price_usd', +e.target.value || 0)} /></FieldSmall>
                 </div>
-                <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text-muted)' }}>
-                  總支數: {(it.qty_bundles || 0) * (it.pcs_per_bundle || 0)} · 小計: ${((it.qty_bundles || 0) * (it.pcs_per_bundle || 0) * (it.unit_price_usd || 0)).toFixed(2)}
-                </div>
+                <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text-muted)' }}>總支數: {(it.qty_bundles || 0) * (it.pcs_per_bundle || 0)} · 小計: ${((it.qty_bundles || 0) * (it.pcs_per_bundle || 0) * (it.unit_price_usd || 0)).toFixed(2)}</div>
               </div>
             ))}
             <details style={{ marginTop: 8 }}>
-              <summary style={{ padding: '10px', background: 'rgba(255,215,0,0.1)', borderRadius: 8, cursor: 'pointer', fontSize: 13, color: 'var(--gold)', listStyle: 'none' }}>
-                <Plus size={14} style={{ verticalAlign: -2 }} /> 加入產品...
-              </summary>
+              <summary style={{ padding: '10px', background: 'rgba(255,215,0,0.1)', borderRadius: 8, cursor: 'pointer', fontSize: 13, color: 'var(--gold)', listStyle: 'none' }}><Plus size={14} style={{ verticalAlign: -2 }} /> 加入產品...</summary>
               <div style={{ marginTop: 8, maxHeight: 300, overflow: 'auto' }}>
                 {products.filter(p => !draft.items.some(i => i.product_id === p.id)).map(p => (
                   <div key={p.id} onClick={() => addItem(p.id)} style={{ padding: '8px 10px', borderBottom: '1px solid #2a2a2a', cursor: 'pointer', display: 'flex', justifyContent: 'space-between' }}>
-                    <div style={{ flex: 1, fontSize: 12 }}>
-                      <div>{p.name}</div>
-                      <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>{p.pcs_per_bundle}/{p.package_type} · ${p.unit_price_usd}</div>
-                    </div>
+                    <div style={{ flex: 1, fontSize: 12 }}><div>{p.name}</div><div style={{ color: 'var(--text-muted)', fontSize: 10 }}>{p.pcs_per_bundle}/{p.package_type} · ${p.unit_price_usd}</div></div>
                     <ChevronRight size={16} style={{ color: 'var(--gold)' }} />
                   </div>
                 ))}
@@ -320,24 +289,11 @@ export default function Customs() {
           </Section>
           {draft.items.length > 0 && (() => {
             const t = computeShipmentTotals([...draft.items])
-            return (
-              <Section title="總計">
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 13 }}>
-                  <Stat label="總束/盒數" value={t.total_bundles} />
-                  <Stat label="總支數" value={t.total_sticks} />
-                  <Stat label="總金額 USD" value={`$${t.total_amount_usd}`} hi />
-                  <Stat label="淨重 (kg)" value={t.total_net_weight_kg} />
-                </div>
-              </Section>
-            )
+            return (<Section title="總計"><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 13 }}><Stat label="總束/盒數" value={t.total_bundles} /><Stat label="總支數" value={t.total_sticks} /><Stat label="總金額 USD" value={`$${t.total_amount_usd}`} hi /><Stat label="淨重 (kg)" value={t.total_net_weight_kg} /></div></Section>)
           })()}
           <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, padding: 12, background: 'rgba(0,0,0,0.95)', borderTop: '1px solid #333', display: 'flex', gap: 8, zIndex: 100 }}>
-            <button onClick={() => genDocs('share')} disabled={draft.items.length === 0 || !draft.buyer_name} style={{ flex: 1, padding: 14, borderRadius: 10, background: 'var(--gold)', color: '#000', border: 'none', fontWeight: 700, fontSize: 14, opacity: (draft.items.length === 0 || !draft.buyer_name) ? 0.5 : 1 }}>
-              <Share2 size={16} style={{ verticalAlign: -3 }} /> 產生並分享 LINE
-            </button>
-            <button onClick={() => genDocs('download')} disabled={draft.items.length === 0 || !draft.buyer_name} style={{ flex: 1, padding: 14, borderRadius: 10, background: '#2a2a2a', color: '#fff', border: '1px solid #555', fontSize: 14, opacity: (draft.items.length === 0 || !draft.buyer_name) ? 0.5 : 1 }}>
-              <Download size={16} style={{ verticalAlign: -3 }} /> 下載 3 份 PDF
-            </button>
+            <button onClick={() => genDocs('share')} disabled={draft.items.length === 0 || !draft.buyer_name} style={{ flex: 1, padding: 14, borderRadius: 10, background: 'var(--gold)', color: '#000', border: 'none', fontWeight: 700, fontSize: 14, opacity: (draft.items.length === 0 || !draft.buyer_name) ? 0.5 : 1 }}><Share2 size={16} style={{ verticalAlign: -3 }} /> 產生並分享 LINE</button>
+            <button onClick={() => genDocs('download')} disabled={draft.items.length === 0 || !draft.buyer_name} style={{ flex: 1, padding: 14, borderRadius: 10, background: '#2a2a2a', color: '#fff', border: '1px solid #555', fontSize: 14, opacity: (draft.items.length === 0 || !draft.buyer_name) ? 0.5 : 1 }}><Download size={16} style={{ verticalAlign: -3 }} /> 下載 3 份 PDF</button>
           </div>
         </div>
       )}
@@ -348,40 +304,19 @@ export default function Customs() {
 }
 
 function Section({ title, children }) {
-  return (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--gold)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>{title}</div>
-      <div>{children}</div>
-    </div>
-  )
+  return (<div style={{ marginBottom: 16 }}><div style={{ fontSize: 12, fontWeight: 700, color: 'var(--gold)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>{title}</div><div>{children}</div></div>)
 }
 
 function Field({ label, children }) {
-  return (
-    <div style={{ marginBottom: 8 }}>
-      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 3 }}>{label}</div>
-      <div>{children}</div>
-      <style>{`input, textarea, select { width: 100%; padding: 8px 10px; background: rgba(255,255,255,0.05); border: 1px solid #333; border-radius: 6px; color: #fff; font-size: 13px; box-sizing: border-box; } input:focus, textarea:focus, select:focus { outline: none; border-color: var(--gold); }`}</style>
-    </div>
-  )
+  return (<div style={{ marginBottom: 8 }}><div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 3 }}>{label}</div><div>{children}</div><style>{`input, textarea, select { width: 100%; padding: 8px 10px; background: rgba(255,255,255,0.05); border: 1px solid #333; border-radius: 6px; color: #fff; font-size: 13px; box-sizing: border-box; } input:focus, textarea:focus, select:focus { outline: none; border-color: var(--gold); }`}</style></div>)
 }
 
 function FieldSmall({ label, children }) {
-  return (
-    <div>
-      <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>{label}</div>
-      {children}
-    </div>
-  )
+  return (<div><div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>{label}</div>{children}</div>)
 }
 
 function Stat({ label, value, hi }) {
-  return (
-    <div style={{ padding: 10, background: 'rgba(255,255,255,0.04)', borderRadius: 6, border: hi ? '1px solid var(--gold)' : '1px solid #333' }}>
-      <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{label}</div>
-      <div style={{ fontSize: 16, fontWeight: 700, color: hi ? 'var(--gold)' : '#fff' }}>{value}</div>
-    </div>
-  )
+  return (<div style={{ padding: 10, background: 'rgba(255,255,255,0.04)', borderRadius: 6, border: hi ? '1px solid var(--gold)' : '1px solid #333' }}><div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{label}</div><div style={{ fontSize: 16, fontWeight: 700, color: hi ? 'var(--gold)' : '#fff' }}>{value}</div></div>)
 }
 
 function ProductManager({ products, onChange }) {
@@ -389,16 +324,9 @@ function ProductManager({ products, onChange }) {
   const [adding, setAdding] = useState(false)
   async function save(p) {
     if (p.id) {
-      await supabase.from('customs_products').update({
-        name: p.name, pcs_per_bundle: +p.pcs_per_bundle, package_type: p.package_type,
-        unit_price_usd: +p.unit_price_usd, unit_weight_g: +p.unit_weight_g,
-        sort_order: +p.sort_order || 999, updated_at: new Date().toISOString(),
-      }).eq('id', p.id)
+      await supabase.from('customs_products').update({ name: p.name, pcs_per_bundle: +p.pcs_per_bundle, package_type: p.package_type, unit_price_usd: +p.unit_price_usd, unit_weight_g: +p.unit_weight_g, sort_order: +p.sort_order || 999, updated_at: new Date().toISOString() }).eq('id', p.id)
     } else {
-      await supabase.from('customs_products').insert({
-        name: p.name, pcs_per_bundle: +p.pcs_per_bundle || 25, package_type: p.package_type || 'Bundle',
-        unit_price_usd: +p.unit_price_usd || 0, unit_weight_g: +p.unit_weight_g || 15, sort_order: 999,
-      })
+      await supabase.from('customs_products').insert({ name: p.name, pcs_per_bundle: +p.pcs_per_bundle || 25, package_type: p.package_type || 'Bundle', unit_price_usd: +p.unit_price_usd || 0, unit_weight_g: +p.unit_weight_g || 15, sort_order: 999 })
     }
     setEditing(null); setAdding(false); onChange()
   }
@@ -409,9 +337,7 @@ function ProductManager({ products, onChange }) {
   }
   return (
     <div>
-      <button onClick={() => { setAdding(true); setEditing({ name: '', pcs_per_bundle: 25, package_type: 'Bundle', unit_price_usd: 0.85, unit_weight_g: 15 }) }} style={{ width: '100%', padding: 12, marginBottom: 12, borderRadius: 8, background: 'var(--gold)', color: '#000', border: 'none', fontWeight: 700 }}>
-        <Plus size={16} style={{ verticalAlign: -3 }} /> 新增產品
-      </button>
+      <button onClick={() => { setAdding(true); setEditing({ name: '', pcs_per_bundle: 25, package_type: 'Bundle', unit_price_usd: 0.85, unit_weight_g: 15 }) }} style={{ width: '100%', padding: 12, marginBottom: 12, borderRadius: 8, background: 'var(--gold)', color: '#000', border: 'none', fontWeight: 700 }}><Plus size={16} style={{ verticalAlign: -3 }} /> 新增產品</button>
       {(editing || adding) && (
         <div style={{ background: 'rgba(255,215,0,0.05)', border: '1px solid var(--gold)', borderRadius: 10, padding: 12, marginBottom: 12 }}>
           <Field label="產品名稱"><input value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })} /></Field>
@@ -440,3 +366,44 @@ function ProductManager({ products, onChange }) {
     </div>
   )
 }
+
+// ===== Factory share link banner =====
+function FactoryLinkBanner() {
+  const [copied, setCopied] = useState(false)
+  const url = typeof window !== 'undefined' ? `${window.location.origin}/customs/submit` : '/customs/submit'
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      window.prompt('Copy this link:', url)
+    }
+  }
+  async function shareLink() {
+    if (navigator.share) {
+      try { await navigator.share({ title: 'W Cigar Bar — Customs Submission', text: '請用此連結提交報關文件 / Please submit shipment via this link:', url }) } catch (e) {}
+    } else { copyLink() }
+  }
+  return (
+    <div style={{ background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.3)', borderRadius: 10, padding: 12, marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+        <Link2 size={14} style={{ color: '#4ade80' }} />
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#4ade80' }}>古巴員工提交連結</div>
+      </div>
+      <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 8 }}>把這個連結傳給工廠員工，他們填完表單會自動產生 PDF + 寫入這裡的紀錄</div>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', background: 'rgba(0,0,0,0.4)', padding: '8px 10px', borderRadius: 6, marginBottom: 8 }}>
+        <code style={{ flex: 1, fontSize: 11, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{url}</code>
+      </div>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <button onClick={copyLink} style={{ flex: 1, padding: 8, borderRadius: 6, background: copied ? '#4ade80' : '#2a2a2a', color: copied ? '#000' : '#fff', border: '1px solid #555', fontSize: 12, fontWeight: 600 }}>
+          {copied ? <><Check size={12} style={{ verticalAlign: -2 }} /> 已複製</> : <><Copy size={12} style={{ verticalAlign: -2 }} /> 複製連結</>}
+        </button>
+        <button onClick={shareLink} style={{ flex: 1, padding: 8, borderRadius: 6, background: '#4ade80', color: '#000', border: 'none', fontSize: 12, fontWeight: 700 }}>
+          <Share2 size={12} style={{ verticalAlign: -2 }} /> 分享 LINE
+        </button>
+      </div>
+    </div>
+  )
+}
+
