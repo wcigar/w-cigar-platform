@@ -5,11 +5,15 @@ body{font-family:'Noto Serif TC',serif;background:#050403;color:#e8dcc8;-webkit-
 input,select,textarea{font-family:var(--font-body);background:var(--black);color:var(--text);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;font-size:14px;outline:none;transition:border-color .2s;width:100%}
 input:focus,select:focus,textarea:focus{border-color:var(--gold)}
 button{font-family:var(--font-body);cursor:pointer;border:none;outline:none;transition:all .2s}
-.btn-gold{background:linear-gradient(135deg,var(--gold),var(--gold-dim));color:var(--black);font-weight:600;padding:12px 24px;border-radius:var(--radius-sm);font-size:14px}
-.btn-gold:hover{filter:brightness(1.1)}.btn-gold:active{transform:translateY(0)}
-.btn-outline{background:transparent;color:var(--gold);border:1px solid var(--border-gold);padding:10px 20px;border-radius:var(--radius-sm);font-size:14px}
-.btn-outline:hover{background:var(--gold-glow)}
-.btn-red{background:rgba(196,77,77,.15);color:var(--red);border:1px solid rgba(196,77,77,.25);padding:10px 20px;border-radius:var(--radius-sm);font-size:14px}
+.btn-gold{background:var(--gold);color:#0a0a0a;font-weight:700;padding:12px 24px;border-radius:var(--radius-sm);font-size:14px;border:1px solid var(--gold-light);box-shadow:0 2px 12px rgba(201,168,76,.35)}
+.btn-gold:hover{background:var(--gold-light);box-shadow:0 3px 16px rgba(201,168,76,.5)}
+.btn-gold:active{transform:translateY(1px);box-shadow:0 1px 6px rgba(201,168,76,.25)}
+.btn-gold:disabled{background:var(--gold-dim);color:rgba(0,0,0,.6);box-shadow:none;cursor:not-allowed}
+.btn-outline{background:rgba(201,168,76,.06);color:var(--gold-light);border:1.5px solid var(--gold);padding:10px 20px;border-radius:var(--radius-sm);font-size:14px;font-weight:500}
+.btn-outline:hover{background:var(--gold-glow);color:#fff;border-color:var(--gold-light)}
+.btn-outline:active{transform:translateY(1px)}
+.btn-red{background:rgba(196,77,77,.2);color:#f0a0a0;border:1.5px solid var(--red);padding:10px 20px;border-radius:var(--radius-sm);font-size:14px;font-weight:500}
+.btn-red:hover{background:rgba(196,77,77,.3);color:#fff}
 .card{background:var(--black-card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;transition:border-color .2s}
 .badge{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:500}
 .badge-gold{background:var(--gold-glow);color:var(--gold)}.badge-green{background:rgba(77,168,108,.15);color:var(--green)}.badge-red{background:rgba(196,77,77,.15);color:var(--red)}.badge-blue{background:rgba(77,138,196,.15);color:var(--blue)}
