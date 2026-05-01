@@ -87,6 +87,7 @@ export default function BossHome() {
     { icon: UserCheck, label: '會員', path: '/members/registrations' },
     { icon: Settings, label: '設定', path: '/settings' },
     { icon: QrCode, label: 'QR', path: '/qrcode' },
+    { icon: FileText, label: '報關', path: '/admin/customs' },
   ]
 
   return (
