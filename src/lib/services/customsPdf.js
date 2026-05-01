@@ -14,15 +14,48 @@ function formatDate(d) {
   return dt.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
 }
 
+// Draw TDE | TABACOS DON ESTEBAN logo (standard version)
+function drawLogo(doc, centerX, topY) {
+  const logoW = 80
+  const x = centerX - logoW / 2
+  const y = topY
+
+  // ── TDE box (left side) ──
+  const boxX = x
+  const boxY = y + 1
+  const boxW = 22
+  const boxH = 14
+  doc.setDrawColor(20, 20, 20)
+  doc.setLineWidth(0.6)
+  doc.rect(boxX, boxY, boxW, boxH)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(17)
+  doc.setTextColor(20, 20, 20)
+  doc.text('TDE', boxX + boxW / 2, boxY + boxH / 2 + 2.4, { align: 'center' })
+
+  // ── Vertical separator ──
+  const sepX = boxX + boxW + 3
+  doc.setLineWidth(0.4)
+  doc.line(sepX, y + 1, sepX, y + 15)
+
+  // ── Right side text ──
+  const textX = sepX + 3
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8)
+  doc.setTextColor(20, 20, 20)
+  doc.text('TABACOS', textX, y + 6, { charSpace: 1.2 })
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(13)
+  doc.text('DON ESTEBAN', textX, y + 13)
+}
+
 function header(doc, supplier) {
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(20); doc.setTextColor(20, 20, 20)
-  doc.text('TDE', 92, 18, { align: 'right' })
-  doc.setFontSize(11); doc.text('TABACOS', 96, 14); doc.text('DON ESTEBAN', 96, 20)
-  doc.setDrawColor(180, 180, 180); doc.setLineWidth(0.3); doc.line(20, 26, 190, 26)
+  drawLogo(doc, 105, 8)
+  doc.setDrawColor(180, 180, 180); doc.setLineWidth(0.3); doc.line(20, 28, 190, 28)
   doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(80, 80, 80)
-  doc.text(supplier?.address || '', 105, 32, { align: 'center' })
+  doc.text(supplier?.address || '', 105, 33, { align: 'center' })
   const contact = [supplier?.tel ? `Tel: ${supplier.tel}` : '', supplier?.email ? `Email: ${supplier.email}` : ''].filter(Boolean).join('   ')
-  doc.text(contact, 105, 37, { align: 'center' })
+  doc.text(contact, 105, 38, { align: 'center' })
 }
 
 function titleBar(doc, title, y = 48) {
@@ -126,10 +159,10 @@ export function makeCommercialInvoice({ supplier, shipment }) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   header(doc, supplier)
   doc.setFontSize(8); doc.setTextColor(80, 80, 80)
-  doc.text(`RNC: ${supplier?.rnc || ''}`, 20, 42)
-  doc.text(`Email: ${supplier?.email || ''}`, 20, 46)
-  titleBar(doc, 'EXPORT INVOICE', 54)
-  let y = 60
+  doc.text(`RNC: ${supplier?.rnc || ''}`, 20, 44)
+  doc.text(`Email: ${supplier?.email || ''}`, 20, 48)
+  titleBar(doc, 'EXPORT INVOICE', 56)
+  let y = 62
   partyBlock(doc, 'Bill-to-party', [shipment.buyer_name, shipment.buyer_address], 20, y, 95)
   doc.setFillColor(235, 235, 235); doc.rect(120, y, 70, 8, 'F')
   doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(40, 40, 40)
