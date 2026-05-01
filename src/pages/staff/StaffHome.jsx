@@ -59,12 +59,13 @@ export default function StaffHome() {
     let pOut = [...punchRecords].reverse().find(r => r.punch_type === '下班')
     setCrossDayPunchDate(null)
     const hour = new Date().getHours()
-    if (!pIn && hour < 6) {
+    // 跨日晚班：凌晨 0-6 點查昨天有沒有「有上班沒下班」（支援加班到凌晨 3 點）
+    if (hour < 6) {
       const yesterday = format(new Date(Date.now() - 86400000), 'yyyy-MM-dd')
       const { data: yPunches } = await supabase.from('punch_records').select('*').eq('employee_id', user.employee_id).eq('date', yesterday).order('time', { ascending: true })
       const yIn = (yPunches || []).find(r => r.punch_type === '上班')
       const yOut = [...(yPunches || [])].reverse().find(r => r.punch_type === '下班')
-      if (yIn && !yOut) { pIn = yIn; setCrossDayPunchDate(yesterday) }
+      if (yIn && !yOut) { pIn = yIn; pOut = null; setCrossDayPunchDate(yesterday) }
     }
     setPunchIn(pIn || null); setPunchOut(pOut || null)
     const counts = {}
