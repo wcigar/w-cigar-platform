@@ -70,11 +70,37 @@ export default function Collections() {
     let cancelled = false
     ;(async () => {
       const out = []
+      if (myVenueIds.length === 0) {
+        if (!cancelled) setCollections(out)
+        return
+      }
+
+      // Batch 撈當月所有負責店家的 venue_sales_daily，避免 N+1
+      const [py, pm] = period.split('-').map(Number)
+      const startDate = `${py}-${String(pm).padStart(2, '0')}-01`
+      const lastDay = new Date(py, pm, 0).getDate()
+      const endDate = `${py}-${String(pm).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+      const { data: salesRows } = await supabase
+        .from('venue_sales_daily')
+        .select('venue_id, items, is_self_sale')
+        .in('venue_id', myVenueIds)
+        .gte('sale_date', startDate)
+        .lte('sale_date', endDate)
+      if (cancelled) return
+
+      // Bucket：{ venue_id: { product_key: total_qty } } — 只累計大使賣
+      const ambassadorByVenue = {}
+      ;(salesRows || []).filter(r => !r.is_self_sale).forEach(row => {
+        const m = ambassadorByVenue[row.venue_id] || (ambassadorByVenue[row.venue_id] = {})
+        Object.entries(row.items || {}).forEach(([key, qty]) => {
+          m[key] = (m[key] || 0) + Number(qty || 0)
+        })
+      })
+
       for (const vid of myVenueIds) {
         const venue = venuesById[vid]
         if (!venue) continue
-        // MVP: empty ambassador sales (上線後改從 sales table 聚合)
-        const c = await getMonthlyCollection(period, vid, {}, !!venue.has_self_sale)
+        const c = await getMonthlyCollection(period, vid, ambassadorByVenue[vid] || {}, !!venue.has_self_sale)
         if (cancelled) return
         out.push({
           ...c,
