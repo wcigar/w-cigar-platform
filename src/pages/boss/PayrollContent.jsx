@@ -129,7 +129,10 @@ function calcSalaryToDate(emp, cfg, bonusDefs, att, isCurrentMonth, targetDate) 
 
   const empBonuses = bonusDefs.filter(b => b.employee_id === emp.id && b.enabled)
   const attendanceBonusDef = empBonuses.find(b => b.bonus_name && b.bonus_name.includes('全勤'))
-  const otherBonuses = empBonuses.filter(b => !b.bonus_name?.includes('全勤'))
+  const attendanceRatio = daysInMonth > 0 ? att.work / daysInMonth : 0
+  const otherBonuses = empBonuses
+    .filter(b => !b.bonus_name?.includes('全勤'))
+    .map(b => ({ ...b, originalAmount: b.amount || 0, amount: Math.round((b.amount || 0) * attendanceRatio) }))
   let attendanceBonusStatus = 'pending'
   if (att.lateCount > 0 || att.earlyCount > 0 || att.sick > 0 || att.personal > 0 || att.absent > 0 || att.missingPunch?.length > 0) attendanceBonusStatus = 'lost'
   else if (!isCurrentMonth) attendanceBonusStatus = 'eligible'
