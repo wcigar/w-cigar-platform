@@ -89,12 +89,22 @@ export default function Collections() {
       if (cancelled) return
 
       // Bucket：{ venue_id: { product_key: total_qty } } — 只累計大使賣
+      // items 兼容兩種格式：array of {product_key, quantity} 或 object map {product_key: qty}
       const ambassadorByVenue = {}
       ;(salesRows || []).filter(r => !r.is_self_sale).forEach(row => {
         const m = ambassadorByVenue[row.venue_id] || (ambassadorByVenue[row.venue_id] = {})
-        Object.entries(row.items || {}).forEach(([key, qty]) => {
-          m[key] = (m[key] || 0) + Number(qty || 0)
-        })
+        const items = row.items || []
+        if (Array.isArray(items)) {
+          items.forEach(item => {
+            const key = item.product_key
+            const qty = Number(item.quantity) || 0
+            if (key && qty > 0) m[key] = (m[key] || 0) + qty
+          })
+        } else {
+          Object.entries(items).forEach(([key, qty]) => {
+            m[key] = (m[key] || 0) + Number(qty || 0)
+          })
+        }
       })
 
       for (const vid of myVenueIds) {

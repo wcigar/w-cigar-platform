@@ -41,11 +41,21 @@ export default function CollectionReceipt() {
         .eq('venue_id', venueId)
         .gte('sale_date', startDate)
         .lte('sale_date', endDate)
+      // items 兼容兩種格式：array of {product_key, quantity} 或 object map {product_key: qty}
       const ambassadorMap = {}
       ;(salesRows || []).filter(r => !r.is_self_sale).forEach(row => {
-        Object.entries(row.items || {}).forEach(([key, qty]) => {
-          ambassadorMap[key] = (ambassadorMap[key] || 0) + Number(qty || 0)
-        })
+        const items = row.items || []
+        if (Array.isArray(items)) {
+          items.forEach(item => {
+            const key = item.product_key
+            const qty = Number(item.quantity) || 0
+            if (key && qty > 0) ambassadorMap[key] = (ambassadorMap[key] || 0) + qty
+          })
+        } else {
+          Object.entries(items).forEach(([key, qty]) => {
+            ambassadorMap[key] = (ambassadorMap[key] || 0) + Number(qty || 0)
+          })
+        }
       })
 
       const c = await getMonthlyCollection(period, venueId, ambassadorMap, !!v.has_self_sale)
