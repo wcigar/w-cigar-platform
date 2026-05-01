@@ -8,7 +8,7 @@ import {
   listVenues, upsertVenue, deactivateVenue, activateVenue, REGION_OPTIONS,
 } from '../../lib/services/venues'
 import { getAllAmbassadors } from '../../lib/services/venueSales'
-import { SUPERVISORS, getSupervisorOfVenue, assignVenueToSupervisor } from '../../lib/services/supervisors'
+import { SUPERVISORS } from '../../lib/services/supervisors'
 import PageShell, { Card, Badge } from '../../components/PageShell'
 
 export default function VenuesAdmin() {
@@ -23,9 +23,7 @@ export default function VenuesAdmin() {
   async function reload() {
     setLoading(true)
     const [vs, ambs] = await Promise.all([listVenues(), getAllAmbassadors()])
-    // Merge supervisor_id from supervisors store
-    const enriched = vs.map(v => ({ ...v, supervisor_id: getSupervisorOfVenue(v.id) }))
-    setVenues(enriched)
+    setVenues(vs)
     setAmbassadors(ambs)
     setLoading(false)
   }
@@ -200,7 +198,7 @@ function VenueEditModal({ venue, ambassadors, busy, onClose, onSave }) {
   const [isActive, setIsActive] = useState(venue?.is_active !== false)
   const [codes, setCodes] = useState(() => new Set(venue?.assigned_ambassador_codes || []))
   const [hasSelfSale, setHasSelfSale] = useState(venue?.has_self_sale === true)
-  const [supervisorId, setSupervisorId] = useState(() => venue?.id ? (getSupervisorOfVenue(venue.id) || '') : '')
+  const [supervisorId, setSupervisorId] = useState(venue?.supervisor_id || '')
   const isNew = !venue
 
   function toggleCode(id) {
@@ -211,11 +209,9 @@ function VenueEditModal({ venue, ambassadors, busy, onClose, onSave }) {
     })
   }
 
-  function submit() {
+  async function submit() {
     if (!name.trim()) return alert('請輸入店家名稱')
-    const finalId = venue?.id || (name.trim() ? null : null)
-    // 先呼叫 onSave 取得 venue_id（onSave 內部會 upsertVenue），再指派督導
-    onSave({
+    await onSave({
       id: venue?.id,
       name: name.trim(),
       region,
@@ -223,11 +219,8 @@ function VenueEditModal({ venue, ambassadors, busy, onClose, onSave }) {
       is_active: isActive,
       assigned_ambassador_codes: [...codes],
       has_self_sale: hasSelfSale,
+      supervisor_id: supervisorId || null,
     })
-    // 同時寫督導分配（id 已知時直接寫；新增的 venue 由 onSave 端寫入後 reload 時讀新 id 不需要 — 此處只處理已存在的）
-    if (venue?.id) {
-      assignVenueToSupervisor(venue.id, supervisorId || null)
-    }
   }
 
   return (

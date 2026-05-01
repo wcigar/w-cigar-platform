@@ -8,7 +8,7 @@ import { supabase } from '../../lib/supabase'
 import { listVenues } from '../../lib/services/venues'
 import { getVenueSalesMatrixTemplate } from '../../lib/services/venueSales'
 import { getMonthlyCollection } from '../../lib/services/collections'
-import { getSupervisorOfVenue, getSupervisorById } from '../../lib/services/supervisors'
+import { getSupervisorById } from '../../lib/services/supervisors'
 
 export default function CollectionReceipt() {
   const { venueId, period } = useParams()
@@ -49,7 +49,7 @@ export default function CollectionReceipt() {
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#8a8278' }}>載入中…</div>
   if (!venue) return <div style={{ padding: 40, textAlign: 'center', color: '#ef4444' }}>找不到店家</div>
 
-  const supervisor = getSupervisorById(getSupervisorOfVenue(venueId))
+  const supervisor = getSupervisorById(venue.supervisor_id)
   const today = new Date()
   const dateStr = `${today.getFullYear()}/${String(today.getMonth()+1).padStart(2,'0')}/${String(today.getDate()).padStart(2,'0')}`
   const ambDue = collection?.ambassador?.venue_share_due || 0

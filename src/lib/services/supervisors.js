@@ -1,15 +1,11 @@
 // src/lib/services/supervisors.js
 // 督導 service：4 位督導 hardcoded（KELLY、IRIS、NANA 台北 / BOA 台中）
+// 綁定來源：venues.supervisor_id (DB，TEXT 欄位)
 //
 // 督導職責：每月去自己負責的店家收帳，分兩段確認：
 //   1. 大使賣的銷量（從 KEY-in 累計）→ 系統自動算
 //   2. 店家少爺自賣的銷量（盤點時補錄）→ 督導現場填
-//
-// localStorage:
-//   wcigar_supervisor_assignments_v1 = { [venue_id]: supervisor_id }
-
-const USE_MOCK = true
-const STORAGE_KEY = 'wcigar_supervisor_assignments_v1'
+import { supabase } from '../supabase'
 
 // 4 位督導（hardcoded）
 export const SUPERVISORS = [
@@ -27,50 +23,31 @@ export function getSupervisorById(id) {
   return SUPERVISORS.find(s => s.id === id) || null
 }
 
-// ---------- localStorage layer ----------
-
-function readAssignments() {
-  if (typeof window === 'undefined') return {}
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') } catch { return {} }
-}
-
-function writeAssignments(map) {
-  if (typeof window === 'undefined') return
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(map)) } catch {}
-}
-
-/**
- * 取得單店指派的督導 id
- */
-export function getSupervisorOfVenue(venueId) {
-  const map = readAssignments()
-  return map[venueId] || null
-}
-
-/**
- * 指派/變更店家督導
- */
-export function assignVenueToSupervisor(venueId, supervisorId) {
-  const map = readAssignments()
-  if (supervisorId) map[venueId] = supervisorId
-  else delete map[venueId]
-  writeAssignments(map)
+// 設定酒店督導（寫 DB）
+export async function setVenueSupervisor(venueId, supervisorId) {
+  const { error } = await supabase
+    .from('venues')
+    .update({ supervisor_id: supervisorId || null, updated_at: new Date().toISOString() })
+    .eq('id', venueId)
+  if (error) throw error
   return { success: true }
 }
 
-/**
- * 取得某督導負責的所有 venue id
- */
-export function getVenuesBySupervisor(supervisorId) {
-  const map = readAssignments()
-  return Object.keys(map).filter(vid => map[vid] === supervisorId)
+// 讀取所有綁定（從 DB 讀，回傳 { venueId: supervisorId } map）
+export async function loadVenueSupervisors() {
+  const { data, error } = await supabase
+    .from('venues')
+    .select('id, supervisor_id')
+    .not('supervisor_id', 'is', null)
+  if (error) return {}
+  const map = {}
+  ;(data || []).forEach(v => { map[v.id] = v.supervisor_id })
+  return map
 }
 
-/**
- * 取得 supervisor → venueIds 的反向 map（給統計用）
- */
-export function getSupervisorVenueMap() {
-  const assignments = readAssignments()
+// supervisor → venueIds 反向 map（給統計用）
+export async function getSupervisorVenueMap() {
+  const assignments = await loadVenueSupervisors()
   const out = {}
   SUPERVISORS.forEach(s => { out[s.id] = [] })
   Object.entries(assignments).forEach(([vid, sid]) => {
@@ -79,22 +56,19 @@ export function getSupervisorVenueMap() {
   return out
 }
 
-/**
- * 自動建議：如果某店未指派督導，按 region 自動分配
- *   台中所有店 → BOA
- *   台北店 → 平均分給 KELLY/IRIS/NANA
- */
-export function autoAssignByRegion(venues) {
-  const map = readAssignments()
-  const taipeiUnassigned = venues.filter(v => v.region === 'taipei' && !map[v.id])
-  const taichungUnassigned = venues.filter(v => v.region === 'taichung' && !map[v.id])
+// 自動指派（按地區）— 只填未指派的店；台中 → BOA、台北 KELLY/IRIS/NANA 平均
+export async function autoAssignByRegion(venues) {
+  const existing = await loadVenueSupervisors()
+  const taipeiUnassigned = venues.filter(v => v.region === 'taipei' && !existing[v.id])
+  const taichungUnassigned = venues.filter(v => v.region === 'taichung' && !existing[v.id])
   const taipeiSupers = ['KELLY', 'IRIS', 'NANA']
+  const writes = []
   taipeiUnassigned.forEach((v, i) => {
-    map[v.id] = taipeiSupers[i % 3]
+    writes.push(setVenueSupervisor(v.id, taipeiSupers[i % 3]))
   })
   taichungUnassigned.forEach(v => {
-    map[v.id] = 'BOA'
+    writes.push(setVenueSupervisor(v.id, 'BOA'))
   })
-  writeAssignments(map)
+  await Promise.all(writes)
   return { success: true, assigned: taipeiUnassigned.length + taichungUnassigned.length }
 }

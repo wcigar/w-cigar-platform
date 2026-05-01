@@ -46,7 +46,7 @@ export default function Collections() {
     }
     setTplMap(map)
     setVenues(vs)
-    setSupVenueMap(getSupervisorVenueMap())
+    setSupVenueMap(await getSupervisorVenueMap())
     setLoading(false)
   }
   useEffect(() => { reload() }, [refreshTick])
@@ -99,9 +99,9 @@ export default function Collections() {
     return { total: collections.length, due, paid, pendingCount, collectedCount }
   }, [collections])
 
-  function handleAutoAssign() {
+  async function handleAutoAssign() {
     if (!window.confirm('未指派的店家會自動按地區分配（台中→Boa、台北 KELLY/IRIS/NANA 平均）。繼續？')) return
-    autoAssignByRegion(venues)
+    await autoAssignByRegion(venues)
     setRefreshTick(n => n + 1)
   }
 
