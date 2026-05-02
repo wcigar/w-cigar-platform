@@ -109,7 +109,7 @@ export default function InventoryMatrix() {
   }
 
   return (
-    <PageShell title="庫存管理" subtitle="ADMIN · INVENTORY">
+    <PageShell title="庫存管理" subtitle="ADMIN · INVENTORY" backTo="/admin/venue-hub" backLabel="酒店銷售管理">
       <SummaryRow stats={stats} loading={loading} />
 
       <Card style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>

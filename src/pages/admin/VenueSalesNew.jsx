@@ -25,6 +25,8 @@ export default function VenueSalesNew() {
     <PageShell
       title="新增酒店銷售"
       subtitle="依現有 Excel 銷量表邏輯 · 快速輸入各店每日銷售"
+      backTo="/admin/venue-hub"
+      backLabel="酒店銷售管理"
       actions={
         <button onClick={() => navigate('/admin/venue-sales')} style={backBtn()}>
           <ArrowLeft size={14} /> 返回
