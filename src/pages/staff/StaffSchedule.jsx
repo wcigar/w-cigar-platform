@@ -93,7 +93,6 @@ function ScheduleContent() {
   const oc = schedules.filter(s => LEAVE_TYPES.includes(s.shift) || s.shift === '休假').length
   const shiftColors = { '早班': 'var(--green)', '晚班': 'var(--blue)', '休假': 'var(--red)', '臨時請假': 'var(--red)', '病假': '#ffb347', '事假': '#ffd700', '特休': '#64c8ff', '調班': '#c896ff' }
 
-  // Group punches by date
   const punchByDate = {}
   punches.forEach(p => { if (!punchByDate[p.date]) punchByDate[p.date] = []; punchByDate[p.date].push(p) })
 
@@ -131,33 +130,16 @@ function ScheduleContent() {
         })}
       </div>
 
-      {/* Leave type picker modal */}
       {leaveMenu && !reasonInput.show && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,.7)', zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }} onClick={() => setLeaveMenu(null)}>
           <div style={{ width: '100%', maxWidth: 400, background: 'var(--black-card)', borderRadius: '16px 16px 0 0', padding: 16 }} onClick={e => e.stopPropagation()}>
             <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 700, color: 'var(--gold)', marginBottom: 4 }}>{leaveMenu.ds}</div>
-            <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
-              目前：{leaveMenu.shift}{leaveMenu.holName ? ' 🔴' + leaveMenu.holName : ''}
-            </div>
-            {leaveMenu.isOff && (
-              <button onClick={() => { setReasonInput({ show: true, ds: leaveMenu.ds, type: '申請上班', text: '' }) }} style={{ width: '100%', padding: '14px 0', fontSize: 15, fontWeight: 700, borderRadius: 10, border: '1px solid var(--green)', background: 'rgba(77,168,108,.12)', color: 'var(--green)', cursor: 'pointer', marginBottom: 10 }}>
-                💪 申請上班
-              </button>
-            )}
+            <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>目前：{leaveMenu.shift}{leaveMenu.holName ? ' 🔴' + leaveMenu.holName : ''}</div>
+            {leaveMenu.isOff && (<button onClick={() => { setReasonInput({ show: true, ds: leaveMenu.ds, type: '申請上班', text: '' }) }} style={{ width: '100%', padding: '14px 0', fontSize: 15, fontWeight: 700, borderRadius: 10, border: '1px solid var(--green)', background: 'rgba(77,168,108,.12)', color: 'var(--green)', cursor: 'pointer', marginBottom: 10 }}>💪 申請上班</button>)}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
               {LEAVE_MENU.filter(opt => !leaveMenu.isOff || opt.key !== '休假').map(opt => {
                 const needsReason = ['臨時請假','病假','事假','特休','調班'].includes(opt.key)
-                return (
-                  <button key={opt.key} onClick={() => {
-                    if (needsReason) {
-                      setReasonInput({ show: true, ds: leaveMenu.ds, type: opt.key, text: '' })
-                    } else {
-                      requestLeave(leaveMenu.ds, opt.key); setLeaveMenu(null)
-                    }
-                  }} style={{ padding: '14px 0', fontSize: 14, fontWeight: 600, borderRadius: 10, border: '1px solid ' + opt.color + '40', background: opt.color + '15', color: opt.color, cursor: 'pointer' }}>
-                    {opt.label}
-                  </button>
-                )
+                return (<button key={opt.key} onClick={() => { if (needsReason) { setReasonInput({ show: true, ds: leaveMenu.ds, type: opt.key, text: '' }) } else { requestLeave(leaveMenu.ds, opt.key); setLeaveMenu(null) } }} style={{ padding: '14px 0', fontSize: 14, fontWeight: 600, borderRadius: 10, border: '1px solid ' + opt.color + '40', background: opt.color + '15', color: opt.color, cursor: 'pointer' }}>{opt.label}</button>)
               })}
             </div>
             <button onClick={() => setLeaveMenu(null)} style={{ width: '100%', marginTop: 10, padding: 12, fontSize: 14, fontWeight: 600, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text-muted)', cursor: 'pointer' }}>取消</button>
@@ -165,20 +147,12 @@ function ScheduleContent() {
         </div>
       )}
 
-      {/* Reason input modal */}
       {reasonInput.show && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,.7)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => { setReasonInput({ show: false, ds: '', type: '', text: '' }); setLeaveMenu(null) }}>
           <div style={{ width: '100%', maxWidth: 360, background: 'var(--black-card)', borderRadius: 16, padding: 20 }} onClick={e => e.stopPropagation()}>
             <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--gold)', marginBottom: 4, textAlign: 'center' }}>{reasonInput.type}</div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12, textAlign: 'center' }}>{reasonInput.ds}</div>
-            <textarea
-              autoFocus
-              value={reasonInput.text}
-              onChange={e => setReasonInput(prev => ({ ...prev, text: e.target.value }))}
-              placeholder={reasonInput.type === '調班' ? '請輸入調班原因…' : '請輸入請假原因…'}
-              rows={3}
-              style={{ width: '100%', fontSize: 14, padding: 10, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text)', resize: 'none', boxSizing: 'border-box' }}
-            />
+            <textarea autoFocus value={reasonInput.text} onChange={e => setReasonInput(prev => ({ ...prev, text: e.target.value }))} placeholder={reasonInput.type === '調班' ? '請輸入調班原因…' : '請輸入請假原因…'} rows={3} style={{ width: '100%', fontSize: 14, padding: 10, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text)', resize: 'none', boxSizing: 'border-box' }} />
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
               <button onClick={() => { setReasonInput({ show: false, ds: '', type: '', text: '' }); setLeaveMenu(null) }} style={{ flex: 1, padding: 12, fontSize: 14, fontWeight: 600, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text-muted)', cursor: 'pointer' }}>取消</button>
               <button onClick={() => { requestLeave(reasonInput.ds, reasonInput.type); setReasonInput({ show: false, ds: '', type: '', text: '' }); setLeaveMenu(null) }} style={{ flex: 1, padding: 12, fontSize: 14, fontWeight: 700, borderRadius: 10, border: 'none', background: 'var(--gold)', color: 'var(--black)', cursor: 'pointer' }}>送出申請</button>
@@ -195,7 +169,6 @@ function ScheduleContent() {
         </div>
       })}
 
-      {/* 打卡歷史 */}
       <div style={{ marginTop: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <button style={nb} onClick={() => setPunchMonth(format(subMonths(new Date(punchMonth + '-01'), 1), 'yyyy-MM'))}><ChevronLeft size={16} /></button>
@@ -236,8 +209,7 @@ const PREF_OPTIONS = [
 
 function PreferenceContent() {
   const { user } = useAuth()
-  const nextMonth = addMonths(new Date(), 1)
-  const [month] = useState(nextMonth)
+  const [month, setMonth] = useState(addMonths(new Date(), 1))
   const monthStr = format(month, 'yyyy-MM')
   const [prefs, setPrefs] = useState({})
   const [monthInfo, setMonthInfo] = useState(null)
@@ -247,7 +219,7 @@ function PreferenceContent() {
   const start = startOfMonth(month), end = endOfMonth(month)
   const days = eachDayOfInterval({ start, end })
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [month])
 
   async function load() {
     setLoading(true)
@@ -307,29 +279,23 @@ function PreferenceContent() {
   return (
     <div className="fade-in">
       <div className="section-title">📝 填寫希望班表</div>
-      <div style={{ fontSize: 13, color: 'var(--gold)', textAlign: 'center', marginBottom: 6, fontWeight: 600 }}>{format(month, 'yyyy年M月')}</div>
-
-      {status === 'published' && (
-        <div style={{ padding: 10, marginBottom: 10, borderRadius: 10, background: 'var(--gold-glow)', border: '1px solid var(--border-gold)', fontSize: 12, color: 'var(--gold)', textAlign: 'center', fontWeight: 600 }}>
-          ✅ 此月已發布正式排班，請以正式排班為準
-        </div>
-      )}
-      {status === 'draft' && (
-        <div style={{ padding: 10, marginBottom: 10, borderRadius: 10, background: 'rgba(196,77,77,.06)', border: '1px solid rgba(196,77,77,.2)', fontSize: 12, color: 'var(--red)', textAlign: 'center' }}>
-          🔒 老闆排班中，已鎖定無法修改
-        </div>
-      )}
-
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 8 }}>
+        <button onClick={() => setMonth(subMonths(month, 1))} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 8px', color: 'var(--text)', cursor: 'pointer' }}><ChevronLeft size={14} /></button>
+        <div style={{ fontSize: 16, color: 'var(--gold)', fontWeight: 700, minWidth: 110, textAlign: 'center' }}>{format(month, 'yyyy年M月')}</div>
+        <button onClick={() => setMonth(addMonths(month, 1))} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 8px', color: 'var(--text)', cursor: 'pointer' }}><ChevronRight size={14} /></button>
+      </div>
+      <div style={{ display: 'flex', gap: 6, justifyContent: 'center', marginBottom: 10 }}>
+        <button onClick={() => setMonth(new Date())} style={{ padding: '4px 10px', fontSize: 11, borderRadius: 14, background: format(month, 'yyyy-MM') === format(new Date(), 'yyyy-MM') ? 'var(--gold)' : 'rgba(255,255,255,0.05)', color: format(month, 'yyyy-MM') === format(new Date(), 'yyyy-MM') ? '#000' : 'var(--text-muted)', border: '1px solid var(--border)', cursor: 'pointer', fontWeight: 600 }}>本月</button>
+        <button onClick={() => setMonth(addMonths(new Date(), 1))} style={{ padding: '4px 10px', fontSize: 11, borderRadius: 14, background: format(month, 'yyyy-MM') === format(addMonths(new Date(), 1), 'yyyy-MM') ? 'var(--gold)' : 'rgba(255,255,255,0.05)', color: format(month, 'yyyy-MM') === format(addMonths(new Date(), 1), 'yyyy-MM') ? '#000' : 'var(--text-muted)', border: '1px solid var(--border)', cursor: 'pointer', fontWeight: 600 }}>下月</button>
+      </div>
+      {status === 'published' && (<div style={{ padding: 10, marginBottom: 10, borderRadius: 10, background: 'var(--gold-glow)', border: '1px solid var(--border-gold)', fontSize: 12, color: 'var(--gold)', textAlign: 'center', fontWeight: 600 }}>✅ 此月已發布正式排班，請以正式排班為準</div>)}
+      {status === 'draft' && (<div style={{ padding: 10, marginBottom: 10, borderRadius: 10, background: 'rgba(196,77,77,.06)', border: '1px solid rgba(196,77,77,.2)', fontSize: 12, color: 'var(--red)', textAlign: 'center' }}>🔒 老闆排班中，已鎖定無法修改</div>)}
       <div className="card" style={{ padding: 10, marginBottom: 10, display: 'flex', justifyContent: 'space-around', textAlign: 'center' }}>
         <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>已填</div><div style={{ fontSize: 18, color: 'var(--gold)', fontWeight: 700 }}>{filled}</div></div>
         <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>總天數</div><div style={{ fontSize: 18, color: 'var(--text)', fontWeight: 700 }}>{total}</div></div>
         <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>進度</div><div style={{ fontSize: 18, color: pct === 100 ? 'var(--green)' : 'var(--gold)', fontWeight: 700 }}>{pct}%</div></div>
       </div>
-
-      <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 8, textAlign: 'center' }}>
-        點日期循環：早 → 晚 → 都可 → 休 → ✗ → 清除
-      </div>
-
+      <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 8, textAlign: 'center' }}>點日期循環：早 → 晚 → 都可 → 休 → ✗ → 清除</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, marginBottom: 14 }}>
         {WEEKDAYS.map(w => <div key={w} style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-muted)', padding: 4 }}>{w}</div>)}
         {Array.from({ length: getDay(start) }).map((_, i) => <div key={'p' + i} />)}
@@ -340,34 +306,22 @@ function PreferenceContent() {
           const hol = isHoliday(ds)
           const isWeekend = day.getDay() === 0 || day.getDay() === 6
           return (
-            <div key={ds} onClick={() => cycle(ds)} style={{
-              padding: 4, textAlign: 'center', borderRadius: 8,
-              background: pref ? opt.bg : (hol ? 'rgba(196,77,77,.06)' : 'var(--black-card)'),
-              border: '1px solid ' + (pref ? opt.color : 'var(--border)'),
-              minHeight: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center',
-              cursor: locked ? 'not-allowed' : 'pointer', opacity: locked ? 0.6 : 1,
-            }}>
+            <div key={ds} onClick={() => cycle(ds)} style={{ padding: 4, textAlign: 'center', borderRadius: 8, background: pref ? opt.bg : (hol ? 'rgba(196,77,77,.06)' : 'var(--black-card)'), border: '1px solid ' + (pref ? opt.color : 'var(--border)'), minHeight: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center', cursor: locked ? 'not-allowed' : 'pointer', opacity: locked ? 0.6 : 1 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: isWeekend || hol ? 'var(--red)' : 'var(--text)' }}>{format(day, 'd')}</div>
               {pref && <div style={{ fontSize: 11, fontWeight: 700, color: opt.color, marginTop: 2 }}>{opt.label}</div>}
             </div>
           )
         })}
       </div>
-
       {!locked && (
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={saveDraft} disabled={saving} className="btn-outline" style={{ flex: 1, padding: 12, fontSize: 13 }}>
-            {saving ? '儲存中...' : '💾 暫存'}
-          </button>
-          <button onClick={submit} disabled={saving} style={{ flex: 1, padding: 12, fontSize: 13, fontWeight: 700, background: 'var(--gold)', color: 'var(--black)', border: 'none', borderRadius: 10, cursor: 'pointer' }}>
-            {saving ? '送出中...' : '✅ 提交（鎖定）'}
-          </button>
+          <button onClick={saveDraft} disabled={saving} className="btn-outline" style={{ flex: 1, padding: 12, fontSize: 13 }}>{saving ? '儲存中...' : '💾 暫存'}</button>
+          <button onClick={submit} disabled={saving} style={{ flex: 1, padding: 12, fontSize: 13, fontWeight: 700, background: 'var(--gold)', color: 'var(--black)', border: 'none', borderRadius: 10, cursor: 'pointer' }}>{saving ? '送出中...' : '✅ 提交（鎖定）'}</button>
         </div>
       )}
     </div>
   )
 }
-
 
 export default function StaffSchedule() {
   const [pageMode, setPageMode] = useState('schedule')
