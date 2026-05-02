@@ -5,7 +5,7 @@
 // ============================================================
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { FileText, Plus, Trash2, Download, Share2, Package, Edit3, X, ChevronRight, ChevronDown, ChevronUp, FileBadge, Link2, Copy, Check } from 'lucide-react'
+import { FileText, Plus, Trash2, Download, Share2, Package, Edit3, X, ChevronRight, ChevronDown, ChevronUp, FileBadge, Link2, Copy, Check, Calculator, Settings } from 'lucide-react'
 import {
   generateAllDocs, downloadPdf, sharePdfFiles, computeShipmentTotals,
 } from '../../lib/services/customsPdf'
@@ -18,7 +18,6 @@ export default function Customs() {
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState(null)
-
   const [draft, setDraft] = useState(newDraft())
 
   function newDraft() {
@@ -42,7 +41,7 @@ export default function Customs() {
     const [sR, bR, pR, shR] = await Promise.all([
       supabase.from('customs_suppliers').select('*').eq('is_default', true).limit(1).single(),
       supabase.from('customs_buyers').select('*').order('is_default', { ascending: false }),
-      supabase.from('customs_products').select('*').eq('enabled', true).order('sort_order'),
+      supabase.from('customs_products_with_cost').select('*').eq('enabled', true).order('sort_order'),
       supabase.from('customs_shipments').select('*').order('shipment_date', { ascending: false }).limit(100),
     ])
     setSupplier(sR.data || null)
@@ -59,24 +58,11 @@ export default function Customs() {
     const p = products.find(x => x.id === productId)
     if (!p) return
     if (draft.items.some(i => i.product_id === productId)) return
-    setDraft(d => ({
-      ...d,
-      items: [...d.items, {
-        product_id: p.id, name: p.name,
-        pcs_per_bundle: p.pcs_per_bundle, package_type: p.package_type,
-        unit_price_usd: p.unit_price_usd, unit_weight_g: p.unit_weight_g,
-        qty_bundles: 1, total_pcs: p.pcs_per_bundle,
-        subtotal: +(p.pcs_per_bundle * p.unit_price_usd).toFixed(2),
-      }],
-    }))
+    setDraft(d => ({ ...d, items: [...d.items, { product_id: p.id, name: p.name, pcs_per_bundle: p.pcs_per_bundle, package_type: p.package_type, unit_price_usd: p.unit_price_usd, unit_weight_g: p.unit_weight_g, qty_bundles: 1, total_pcs: p.pcs_per_bundle, subtotal: +(p.pcs_per_bundle * p.unit_price_usd).toFixed(2) }] }))
   }
 
   function updateItem(idx, field, value) {
-    setDraft(d => {
-      const items = [...d.items]
-      items[idx] = { ...items[idx], [field]: value }
-      return { ...d, items }
-    })
+    setDraft(d => { const items = [...d.items]; items[idx] = { ...items[idx], [field]: value }; return { ...d, items } })
   }
 
   function removeItem(idx) {
@@ -110,12 +96,8 @@ export default function Customs() {
       { doc: docs.coo,         filename: `CertificateOfOrigin_${shipment.shipment_no}.pdf` },
       { doc: docs.invoice,     filename: `CommercialInvoice_${shipment.shipment_no}.pdf` },
     ]
-    if (action === 'share') {
-      const r = await sharePdfFiles(files)
-      if (r.method === 'cancelled') return
-    } else {
-      files.forEach(f => downloadPdf(f.doc, f.filename))
-    }
+    if (action === 'share') { const r = await sharePdfFiles(files); if (r.method === 'cancelled') return }
+    else { files.forEach(f => downloadPdf(f.doc, f.filename)) }
     setDraft(newDraft()); setTab('list'); loadAll()
   }
 
@@ -149,21 +131,14 @@ export default function Customs() {
           選產品 → 自動產生 Packing List / Certificate of Origin / Commercial Invoice
         </div>
       </div>
-
       <FactoryLinkBanner />
-
       <div style={{ display: 'flex', gap: 6, marginBottom: 16, borderBottom: '1px solid #2a2a2a' }}>
         {[
           { k: 'list',     label: '貨件記錄',  c: shipments.length },
           { k: 'new',      label: '建立新單',  c: draft.items.length },
           { k: 'products', label: '產品庫',    c: products.length },
         ].map(t => (
-          <button key={t.k} onClick={() => setTab(t.k)} style={{
-            flex: 1, padding: '10px 8px', background: 'transparent',
-            border: 'none', borderBottom: tab === t.k ? '2px solid var(--gold)' : '2px solid transparent',
-            color: tab === t.k ? 'var(--gold)' : 'var(--text-muted)',
-            fontSize: 14, fontWeight: 600, cursor: 'pointer',
-          }}>
+          <button key={t.k} onClick={() => setTab(t.k)} style={{ flex: 1, padding: '10px 8px', background: 'transparent', border: 'none', borderBottom: tab === t.k ? '2px solid var(--gold)' : '2px solid transparent', color: tab === t.k ? 'var(--gold)' : 'var(--text-muted)', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
             {t.label} {t.c > 0 && <span style={{ fontSize: 11, opacity: 0.7 }}>({t.c})</span>}
           </button>
         ))}
@@ -174,29 +149,21 @@ export default function Customs() {
           {shipments.length === 0 && (
             <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
               還沒有貨件記錄。<br /><br />
-              <button onClick={() => setTab('new')} style={{ padding: '10px 20px', borderRadius: 8, background: 'var(--gold)', color: '#000', border: 'none', fontWeight: 600 }}>
-                <Plus size={16} style={{ verticalAlign: -3 }} /> 建立第一筆
-              </button>
+              <button onClick={() => setTab('new')} style={{ padding: '10px 20px', borderRadius: 8, background: 'var(--gold)', color: '#000', border: 'none', fontWeight: 600 }}><Plus size={16} style={{ verticalAlign: -3 }} /> 建立第一筆</button>
             </div>
           )}
           {shipments.map(sh => {
             const cleared = sh.status === 'cleared'
             const expanded = expandedId === sh.id
-            const fromFactory = sh.source === 'factory_link'
             return (
               <div key={sh.id} style={{ background: 'rgba(255,255,255,0.03)', border: cleared ? '1px solid rgba(74,222,128,0.3)' : '1px solid #2a2a2a', borderRadius: 10, padding: 12, marginBottom: 10 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <div style={{ fontWeight: 700, color: 'var(--gold)' }}>{sh.shipment_no || '(未編號)'}</div>
                       {cleared && (<span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: 'rgba(74,222,128,0.15)', color: '#4ade80', fontWeight: 600 }}>已清關 ✓</span>)}
-                      {fromFactory && (<span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: 'rgba(99,102,241,0.15)', color: '#818cf8', fontWeight: 600 }}>🏭 工廠提交</span>)}
                     </div>
-                    {sh.declaration_no && (
-                      <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2, fontFamily: 'monospace' }}>
-                        <FileBadge size={10} style={{ verticalAlign: -1, marginRight: 3 }} /> 報單 {sh.declaration_no}
-                      </div>
-                    )}
+                    {sh.declaration_no && (<div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2, fontFamily: 'monospace' }}><FileBadge size={10} style={{ verticalAlign: -1, marginRight: 3 }} /> 報單 {sh.declaration_no}</div>)}
                     <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{sh.shipment_date} · {sh.buyer_name}</div>
                     <div style={{ fontSize: 12, marginTop: 6 }}>
                       <Package size={12} style={{ verticalAlign: -2 }} /> {sh.total_bundles} 束 / {sh.total_sticks} 支
@@ -322,11 +289,13 @@ function Stat({ label, value, hi }) {
 function ProductManager({ products, onChange }) {
   const [editing, setEditing] = useState(null)
   const [adding, setAdding] = useState(false)
+  const [showTaxSettings, setShowTaxSettings] = useState(false)
   async function save(p) {
+    const actual = p.actual_cost_usd === '' || p.actual_cost_usd === null || p.actual_cost_usd === undefined ? null : +p.actual_cost_usd
     if (p.id) {
-      await supabase.from('customs_products').update({ name: p.name, pcs_per_bundle: +p.pcs_per_bundle, package_type: p.package_type, unit_price_usd: +p.unit_price_usd, unit_weight_g: +p.unit_weight_g, sort_order: +p.sort_order || 999, updated_at: new Date().toISOString() }).eq('id', p.id)
+      await supabase.from('customs_products').update({ name: p.name, pcs_per_bundle: +p.pcs_per_bundle, package_type: p.package_type, unit_price_usd: +p.unit_price_usd, unit_weight_g: +p.unit_weight_g, actual_cost_usd: actual, sort_order: +p.sort_order || 999, updated_at: new Date().toISOString() }).eq('id', p.id)
     } else {
-      await supabase.from('customs_products').insert({ name: p.name, pcs_per_bundle: +p.pcs_per_bundle || 25, package_type: p.package_type || 'Bundle', unit_price_usd: +p.unit_price_usd || 0, unit_weight_g: +p.unit_weight_g || 15, sort_order: 999 })
+      await supabase.from('customs_products').insert({ name: p.name, pcs_per_bundle: +p.pcs_per_bundle || 25, package_type: p.package_type || 'Bundle', unit_price_usd: +p.unit_price_usd || 0, unit_weight_g: +p.unit_weight_g || 15, actual_cost_usd: actual, sort_order: 999 })
     }
     setEditing(null); setAdding(false); onChange()
   }
@@ -337,15 +306,25 @@ function ProductManager({ products, onChange }) {
   }
   return (
     <div>
-      <button onClick={() => { setAdding(true); setEditing({ name: '', pcs_per_bundle: 25, package_type: 'Bundle', unit_price_usd: 0.85, unit_weight_g: 15 }) }} style={{ width: '100%', padding: 12, marginBottom: 12, borderRadius: 8, background: 'var(--gold)', color: '#000', border: 'none', fontWeight: 700 }}><Plus size={16} style={{ verticalAlign: -3 }} /> 新增產品</button>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+        <button onClick={() => { setAdding(true); setEditing({ name: '', pcs_per_bundle: 25, package_type: 'Bundle', unit_price_usd: 0.85, unit_weight_g: 15 }) }} style={{ flex: 2, padding: 12, borderRadius: 8, background: 'var(--gold)', color: '#000', border: 'none', fontWeight: 700 }}><Plus size={16} style={{ verticalAlign: -3 }} /> 新增產品</button>
+        <button onClick={() => setShowTaxSettings(true)} style={{ flex: 1, padding: 12, borderRadius: 8, background: 'rgba(251,146,60,0.15)', color: '#fb923c', border: '1px solid rgba(251,146,60,0.4)', fontWeight: 600, fontSize: 13 }}><Calculator size={14} style={{ verticalAlign: -2 }} /> 稅率設定</button>
+      </div>
+      {showTaxSettings && <TaxSettingsModal onClose={() => { setShowTaxSettings(false); onChange() }} />}
       {(editing || adding) && (
         <div style={{ background: 'rgba(255,215,0,0.05)', border: '1px solid var(--gold)', borderRadius: 10, padding: 12, marginBottom: 12 }}>
           <Field label="產品名稱"><input value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })} /></Field>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <Field label="支/束"><input type="number" value={editing.pcs_per_bundle} onChange={e => setEditing({ ...editing, pcs_per_bundle: e.target.value })} /></Field>
             <Field label="單位"><select value={editing.package_type} onChange={e => setEditing({ ...editing, package_type: e.target.value })}><option>Bundle</option><option>Box</option></select></Field>
-            <Field label="單價 USD"><input type="number" step="0.01" value={editing.unit_price_usd} onChange={e => setEditing({ ...editing, unit_price_usd: e.target.value })} /></Field>
             <Field label="單支重 g"><input type="number" value={editing.unit_weight_g} onChange={e => setEditing({ ...editing, unit_weight_g: e.target.value })} /></Field>
+          </div>
+          <div style={{ marginTop: 4, padding: 8, background: 'rgba(251,146,60,0.08)', border: '1px solid rgba(251,146,60,0.3)', borderRadius: 6, fontSize: 11, color: '#fb923c', marginBottom: 4 }}>
+            💡 報關價 = 給海關用的 PDF 金額（可低報）；實際成本 = 你真正付的錢
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <Field label="報關價 USD/支"><input type="number" step="0.01" value={editing.unit_price_usd} onChange={e => setEditing({ ...editing, unit_price_usd: e.target.value })} /></Field>
+            <Field label="實際成本 USD/支"><input type="number" step="0.01" value={editing.actual_cost_usd || ''} placeholder="若無填預設等於報關價" onChange={e => setEditing({ ...editing, actual_cost_usd: e.target.value })} /></Field>
           </div>
           <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
             <button onClick={() => save(editing)} style={{ flex: 1, padding: 10, borderRadius: 6, background: 'var(--gold)', color: '#000', border: 'none', fontWeight: 700 }}>儲存</button>
@@ -354,35 +333,54 @@ function ProductManager({ products, onChange }) {
         </div>
       )}
       {products.map(p => (
-        <div key={p.id} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid #2a2a2a', borderRadius: 8, padding: 10, marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{p.pcs_per_bundle}/{p.package_type} · ${p.unit_price_usd}</div>
+        <div key={p.id} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid #2a2a2a', borderRadius: 8, padding: 10, marginBottom: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {p.name}
+                {p.has_under_declared && <span style={{ marginLeft: 6, fontSize: 9, padding: '1px 5px', background: 'rgba(251,146,60,0.2)', color: '#fb923c', borderRadius: 3, fontWeight: 700 }}>低報</span>}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                {p.pcs_per_bundle}/{p.package_type} · {p.unit_weight_g}g/支 ·
+                <span style={{ color: '#9ca3af' }}> 報關 USD${p.unit_price_usd}</span>
+                {p.actual_cost_usd && <span style={{ color: '#fb923c', marginLeft: 4 }}>· 實際 USD${p.actual_cost_usd}</span>}
+              </div>
+            </div>
+            <button onClick={() => setEditing(p)} style={{ background: 'transparent', border: 'none', color: 'var(--gold)', padding: 6 }}><Edit3 size={14} /></button>
+            <button onClick={() => remove(p.id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', padding: 6 }}><Trash2 size={14} /></button>
           </div>
-          <button onClick={() => setEditing(p)} style={{ background: 'transparent', border: 'none', color: 'var(--gold)', padding: 6 }}><Edit3 size={14} /></button>
-          <button onClick={() => remove(p.id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', padding: 6 }}><Trash2 size={14} /></button>
+          {p.real_landed_cost_twd && (
+            <div style={{ marginTop: 8, padding: 8, background: 'rgba(0,0,0,0.3)', borderRadius: 6, fontSize: 11, color: '#d1d5db' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+                <div>實際進貨 <span style={{ color: '#9ca3af' }}>NT${p.actual_cost_twd_per_stick}</span></div>
+                <div>進口稅 <span style={{ color: '#9ca3af' }}>NT${p.tariff_per_stick}</span></div>
+                <div>菸酒稅 <span style={{ color: '#9ca3af' }}>NT${p.tobacco_tax_per_stick}</span></div>
+                <div>健康捐 <span style={{ color: '#9ca3af' }}>NT${p.health_tax_per_stick}</span></div>
+                <div>營業稅 <span style={{ color: '#9ca3af' }}>NT${p.business_tax_per_stick}</span></div>
+                <div style={{ color: '#fb923c', fontWeight: 700 }}>稅費合計 NT${p.total_tax_per_stick}</div>
+              </div>
+              <div style={{ marginTop: 4, paddingTop: 4, borderTop: '1px dashed #444', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: '#9ca3af' }}>真實落地成本 / 支</span>
+                <span style={{ color: 'var(--gold)', fontWeight: 700, fontSize: 15 }}>NT${p.real_landed_cost_twd}</span>
+              </div>
+            </div>
+          )}
         </div>
       ))}
     </div>
   )
 }
 
-// ===== Factory share link banner =====
 function FactoryLinkBanner() {
   const [copied, setCopied] = useState(false)
   const url = typeof window !== 'undefined' ? `${window.location.origin}/customs/submit` : '/customs/submit'
   async function copyLink() {
-    try {
-      await navigator.clipboard.writeText(url)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      window.prompt('Copy this link:', url)
-    }
+    try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 2000) }
+    catch { window.prompt('Copy this link:', url) }
   }
   async function shareLink() {
     if (navigator.share) {
-      try { await navigator.share({ title: 'W Cigar Bar — Customs Submission', text: '請用此連結提交報關文件 / Please submit shipment via this link:', url }) } catch (e) {}
+      try { await navigator.share({ title: 'W Cigar Bar — Customs Submission', text: '請用此連結提交報關文件:', url }) } catch (e) {}
     } else { copyLink() }
   }
   return (
@@ -396,14 +394,60 @@ function FactoryLinkBanner() {
         <code style={{ flex: 1, fontSize: 11, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{url}</code>
       </div>
       <div style={{ display: 'flex', gap: 6 }}>
-        <button onClick={copyLink} style={{ flex: 1, padding: 8, borderRadius: 6, background: copied ? '#4ade80' : '#2a2a2a', color: copied ? '#000' : '#fff', border: '1px solid #555', fontSize: 12, fontWeight: 600 }}>
-          {copied ? <><Check size={12} style={{ verticalAlign: -2 }} /> 已複製</> : <><Copy size={12} style={{ verticalAlign: -2 }} /> 複製連結</>}
-        </button>
-        <button onClick={shareLink} style={{ flex: 1, padding: 8, borderRadius: 6, background: '#4ade80', color: '#000', border: 'none', fontSize: 12, fontWeight: 700 }}>
-          <Share2 size={12} style={{ verticalAlign: -2 }} /> 分享 LINE
-        </button>
+        <button onClick={copyLink} style={{ flex: 1, padding: 8, borderRadius: 6, background: copied ? '#4ade80' : '#2a2a2a', color: copied ? '#000' : '#fff', border: '1px solid #555', fontSize: 12, fontWeight: 600 }}>{copied ? <><Check size={12} style={{ verticalAlign: -2 }} /> 已複製</> : <><Copy size={12} style={{ verticalAlign: -2 }} /> 複製連結</>}</button>
+        <button onClick={shareLink} style={{ flex: 1, padding: 8, borderRadius: 6, background: '#4ade80', color: '#000', border: 'none', fontSize: 12, fontWeight: 700 }}><Share2 size={12} style={{ verticalAlign: -2 }} /> 分享 LINE</button>
       </div>
     </div>
   )
 }
 
+function TaxSettingsModal({ onClose }) {
+  const [settings, setSettings] = useState(null)
+  const [saving, setSaving] = useState(false)
+  useEffect(() => {
+    supabase.from('customs_tax_settings').select('*').eq('id', 1).single().then(({ data }) => setSettings(data))
+  }, [])
+  async function save() {
+    setSaving(true)
+    await supabase.from('customs_tax_settings').update({
+      exchange_rate: +settings.exchange_rate, cif_markup: +settings.cif_markup,
+      tariff_rate: +settings.tariff_rate, tobacco_tax_per_kg: +settings.tobacco_tax_per_kg,
+      health_tax_per_kg: +settings.health_tax_per_kg, business_tax_rate: +settings.business_tax_rate,
+      updated_at: new Date().toISOString(),
+    }).eq('id', 1)
+    setSaving(false); onClose()
+  }
+  if (!settings) return null
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: '#1a1a1a', border: '1px solid var(--gold)', borderRadius: 12, width: '100%', maxWidth: 420, maxHeight: '85vh', overflow: 'auto' }}>
+        <div style={{ padding: 14, borderBottom: '1px solid #2a2a2a', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontWeight: 700, color: 'var(--gold)' }}><Settings size={16} style={{ verticalAlign: -3, marginRight: 6 }} />稅率參數設定</div>
+          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer' }}><X size={18} /></button>
+        </div>
+        <div style={{ padding: 16 }}>
+          <div style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.3)', borderRadius: 6, padding: 8, fontSize: 11, color: '#fbbf24', marginBottom: 12, lineHeight: 1.5 }}>⚙ 調整匯率/稅率後，所有產品落地成本會即時重新計算</div>
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>美金匯率 (USD → TWD)</div>
+            <input type="number" step="0.01" value={settings.exchange_rate} onChange={e => setSettings({ ...settings, exchange_rate: e.target.value })} style={{ width: '100%', padding: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid #333', borderRadius: 6, color: '#fff', fontSize: 14, boxSizing: 'border-box' }} />
+            <div style={{ fontSize: 10, color: '#666', marginTop: 2 }}>近 3 批清關平均: 31.29 / 31.59 / 31.97</div>
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>CIF/FOB 比率（含運費保險）</div>
+            <input type="number" step="0.0001" value={settings.cif_markup} onChange={e => setSettings({ ...settings, cif_markup: e.target.value })} style={{ width: '100%', padding: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid #333', borderRadius: 6, color: '#fff', fontSize: 14, boxSizing: 'border-box' }} />
+            <div style={{ fontSize: 10, color: '#666', marginTop: 2 }}>1.013 = FOB + 1.3% 運保費</div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+            <div><div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>進口稅率</div><input type="number" step="0.01" value={settings.tariff_rate} onChange={e => setSettings({ ...settings, tariff_rate: e.target.value })} style={{ width: '100%', padding: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid #333', borderRadius: 6, color: '#fff', fontSize: 13, boxSizing: 'border-box' }} /></div>
+            <div><div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>營業稅率</div><input type="number" step="0.01" value={settings.business_tax_rate} onChange={e => setSettings({ ...settings, business_tax_rate: e.target.value })} style={{ width: '100%', padding: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid #333', borderRadius: 6, color: '#fff', fontSize: 13, boxSizing: 'border-box' }} /></div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
+            <div><div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>菸酒稅 NT$/kg</div><input type="number" step="1" value={settings.tobacco_tax_per_kg} onChange={e => setSettings({ ...settings, tobacco_tax_per_kg: e.target.value })} style={{ width: '100%', padding: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid #333', borderRadius: 6, color: '#fff', fontSize: 13, boxSizing: 'border-box' }} /></div>
+            <div><div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>健康捐 NT$/kg</div><input type="number" step="1" value={settings.health_tax_per_kg} onChange={e => setSettings({ ...settings, health_tax_per_kg: e.target.value })} style={{ width: '100%', padding: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid #333', borderRadius: 6, color: '#fff', fontSize: 13, boxSizing: 'border-box' }} /></div>
+          </div>
+          <button onClick={save} disabled={saving} style={{ width: '100%', padding: 12, borderRadius: 8, background: 'var(--gold)', color: '#000', border: 'none', fontWeight: 700, fontSize: 14, opacity: saving ? 0.5 : 1 }}>{saving ? '儲存中…' : '儲存並重新計算所有產品成本'}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
