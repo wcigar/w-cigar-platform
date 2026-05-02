@@ -5,5 +5,7 @@ dist
 
 # 系統暫存
 memory/
-.claude/
+.claude/*
+!.claude/commands/
+!.claude/agents/
 *.local
