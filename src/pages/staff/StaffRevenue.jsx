@@ -46,7 +46,7 @@ export default function StaffRevenue() {
       supabase.from('daily_revenue').select('total').gte('date', month + '-01').lte('date', format(endOfMonth(new Date(month + '-01')), 'yyyy-MM-dd')),
       supabase.from('daily_revenue').select('*').order('date', { ascending: false }).limit(7),
       supabase.from('room_usage').select('*').eq('date', today).order('created_at'),
-      supabase.from('tips').select('*').eq('date', today).order('created_at'),
+      supabase.rpc('get_tips_by_date', { p_caller_id: user?.employee_id, p_date: today }),
       supabase.from('credit_tabs').select('*').eq('status', '未結').order('date', { ascending: false }),
       supabase.from('daily_closing').select('*').eq('date', today).maybeSingle(),
       supabase.from('employees').select('id, name').eq('enabled', true),
@@ -90,7 +90,13 @@ export default function StaffRevenue() {
 
   async function addTip() {
     if (!tipForm.employee_id || !tipForm.amount) return alert('請選擇員工和金額')
-    await supabase.from('tips').insert({ ...tipForm, date:today, amount:+tipForm.amount })
+    await supabase.rpc('add_tip', {
+      p_caller_id: user?.employee_id,
+      p_employee_id: tipForm.employee_id,
+      p_amount: +tipForm.amount,
+      p_source: tipForm.source,
+      p_note: tipForm.note
+    })
     setTipForm({ employee_id:'', amount:'', source:'現金', note:'' })
     load()
   }

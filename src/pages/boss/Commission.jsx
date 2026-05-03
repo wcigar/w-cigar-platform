@@ -20,7 +20,7 @@ export default function Commission() {
     const [mcR, detR, rulesR] = await Promise.all([
       supabase.rpc('get_monthly_commission', { p_admin_id: user?.employee_id, p_month: month }).maybeSingle(),
       supabase.rpc('get_staff_monthly_commission', { p_admin_id: user?.employee_id, p_month: month }),
-      supabase.from('commission_rate_rules').select('*').eq('enabled', true).order('min_revenue'),
+      supabase.rpc('get_commission_rate_rules', { p_admin_id: user?.employee_id }),
     ])
     setSummary(mcR.data)
     setDetails(detR.data || [])
