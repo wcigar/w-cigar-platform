@@ -1,6 +1,4 @@
-
-import SupervisorApp from './pages/supervisor/SupervisorApp'
-  if (window.location.pathname.startsWith('/supervisor')) return (<Routes><Route path="/supervisor/*" element={<SupervisorApp />} /></Routes>)import { useEffect } from 'react'
+import { useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './lib/auth'
 import { seedTodayTasks } from './lib/seeder'
@@ -27,6 +25,7 @@ import Commission from './pages/boss/Commission'
 import Customers from './pages/boss/Customers'
 import DealerOrders from './pages/DealerOrders'
 import AmbassadorApp from './pages/ambassador/AmbassadorApp'
+import SupervisorApp from './pages/supervisor/SupervisorApp'
 import PosApp from './pages/pos/PosApp'
 import VipCellar from './pages/VipCellar'
 import JoinPage from './pages/join/JoinPage'
@@ -79,6 +78,7 @@ function AppInner() {
   if (window.location.pathname.startsWith('/vip-cellar')) return (<Routes><Route path="/vip-cellar/*" element={<VipCellar />} /></Routes>)
   if (window.location.pathname.startsWith('/pos-app')) return (<Routes><Route path="/pos-app/*" element={<PosApp />} /></Routes>)
   if (window.location.pathname.startsWith('/ambassador')) return (<Routes><Route path="/ambassador/*" element={<AmbassadorApp />} /></Routes>)
+  if (window.location.pathname.startsWith('/supervisor')) return (<Routes><Route path="/supervisor/*" element={<SupervisorApp />} /></Routes>)
   if (!user) return <Login />
   const isBoss = user.role === 'boss'
   return (
