@@ -234,12 +234,24 @@ export default function Customs() {
                   <div style={{ flex: 1, fontSize: 13, fontWeight: 600, paddingRight: 8 }}>{it.name}</div>
                   <button onClick={() => removeItem(idx)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer' }}><X size={16} /></button>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 8 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6, marginTop: 8 }}>
                   <FieldSmall label="束/盒數"><input type="number" min="0" value={it.qty_bundles} onChange={e => updateItem(idx, 'qty_bundles', +e.target.value || 0)} /></FieldSmall>
                   <FieldSmall label="支/束"><input type="number" min="0" value={it.pcs_per_bundle} onChange={e => updateItem(idx, 'pcs_per_bundle', +e.target.value || 0)} /></FieldSmall>
+                  <FieldSmall label="單支重 g"><input type="number" step="0.1" min="0" value={it.unit_weight_g || 0} onChange={e => updateItem(idx, 'unit_weight_g', +e.target.value || 0)} /></FieldSmall>
                   <FieldSmall label="單價 USD"><input type="number" step="0.01" min="0" value={it.unit_price_usd} onChange={e => updateItem(idx, 'unit_price_usd', +e.target.value || 0)} /></FieldSmall>
                 </div>
-                <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text-muted)' }}>總支數: {(it.qty_bundles || 0) * (it.pcs_per_bundle || 0)} · 小計: ${((it.qty_bundles || 0) * (it.pcs_per_bundle || 0) * (it.unit_price_usd || 0)).toFixed(2)}</div>
+                {(() => {
+                  const totalPcs = (it.qty_bundles || 0) * (it.pcs_per_bundle || 0)
+                  const totalWeightG = totalPcs * (it.unit_weight_g || 0)
+                  const totalWeightKg = totalWeightG / 1000
+                  const subtotal = totalPcs * (it.unit_price_usd || 0)
+                  return (
+                    <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                      <div>總支數: <b style={{ color: '#fff' }}>{totalPcs}</b> 支 · 小計: <b style={{ color: '#fff' }}>${subtotal.toFixed(2)}</b></div>
+                      <div>總克重: <b style={{ color: 'var(--gold)' }}>{totalWeightG.toFixed(1)} g</b> = <b style={{ color: 'var(--gold)' }}>{totalWeightKg.toFixed(3)} kg</b></div>
+                    </div>
+                  )
+                })()}
               </div>
             ))}
             <details style={{ marginTop: 8 }}>
@@ -247,7 +259,7 @@ export default function Customs() {
               <div style={{ marginTop: 8, maxHeight: 300, overflow: 'auto' }}>
                 {products.filter(p => !draft.items.some(i => i.product_id === p.id)).map(p => (
                   <div key={p.id} onClick={() => addItem(p.id)} style={{ padding: '8px 10px', borderBottom: '1px solid #2a2a2a', cursor: 'pointer', display: 'flex', justifyContent: 'space-between' }}>
-                    <div style={{ flex: 1, fontSize: 12 }}><div>{p.name}</div><div style={{ color: 'var(--text-muted)', fontSize: 10 }}>{p.pcs_per_bundle}/{p.package_type} · ${p.unit_price_usd}</div></div>
+                    <div style={{ flex: 1, fontSize: 12 }}><div>{p.name}</div><div style={{ color: 'var(--text-muted)', fontSize: 10 }}>{p.pcs_per_bundle}/{p.package_type} · ${p.unit_price_usd} · {p.unit_weight_g}g/支</div></div>
                     <ChevronRight size={16} style={{ color: 'var(--gold)' }} />
                   </div>
                 ))}
