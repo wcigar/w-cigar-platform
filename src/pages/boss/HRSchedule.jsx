@@ -105,7 +105,7 @@ export default function HRSchedule() {
             const cfg = { collecting: { l: '🟡 收集員工偏好中', c: 'var(--gold)' }, draft: { l: '🔒 已鎖定為草稿', c: 'var(--red)' }, published: { l: '✅ 已發布', c: 'var(--green)' } }[st]
             return <span style={{ fontSize: 12, fontWeight: 700, color: cfg.c, padding: '3px 10px', borderRadius: 12, background: 'rgba(0,0,0,0.3)' }}>{cfg.l}</span>
           })()}
-          <span style={{ fontSize: 10, color: 'var(--text-dim)', flex: 1 }}>員工提交: {(() => { const ids = new Set(prefs.filter(p => p.submitted).map(p => p.employee_id)); return ids.size })()}/{emps.length}</span>
+          <span style={{ fontSize: 10, color: 'var(--text-dim)', flex: 1 }}>員工提交: {(() => { const ids = new Set(prefs.filter(p => p.submitted_at).map(p => p.employee_id)); return ids.size })()}/{emps.length}</span>
           <div style={{ display: 'flex', gap: 6 }}>
             {(monthInfo?.status || 'collecting') !== 'published' && (<button onClick={() => { if (confirm('發布後員工前台會看到正式排班，確定？')) setMonthStatus('published') }} disabled={publishing} style={{ padding: '6px 12px', background: 'var(--green)', color: '#000', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', opacity: publishing ? 0.5 : 1 }}>✅ 發布給員工</button>)}
             {(monthInfo?.status || 'collecting') === 'collecting' && (<button onClick={() => setMonthStatus('draft')} disabled={publishing} style={{ padding: '6px 10px', background: 'rgba(255,154,154,.15)', color: 'var(--red)', border: '1px solid rgba(255,154,154,.4)', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>🔒 暫鎖定</button>)}
