@@ -18,7 +18,7 @@ export default function Commission() {
   async function loadData() {
     setLoading(true)
     const [mcR, detR, rulesR] = await Promise.all([
-      supabase.from('monthly_commission').select('*').eq('month', month).maybeSingle(),
+      supabase.rpc('get_monthly_commission', { p_admin_id: user?.employee_id, p_month: month }).maybeSingle(),
       supabase.rpc('get_staff_monthly_commission', { p_admin_id: user?.employee_id, p_month: month }),
       supabase.from('commission_rate_rules').select('*').eq('enabled', true).order('min_revenue'),
     ])
