@@ -26,6 +26,20 @@ export function currentPeriod() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
+// 取得「預設要顯示的月份」— 優先當月，當月若無資料則 fallback 到最近有資料的月份
+// 用途：督導結帳頁初始載入時呼叫，避免月初打開看到空白
+// 後端: get_collections_default_period() SECURITY DEFINER STABLE RPC
+// 失敗 fallback 回 currentPeriod()，不讓前端崩
+export async function getDefaultPeriod() {
+  try {
+    const { data, error } = await supabase.rpc('get_collections_default_period')
+    if (error || !data) return currentPeriod()
+    return data
+  } catch {
+    return currentPeriod()
+  }
+}
+
 function packNotes({ accountant_name, user_note }) {
   return JSON.stringify({
     accountant_name: accountant_name || null,
