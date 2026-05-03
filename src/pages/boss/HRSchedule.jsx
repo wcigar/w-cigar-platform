@@ -55,7 +55,7 @@ export default function HRSchedule() {
   }
 
   function getShift(eid, ds) { return scheds.find(s => s.employee_id === eid && s.date === ds) }
-  function getPref(eid, ds) { return prefs.find(p => p.employee_id === eid && p.date === ds)?.preference }
+  function getPref(eid, ds) { return prefs.find(p => p.employee_id === eid && p.date === ds)?.preferred_shift }
   const PREF_LABELS = { '早班': { t: '希早', c: '#3dd68c' }, '晚班': { t: '希晚', c: '#4d8ac4' }, '都可': { t: '希都可', c: 'var(--gold)' }, '休假': { t: '希休', c: '#ff9a9a' }, '不可': { t: '✗', c: 'var(--red)' } }
   async function setShiftVal(eid, ds, val) {
     const ex = getShift(eid, ds)
