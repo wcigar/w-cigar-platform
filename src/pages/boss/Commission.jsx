@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../lib/auth'
 import { TrendingUp, RefreshCw, ArrowRight } from 'lucide-react'
 
 export default function Commission() {
+  const { user } = useAuth()
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7))
   const [summary, setSummary] = useState(null)
   const [details, setDetails] = useState([])
@@ -17,7 +19,7 @@ export default function Commission() {
     setLoading(true)
     const [mcR, detR, rulesR] = await Promise.all([
       supabase.from('monthly_commission').select('*').eq('month', month).maybeSingle(),
-      supabase.from('staff_monthly_commission').select('*').eq('month', month).order('total_hours', { ascending: false }),
+      supabase.rpc('get_staff_monthly_commission', { p_admin_id: user?.employee_id, p_month: month }),
       supabase.from('commission_rate_rules').select('*').eq('enabled', true).order('min_revenue'),
     ])
     setSummary(mcR.data)
