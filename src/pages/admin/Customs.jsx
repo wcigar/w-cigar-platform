@@ -79,6 +79,21 @@ export default function Customs() {
     if (!draft.buyer_name) { alert('請填寫買家'); return }
     const totals = computeShipmentTotals(draft.items)
     const shipment = { ...draft, ...totals }
+    // iOS Safari requires navigator.share() to run inside the same user gesture as the click;
+    // any await before it (e.g. supabase insert) consumes the gesture and triggers
+    // 「無法為您顯示所有可分享的方式」. Generate + share first, then persist.
+    const docs = generateAllDocs({ supplier, shipment })
+    const files = [
+      { doc: docs.packingList, filename: `PackingList_${shipment.shipment_no}.pdf` },
+      { doc: docs.coo,         filename: `CertificateOfOrigin_${shipment.shipment_no}.pdf` },
+      { doc: docs.invoice,     filename: `CommercialInvoice_${shipment.shipment_no}.pdf` },
+    ]
+    if (action === 'share') {
+      const r = await sharePdfFiles(files)
+      if (r.method === 'cancelled') return
+    } else {
+      files.forEach(f => downloadPdf(f.doc, f.filename))
+    }
     const { error } = await supabase.from('customs_shipments').insert({
       shipment_no: shipment.shipment_no, shipment_date: shipment.shipment_date,
       supplier_id: supplier.id, buyer_name: shipment.buyer_name, buyer_address: shipment.buyer_address,
@@ -90,14 +105,6 @@ export default function Customs() {
       status: 'issued',
     })
     if (error) { alert('儲存失敗: ' + error.message); return }
-    const docs = generateAllDocs({ supplier, shipment })
-    const files = [
-      { doc: docs.packingList, filename: `PackingList_${shipment.shipment_no}.pdf` },
-      { doc: docs.coo,         filename: `CertificateOfOrigin_${shipment.shipment_no}.pdf` },
-      { doc: docs.invoice,     filename: `CommercialInvoice_${shipment.shipment_no}.pdf` },
-    ]
-    if (action === 'share') { const r = await sharePdfFiles(files); if (r.method === 'cancelled') return }
-    else { files.forEach(f => downloadPdf(f.doc, f.filename)) }
     setDraft(newDraft()); setTab('list'); loadAll()
   }
 
