@@ -137,3 +137,25 @@ nav button, nav a { font-size: 13px !important; padding: 8px 4px !important; }
   nav button, nav a { font-size: 14px !important; min-height: 56px !important; }
   nav svg { width: 24px !important; height: 24px !important; }
 }
+
+
+/* ===== Desktop nav fix (桌機 nav 字體放大 + 觸控目標放大) ===== */
+@media (min-width: 1025px) {
+  nav button, nav a {
+    font-size: 14px !important;
+    min-height: 56px !important;
+    padding: 8px 6px !important;
+    gap: 4px !important;
+  }
+  nav svg {
+    width: 22px !important;
+    height: 22px !important;
+  }
+  nav .nav-label {
+    font-size: 11px !important;
+  }
+  /* 桌機補 page-container 底部空間，避免 fixed action bar 被 nav 蓋住 */
+  .page-container {
+    padding-bottom: 140px !important;
+  }
+}
