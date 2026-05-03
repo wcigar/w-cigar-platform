@@ -307,7 +307,7 @@ function ProductManager({ products, onChange }) {
     if (p.id) {
       await supabase.from('customs_products').update({ name: p.name, pcs_per_bundle: +p.pcs_per_bundle, package_type: p.package_type, unit_price_usd: +p.unit_price_usd, unit_weight_g: +p.unit_weight_g, actual_cost_usd: actual, sort_order: +p.sort_order || 999, updated_at: new Date().toISOString() }).eq('id', p.id)
     } else {
-      await supabase.from('customs_products').insert({ name: p.name, pcs_per_bundle: +p.pcs_per_bundle || 25, package_type: p.package_type || 'Bundle', unit_price_usd: +p.unit_price_usd || 0, unit_weight_g: +p.unit_weight_g || 15, actual_cost_usd: actual, sort_order: 999 })
+      await supabase.from('customs_products').insert({ name: p.name, pcs_per_bundle: +p.pcs_per_bundle || 25, package_type: p.package_type || 'Box', unit_price_usd: +p.unit_price_usd || 0, unit_weight_g: +p.unit_weight_g || 15, actual_cost_usd: actual, sort_order: 999 })
     }
     setEditing(null); setAdding(false); onChange()
   }
@@ -319,7 +319,7 @@ function ProductManager({ products, onChange }) {
   return (
     <div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-        <button onClick={() => { setAdding(true); setEditing({ name: '', pcs_per_bundle: 25, package_type: 'Bundle', unit_price_usd: 0.85, unit_weight_g: 15 }) }} style={{ flex: 2, padding: 12, borderRadius: 8, background: 'var(--gold)', color: '#000', border: 'none', fontWeight: 700 }}><Plus size={16} style={{ verticalAlign: -3 }} /> 新增產品</button>
+        <button onClick={() => { setAdding(true); setEditing({ name: '', pcs_per_bundle: 25, package_type: 'Box', unit_price_usd: 0.85, unit_weight_g: 15 }) }} style={{ flex: 2, padding: 12, borderRadius: 8, background: 'var(--gold)', color: '#000', border: 'none', fontWeight: 700 }}><Plus size={16} style={{ verticalAlign: -3 }} /> 新增產品</button>
         <button onClick={() => setShowTaxSettings(true)} style={{ flex: 1, padding: 12, borderRadius: 8, background: 'rgba(251,146,60,0.15)', color: '#fb923c', border: '1px solid rgba(251,146,60,0.4)', fontWeight: 600, fontSize: 13 }}><Calculator size={14} style={{ verticalAlign: -2 }} /> 稅率設定</button>
       </div>
       {showTaxSettings && <TaxSettingsModal onClose={() => { setShowTaxSettings(false); onChange() }} />}
@@ -328,7 +328,11 @@ function ProductManager({ products, onChange }) {
           <Field label="產品名稱"><input value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })} /></Field>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <Field label="支/束"><input type="number" value={editing.pcs_per_bundle} onChange={e => setEditing({ ...editing, pcs_per_bundle: e.target.value })} /></Field>
-            <Field label="單位"><select value={editing.package_type} onChange={e => setEditing({ ...editing, package_type: e.target.value })}><option>Bundle</option><option>Box</option></select></Field>
+            <Field label="包裝 *"><select value={editing.package_type} onChange={e => setEditing({ ...editing, package_type: e.target.value })} required style={{ cursor: 'pointer' }}>
+              <option value="Box">📦 Box（盒裝）</option>
+              <option value="Bundle">🎀 Bundle（捆裝-緞帶+保鮮膜）</option>
+              <option value="Box+Bundle">📦+🎀 Box+Bundle（兩種都有）</option>
+            </select></Field>
             <Field label="單支重 g"><input type="number" value={editing.unit_weight_g} onChange={e => setEditing({ ...editing, unit_weight_g: e.target.value })} /></Field>
           </div>
           <div style={{ marginTop: 4, padding: 8, background: 'rgba(251,146,60,0.08)', border: '1px solid rgba(251,146,60,0.3)', borderRadius: 6, fontSize: 11, color: '#fb923c', marginBottom: 4 }}>
