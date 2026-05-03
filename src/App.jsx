@@ -67,6 +67,7 @@ import AdminOnboardingNew from './pages/admin/OnboardingNew'
 import AdminOnboardingDetail from './pages/admin/OnboardingDetail'
 import AdminCustoms from './pages/admin/Customs'
 import FactorySubmit from './pages/customs/FactorySubmit'
+import SalesInput from './pages/admin/SalesInput'
 
 function AppInner() {
   const { user, loading } = useAuth()
@@ -153,6 +154,7 @@ function AppInner() {
         <Route path="/admin/onboarding/:id/provisioning" element={<AdminGuard scope="admin"><AdminOnboardingDetail /></AdminGuard>} />
         <Route path="/admin/onboarding/:id/compensation" element={<AdminGuard scope="admin"><AdminOnboardingDetail /></AdminGuard>} />
         <Route path="/admin/customs" element={<AdminGuard scope="boss"><AdminCustoms /></AdminGuard>} />
+        <Route path="/admin/sales-input" element={<AdminGuard scope="admin"><SalesInput /></AdminGuard>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>
