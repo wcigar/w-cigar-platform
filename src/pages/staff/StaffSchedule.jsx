@@ -102,9 +102,9 @@ function ScheduleContent() {
     <div className="fade-in">
       <div className="section-title">我的排班</div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <button onClick={() => setMonth(subMonths(month, 1))} style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid var(--border-gold)', borderRadius: 10, padding: '10px 16px', color: 'var(--gold)', cursor: 'pointer', minWidth: 48, minHeight: 48, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ChevronLeft size={20} /></button>
-        <div style={{ fontSize: 20, color: 'var(--gold)', fontWeight: 700, minWidth: 140, textAlign: 'center' }}>{format(month, 'yyyy年M月')}</div>
-        <button onClick={() => setMonth(addMonths(month, 1))} style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid var(--border-gold)', borderRadius: 10, padding: '10px 16px', color: 'var(--gold)', cursor: 'pointer', minWidth: 48, minHeight: 48, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ChevronRight size={20} /></button>
+        <button onClick={() => setMonth(subMonths(month, 1))} style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid var(--border-gold)', borderRadius: 10, padding: '10px 16px', color: '#c9a84c', cursor: 'pointer', minWidth: 48, minHeight: 48, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ChevronLeft size={20} /></button>
+        <div style={{ fontSize: 20, color: '#c9a84c', fontWeight: 700, minWidth: 140, textAlign: 'center' }}>{format(month, 'yyyy年M月')}</div>
+        <button onClick={() => setMonth(addMonths(month, 1))} style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid var(--border-gold)', borderRadius: 10, padding: '10px 16px', color: '#c9a84c', cursor: 'pointer', minWidth: 48, minHeight: 48, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ChevronRight size={20} /></button>
       </div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
         <ST label="早班" value={dc} color="var(--green)" /><ST label="晚班" value={nc} color="var(--blue)" /><ST label="已休" value={oc + '/' + restQuota} color="var(--text)" />
@@ -122,7 +122,7 @@ function ScheduleContent() {
                 if (past || !shift) return
                 setLeaveMenu({ ds, shift, holName, isOff: shift === '休假' })
               }}>
-              <div style={{ fontSize: 12, fontWeight: td ? 700 : 400, color: td ? 'var(--gold)' : isWeekend ? 'var(--red)' : 'var(--text)' }}>{format(day, 'd')}</div>
+              <div style={{ fontSize: 12, fontWeight: td ? 700 : 400, color: td ? '#c9a84c' : isWeekend ? 'var(--red)' : 'var(--text)' }}>{format(day, 'd')}</div>
               {hol && <div style={{ fontSize: 7, color: 'var(--red)', fontWeight: 600, lineHeight: 1, marginTop: 1 }}>{holName.slice(0, 3)}</div>}
               {shift && <div style={{ fontSize: 8, fontWeight: 700, color, marginTop: 1 }}>{shift}</div>}
             </div>
@@ -133,7 +133,7 @@ function ScheduleContent() {
       {leaveMenu && !reasonInput.show && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,.7)', zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }} onClick={() => setLeaveMenu(null)}>
           <div style={{ width: '100%', maxWidth: 400, background: 'var(--black-card)', borderRadius: '16px 16px 0 0', padding: 16 }} onClick={e => e.stopPropagation()}>
-            <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 700, color: 'var(--gold)', marginBottom: 4 }}>{leaveMenu.ds}</div>
+            <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 700, color: '#c9a84c', marginBottom: 4 }}>{leaveMenu.ds}</div>
             <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>目前：{leaveMenu.shift}{leaveMenu.holName ? ' 🔴' + leaveMenu.holName : ''}</div>
             {leaveMenu.isOff && (<button onClick={() => { setReasonInput({ show: true, ds: leaveMenu.ds, type: '申請上班', text: '' }) }} style={{ width: '100%', padding: '14px 0', fontSize: 15, fontWeight: 700, borderRadius: 10, border: '1px solid var(--green)', background: 'rgba(77,168,108,.12)', color: 'var(--green)', cursor: 'pointer', marginBottom: 10 }}>💪 申請上班</button>)}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
@@ -150,18 +150,18 @@ function ScheduleContent() {
       {reasonInput.show && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,.7)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => { setReasonInput({ show: false, ds: '', type: '', text: '' }); setLeaveMenu(null) }}>
           <div style={{ width: '100%', maxWidth: 360, background: 'var(--black-card)', borderRadius: 16, padding: 20 }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--gold)', marginBottom: 4, textAlign: 'center' }}>{reasonInput.type}</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#c9a84c', marginBottom: 4, textAlign: 'center' }}>{reasonInput.type}</div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12, textAlign: 'center' }}>{reasonInput.ds}</div>
             <textarea autoFocus value={reasonInput.text} onChange={e => setReasonInput(prev => ({ ...prev, text: e.target.value }))} placeholder={reasonInput.type === '調班' ? '請輸入調班原因…' : '請輸入請假原因…'} rows={3} style={{ width: '100%', fontSize: 14, padding: 10, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text)', resize: 'none', boxSizing: 'border-box' }} />
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
               <button onClick={() => { setReasonInput({ show: false, ds: '', type: '', text: '' }); setLeaveMenu(null) }} style={{ flex: 1, padding: 12, fontSize: 14, fontWeight: 600, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text-muted)', cursor: 'pointer' }}>取消</button>
-              <button onClick={() => { requestLeave(reasonInput.ds, reasonInput.type); setReasonInput({ show: false, ds: '', type: '', text: '' }); setLeaveMenu(null) }} style={{ flex: 1, padding: 12, fontSize: 14, fontWeight: 700, borderRadius: 10, border: 'none', background: 'var(--gold)', color: 'var(--black)', cursor: 'pointer' }}>送出申請</button>
+              <button onClick={() => { requestLeave(reasonInput.ds, reasonInput.type); setReasonInput({ show: false, ds: '', type: '', text: '' }); setLeaveMenu(null) }} style={{ flex: 1, padding: 12, fontSize: 14, fontWeight: 700, borderRadius: 10, border: 'none', background: '#c9a84c', color: 'var(--black)', cursor: 'pointer' }}>送出申請</button>
             </div>
           </div>
         </div>
       )}
 
-      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--gold)', marginBottom: 8 }}>同事今日班別</div>
+      <div style={{ fontSize: 14, fontWeight: 600, color: '#c9a84c', marginBottom: 8 }}>同事今日班別</div>
       {emps.filter(e => e.id !== user.employee_id).map(emp => {
         const ts = allSchedules.find(s => s.employee_id === emp.id && s.date === format(new Date(), 'yyyy-MM-dd'))?.shift
         return <div key={emp.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)', fontSize: 13 }}>
@@ -172,13 +172,13 @@ function ScheduleContent() {
       <div style={{ marginTop: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <button style={nb} onClick={() => setPunchMonth(format(subMonths(new Date(punchMonth + '-01'), 1), 'yyyy-MM'))}><ChevronLeft size={16} /></button>
-          <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--gold)', display: 'flex', alignItems: 'center', gap: 6 }}><Clock size={14} /> {punchMonth} 打卡紀錄</span>
+          <span style={{ fontSize: 14, fontWeight: 600, color: '#c9a84c', display: 'flex', alignItems: 'center', gap: 6 }}><Clock size={14} /> {punchMonth} 打卡紀錄</span>
           <button style={nb} onClick={() => { const d = new Date(punchMonth + '-01'); d.setMonth(d.getMonth() + 1); setPunchMonth(format(d, 'yyyy-MM')) }}><ChevronRight size={16} /></button>
         </div>
         {Object.keys(punchByDate).length === 0 ? <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-dim)', fontSize: 13 }}>本月無打卡紀錄</div> :
           Object.entries(punchByDate).map(([date, recs]) => (
             <div key={date} className="card" style={{ padding: 12, marginBottom: 6 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--gold)', marginBottom: 6 }}>{date}</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#c9a84c', marginBottom: 6 }}>{date}</div>
               {recs.map(r => <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '3px 0', borderBottom: '1px dotted var(--border)' }}>
                 <span>{r.punch_type} {toTaipei(r.time, true)}</span>
                 <span style={{ color: r.is_valid ? 'var(--green)' : 'var(--red)', fontWeight: 600 }}>{r.distance_m}m {r.is_valid ? '✓' : '✗'}</span>
@@ -202,7 +202,7 @@ const PREF_OPTIONS = [
   { value: '', label: '—', color: 'var(--text-muted)', bg: 'transparent' },
   { value: '早班', label: '早', color: '#3dd68c', bg: 'rgba(61,214,140,.15)' },
   { value: '晚班', label: '晚', color: '#4d8ac4', bg: 'rgba(77,138,196,.15)' },
-  { value: '都可', label: '都可', color: 'var(--gold)', bg: 'var(--gold-glow)' },
+  { value: '都可', label: '都可', color: '#c9a84c', bg: 'var(--gold-glow)' },
   { value: '休假', label: '休', color: '#ff9a9a', bg: 'rgba(255,154,154,.15)' },
   { value: '不可', label: '✗', color: 'var(--red)', bg: 'rgba(196,77,77,.15)' },
 ]
@@ -280,20 +280,20 @@ function PreferenceContent() {
     <div className="fade-in">
       <div className="section-title">📝 填寫希望班表</div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 12 }}>
-        <button onClick={() => setMonth(subMonths(month, 1))} style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid var(--border-gold)', borderRadius: 10, padding: '10px 16px', color: 'var(--gold)', cursor: 'pointer', minWidth: 48, minHeight: 48, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ChevronLeft size={20} /></button>
-        <div style={{ fontSize: 20, color: 'var(--gold)', fontWeight: 700, minWidth: 140, textAlign: 'center' }}>{format(month, 'yyyy年M月')}</div>
-        <button onClick={() => setMonth(addMonths(month, 1))} style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid var(--border-gold)', borderRadius: 10, padding: '10px 16px', color: 'var(--gold)', cursor: 'pointer', minWidth: 48, minHeight: 48, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ChevronRight size={20} /></button>
+        <button onClick={() => setMonth(subMonths(month, 1))} style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid var(--border-gold)', borderRadius: 10, padding: '10px 16px', color: '#c9a84c', cursor: 'pointer', minWidth: 48, minHeight: 48, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ChevronLeft size={20} /></button>
+        <div style={{ fontSize: 20, color: '#c9a84c', fontWeight: 700, minWidth: 140, textAlign: 'center' }}>{format(month, 'yyyy年M月')}</div>
+        <button onClick={() => setMonth(addMonths(month, 1))} style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid var(--border-gold)', borderRadius: 10, padding: '10px 16px', color: '#c9a84c', cursor: 'pointer', minWidth: 48, minHeight: 48, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ChevronRight size={20} /></button>
       </div>
       <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 14 }}>
-        <button onClick={() => setMonth(new Date())} style={{ padding: '10px 20px', fontSize: 14, borderRadius: 20, background: format(month, 'yyyy-MM') === format(new Date(), 'yyyy-MM') ? 'var(--gold)' : 'transparent', color: format(month, 'yyyy-MM') === format(new Date(), 'yyyy-MM') ? '#000' : 'var(--gold)', border: '2px solid var(--gold)', cursor: 'pointer', fontWeight: 700, minHeight: 40 }}>📅 本月 ({new Date().getMonth() + 1}月)</button>
-        <button onClick={() => setMonth(addMonths(new Date(), 1))} style={{ padding: '10px 20px', fontSize: 14, borderRadius: 20, background: format(month, 'yyyy-MM') === format(addMonths(new Date(), 1), 'yyyy-MM') ? 'var(--gold)' : 'transparent', color: format(month, 'yyyy-MM') === format(addMonths(new Date(), 1), 'yyyy-MM') ? '#000' : 'var(--gold)', border: '2px solid var(--gold)', cursor: 'pointer', fontWeight: 700, minHeight: 40 }}>📅 下月 ({addMonths(new Date(), 1).getMonth() + 1}月)</button>
+        <button onClick={() => setMonth(new Date())} style={{ padding: '10px 20px', fontSize: 14, borderRadius: 20, background: format(month, 'yyyy-MM') === format(new Date(), 'yyyy-MM') ? '#c9a84c' : 'transparent', color: format(month, 'yyyy-MM') === format(new Date(), 'yyyy-MM') ? '#000' : '#c9a84c', border: '2px solid #c9a84c', cursor: 'pointer', fontWeight: 700, minHeight: 40 }}>📅 本月 ({new Date().getMonth() + 1}月)</button>
+        <button onClick={() => setMonth(addMonths(new Date(), 1))} style={{ padding: '10px 20px', fontSize: 14, borderRadius: 20, background: format(month, 'yyyy-MM') === format(addMonths(new Date(), 1), 'yyyy-MM') ? '#c9a84c' : 'transparent', color: format(month, 'yyyy-MM') === format(addMonths(new Date(), 1), 'yyyy-MM') ? '#000' : '#c9a84c', border: '2px solid #c9a84c', cursor: 'pointer', fontWeight: 700, minHeight: 40 }}>📅 下月 ({addMonths(new Date(), 1).getMonth() + 1}月)</button>
       </div>
-      {status === 'published' && (<div style={{ padding: 10, marginBottom: 10, borderRadius: 10, background: 'var(--gold-glow)', border: '1px solid var(--border-gold)', fontSize: 12, color: 'var(--gold)', textAlign: 'center', fontWeight: 600 }}>✅ 此月已發布正式排班，請以正式排班為準</div>)}
+      {status === 'published' && (<div style={{ padding: 10, marginBottom: 10, borderRadius: 10, background: 'var(--gold-glow)', border: '1px solid var(--border-gold)', fontSize: 12, color: '#c9a84c', textAlign: 'center', fontWeight: 600 }}>✅ 此月已發布正式排班，請以正式排班為準</div>)}
       {status === 'draft' && (<div style={{ padding: 10, marginBottom: 10, borderRadius: 10, background: 'rgba(196,77,77,.06)', border: '1px solid rgba(196,77,77,.2)', fontSize: 12, color: 'var(--red)', textAlign: 'center' }}>🔒 老闆排班中，已鎖定無法修改</div>)}
       <div className="card" style={{ padding: 10, marginBottom: 10, display: 'flex', justifyContent: 'space-around', textAlign: 'center' }}>
-        <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>已填</div><div style={{ fontSize: 18, color: 'var(--gold)', fontWeight: 700 }}>{filled}</div></div>
+        <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>已填</div><div style={{ fontSize: 18, color: '#c9a84c', fontWeight: 700 }}>{filled}</div></div>
         <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>總天數</div><div style={{ fontSize: 18, color: 'var(--text)', fontWeight: 700 }}>{total}</div></div>
-        <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>進度</div><div style={{ fontSize: 18, color: pct === 100 ? 'var(--green)' : 'var(--gold)', fontWeight: 700 }}>{pct}%</div></div>
+        <div><div style={{ fontSize: 9, color: 'var(--text-dim)' }}>進度</div><div style={{ fontSize: 18, color: pct === 100 ? 'var(--green)' : '#c9a84c', fontWeight: 700 }}>{pct}%</div></div>
       </div>
       <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 8, textAlign: 'center' }}>點日期循環：早 → 晚 → 都可 → 休 → ✗ → 清除</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, marginBottom: 14 }}>
@@ -315,8 +315,8 @@ function PreferenceContent() {
       </div>
       {!locked && (
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={saveDraft} disabled={saving} style={{ flex: 1, padding: 12, fontSize: 13, background: 'transparent', color: 'var(--gold)', border: '2px solid var(--gold)', borderRadius: 10, fontWeight: 700, cursor: 'pointer' }}>{saving ? '儲存中...' : '💾 暫存'}</button>
-          <button onClick={submit} disabled={saving} style={{ flex: 1, padding: 12, fontSize: 13, fontWeight: 700, background: 'var(--gold)', color: 'var(--black)', border: 'none', borderRadius: 10, cursor: 'pointer' }}>{saving ? '送出中...' : '✅ 提交'}</button>
+          <button onClick={saveDraft} disabled={saving} style={{ flex: 1, padding: 12, fontSize: 13, background: 'transparent', color: '#c9a84c', border: '2px solid #c9a84c', borderRadius: 10, fontWeight: 700, cursor: 'pointer' }}>{saving ? '儲存中...' : '💾 暫存'}</button>
+          <button onClick={submit} disabled={saving} style={{ flex: 1, padding: 12, fontSize: 13, fontWeight: 700, background: '#c9a84c', color: 'var(--black)', border: 'none', borderRadius: 10, cursor: 'pointer' }}>{saving ? '送出中...' : '✅ 提交'}</button>
         </div>
       )}
     </div>
@@ -330,7 +330,7 @@ export default function StaffSchedule() {
     <div className="page-container fade-in">
       <div style={{ display: 'flex', gap: 6, marginBottom: 16, overflowX: 'auto' }}>
         {tabs.map(t => (
-          <button key={t.id} onClick={() => setPageMode(t.id)} style={{ padding: '8px 14px', borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', background: pageMode === t.id ? 'var(--gold-glow)' : 'transparent', color: pageMode === t.id ? 'var(--gold)' : 'var(--text-dim)', border: pageMode === t.id ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>{t.l}</button>
+          <button key={t.id} onClick={() => setPageMode(t.id)} style={{ padding: '8px 14px', borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', background: pageMode === t.id ? 'var(--gold-glow)' : 'transparent', color: pageMode === t.id ? '#c9a84c' : 'var(--text-dim)', border: pageMode === t.id ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>{t.l}</button>
         ))}
       </div>
       {pageMode === 'leave' ? <LeaveRequest /> : pageMode === 'preference' ? <PreferenceContent /> : <ScheduleContent />}
