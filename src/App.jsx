@@ -25,7 +25,7 @@ import Commission from './pages/boss/Commission'
 import Customers from './pages/boss/Customers'
 import DealerOrders from './pages/DealerOrders'
 import AmbassadorApp from './pages/ambassador/AmbassadorApp'
-const SupervisorApp = () => null
+import SupervisorApp from './pages/supervisor/SupervisorApp'
 import PosApp from './pages/pos/PosApp'
 import VipCellar from './pages/VipCellar'
 import JoinPage from './pages/join/JoinPage'
