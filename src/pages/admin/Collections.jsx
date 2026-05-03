@@ -19,7 +19,7 @@ import {
   SUPERVISORS, getSupervisorVenueMap, autoAssignByRegion,
 } from '../../lib/services/supervisors'
 import {
-  COLLECTION_STATUSES, currentPeriod, getMonthlyCollection,
+    COLLECTION_STATUSES, currentPeriod, getDefaultPeriod, getMonthlyCollection,
   setSelfSaleQty, recordCollectionPayment, setStocktake, setSignatures,
 } from '../../lib/services/collections'
 import { getDefaultAlertMap } from '../../lib/services/venues'
@@ -50,6 +50,18 @@ export default function Collections() {
     setLoading(false)
   }
   useEffect(() => { reload() }, [refreshTick])
+
+  // 初次載入時動態切到「最近有資料的月份」
+  // 月初打開時當月還沒結算（無資料），自動 fallback 到上一個有資料的月份
+  // 督導手動切月份後不再覆蓋（[] dep 只跑一次）
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const p = await getDefaultPeriod()
+      if (!cancelled && p) setPeriod(p)
+    })()
+    return () => { cancelled = true }
+  }, [])
 
   const session = (() => {
     try { return JSON.parse(localStorage.getItem('w_cigar_user') || '{}') } catch { return {} }
