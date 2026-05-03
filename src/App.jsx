@@ -1,4 +1,6 @@
-import { useEffect } from 'react'
+
+import SupervisorApp from './pages/supervisor/SupervisorApp'
+  if (window.location.pathname.startsWith('/supervisor')) return (<Routes><Route path="/supervisor/*" element={<SupervisorApp />} /></Routes>)import { useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './lib/auth'
 import { seedTodayTasks } from './lib/seeder'
