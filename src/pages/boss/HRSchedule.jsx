@@ -17,7 +17,9 @@ export default function HRSchedule() {
   const [emps, setEmps] = useState([])
   const [scheds, setScheds] = useState([])
   const [prefs, setPrefs] = useState([])
+  const [monthInfo, setMonthInfo] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [publishing, setPublishing] = useState(false)
   const [tab, setTab] = useState('schedule')
 
   const start = startOfMonth(month), end = endOfMonth(month)
@@ -31,13 +33,25 @@ export default function HRSchedule() {
   async function load() {
     setLoading(true)
     const s = format(start, 'yyyy-MM-dd'), e = format(end, 'yyyy-MM-dd')
-    const [eR, sR, pR] = await Promise.all([
+    const [eR, sR, pR, mR] = await Promise.all([
       supabase.from('employees').select('*').eq('enabled', true).order('name'),
       supabase.from('schedules').select('*').gte('date', s).lte('date', e),
       supabase.from('schedule_preferences').select('*').gte('date', s).lte('date', e),
+      supabase.from('schedule_months').select('*').eq('month', monthStr).maybeSingle(),
     ])
     setEmps((eR.data || []).filter(x => !x.is_admin)); setScheds(sR.data || []); setPrefs(pR.data || [])
+    setMonthInfo(mR.data || null)
     setLoading(false)
+  }
+
+  async function setMonthStatus(newStatus) {
+    setPublishing(true)
+    const { error } = await supabase.from('schedule_months').upsert({ month: monthStr, status: newStatus, updated_at: new Date().toISOString() }, { onConflict: 'month' })
+    setPublishing(false)
+    if (error) { alert('狀態更新失敗：' + error.message); return }
+    const labels = { collecting: '已重新開放收集偏好', draft: '已鎖定為草稿（員工無法再改希望）', published: '✅ 已發布！員工前台會同步看到正式排班' }
+    alert(labels[newStatus] || '已更新')
+    load()
   }
 
   function getShift(eid, ds) { return scheds.find(s => s.employee_id === eid && s.date === ds) }
@@ -50,13 +64,11 @@ export default function HRSchedule() {
     load()
   }
 
-  // Punch records
   const [punches, setPunches] = useState([])
   const [punchDate, setPunchDate] = useState(format(new Date(), 'yyyy-MM-dd'))
   async function loadPunches() { const { data } = await supabase.from('punch_records').select('*').eq('date', punchDate).order('time'); setPunches(data || []) }
   useEffect(() => { if (tab === 'punch') loadPunches() }, [tab, punchDate])
 
-  // Audit
   const [logs, setLogs] = useState([])
   async function loadLogs() { const { data } = await supabase.from('audit_logs').select('*').order('time', { ascending: false }).limit(50); setLogs(data || []) }
   useEffect(() => { if (tab === 'audit') loadLogs() }, [tab])
@@ -64,7 +76,6 @@ export default function HRSchedule() {
   const shiftColors = { '早班': '#3dd68c', '晚班': '#4d8ac4', '休假': '#ff9a9a', '臨時請假': '#ff9a9a', '病假': '#ffb347', '事假': '#ffd700', '特休': '#64c8ff' }
   const tabs = [{ id: 'schedule', l: '排班表' }, { id: 'holidays', l: `國定假日 (${monthHolidays.length})` }, { id: 'punch', l: '打卡紀錄' }, { id: 'leave', l: '假單審核' }, { id: 'weekly', l: '📊 週會報表' }, { id: 'audit', l: '稽核日誌' }]
 
-  // Holiday cost analysis
   const holWorkCount = scheds.filter(s => (s.shift === '早班' || s.shift === '晚班') && isHoliday(s.date)).length
   const holRestCount = scheds.filter(s => s.shift === '休假' && isHoliday(s.date)).length
 
@@ -78,7 +89,6 @@ export default function HRSchedule() {
       </div>
 
       {tab === 'schedule' && (<>
-        {/* Month nav + Smart Schedule */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button style={nb} onClick={() => setMonth(subMonths(month, 1))}><ChevronLeft size={18} /></button>
@@ -88,7 +98,21 @@ export default function HRSchedule() {
           <SmartScheduleBtn month={month} onDone={load} />
         </div>
 
-        {/* Employee stats bar */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, padding: 10, background: 'var(--black-card)', border: '1px solid var(--border)', borderRadius: 10, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>本月狀態:</span>
+          {(() => {
+            const st = monthInfo?.status || 'collecting'
+            const cfg = { collecting: { l: '🟡 收集員工偏好中', c: 'var(--gold)' }, draft: { l: '🔒 已鎖定為草稿', c: 'var(--red)' }, published: { l: '✅ 已發布', c: 'var(--green)' } }[st]
+            return <span style={{ fontSize: 12, fontWeight: 700, color: cfg.c, padding: '3px 10px', borderRadius: 12, background: 'rgba(0,0,0,0.3)' }}>{cfg.l}</span>
+          })()}
+          <span style={{ fontSize: 10, color: 'var(--text-dim)', flex: 1 }}>員工提交: {(() => { const ids = new Set(prefs.filter(p => p.submitted).map(p => p.employee_id)); return ids.size })()}/{emps.length}</span>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {(monthInfo?.status || 'collecting') !== 'published' && (<button onClick={() => { if (confirm('發布後員工前台會看到正式排班，確定？')) setMonthStatus('published') }} disabled={publishing} style={{ padding: '6px 12px', background: 'var(--green)', color: '#000', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', opacity: publishing ? 0.5 : 1 }}>✅ 發布給員工</button>)}
+            {(monthInfo?.status || 'collecting') === 'collecting' && (<button onClick={() => setMonthStatus('draft')} disabled={publishing} style={{ padding: '6px 10px', background: 'rgba(255,154,154,.15)', color: 'var(--red)', border: '1px solid rgba(255,154,154,.4)', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>🔒 暫鎖定</button>)}
+            {(monthInfo?.status === 'draft' || monthInfo?.status === 'published') && (<button onClick={() => { if (confirm('重新開放後員工又能改希望偏好，確定？')) setMonthStatus('collecting') }} disabled={publishing} style={{ padding: '6px 10px', background: 'transparent', color: 'var(--gold)', border: '1px solid var(--border-gold)', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>↩ 重新開放</button>)}
+          </div>
+        </div>
+
         <div style={{ display: 'flex', gap: 6, marginBottom: 10, overflowX: 'auto', paddingBottom: 4 }}>
           <div style={{ padding: '6px 10px', background: 'var(--black-card)', border: '1px solid var(--border)', borderRadius: 10, fontSize: 11, whiteSpace: 'nowrap' }}>
             <span style={{ color: 'var(--gold)', fontWeight: 700 }}>可休 {restQuota}天</span>
@@ -100,26 +124,18 @@ export default function HRSchedule() {
             const holWork = es.filter(s => (s.shift === '早班' || s.shift === '晚班') && isHoliday(s.date)).length
             return <div key={emp.id} style={{ padding: '6px 10px', background: 'var(--black-card)', border: '1px solid var(--border)', borderRadius: 10, fontSize: 10, whiteSpace: 'nowrap', textAlign: 'center' }}>
               <div style={{ fontWeight: 700, color: 'var(--gold)' }}>{emp.name}</div>
-              <div style={{ color: 'var(--text-dim)', marginTop: 2 }}>
-                上{work} 休{off}/{restQuota}
-                {holWork > 0 && <span style={{ color: 'var(--red)' }}> 國假{holWork}</span>}
-              </div>
+              <div style={{ color: 'var(--text-dim)', marginTop: 2 }}>上{work} 休{off}/{restQuota}{holWork > 0 && <span style={{ color: 'var(--red)' }}> 國假{holWork}</span>}</div>
             </div>
           })}
         </div>
 
-        {/* Holiday cost banner */}
         {monthHolidays.length > 0 && (
           <div style={{ fontSize: 11, padding: '8px 12px', marginBottom: 10, borderRadius: 10, background: 'rgba(196,77,77,.06)', border: '1px solid rgba(196,77,77,.15)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><AlertTriangle size={12} color="var(--red)" /> 本月{monthHolidays.length}天國假</span>
-            <span>
-              <span style={{ color: 'var(--red)', fontWeight: 600 }}>{holWorkCount}人次上班(2倍)</span>
-              <span style={{ color: 'var(--green)', fontWeight: 600, marginLeft: 8 }}>{holRestCount}人次排休(省$)</span>
-            </span>
+            <span><span style={{ color: 'var(--red)', fontWeight: 600 }}>{holWorkCount}人次上班(2倍)</span><span style={{ color: 'var(--green)', fontWeight: 600, marginLeft: 8 }}>{holRestCount}人次排休(省$)</span></span>
           </div>
         )}
 
-        {/* Schedule table */}
         <div style={{ overflowX: 'auto' }}>
           <table style={{ minWidth: Math.max(500, emps.length * 80 + 120) }}>
             <thead><tr>
@@ -156,12 +172,7 @@ export default function HRSchedule() {
                       const pref = getPref(emp.id, ds)
                       const prefInfo = pref ? PREF_LABELS[pref] : null
                       return <td key={emp.id} style={{ padding: 3, textAlign: 'center', background: isHolWork ? 'rgba(196,77,77,.12)' : undefined }}>
-                        <select value={v} onChange={e => setShiftVal(emp.id, ds, e.target.value)} style={{
-                          background: v ? c + '20' : 'var(--black)', color: isHolWork ? 'var(--red)' : c,
-                          border: isHolWork ? '1px solid rgba(196,77,77,.4)' : '1px solid var(--border)',
-                          borderRadius: 6, padding: '4px 2px', fontSize: 11, width: '100%', cursor: 'pointer', textAlign: 'center',
-                          fontWeight: isHolWork ? 700 : 400
-                        }}>
+                        <select value={v} onChange={e => setShiftVal(emp.id, ds, e.target.value)} style={{ background: v ? c + '20' : 'var(--black)', color: isHolWork ? 'var(--red)' : c, border: isHolWork ? '1px solid rgba(196,77,77,.4)' : '1px solid var(--border)', borderRadius: 6, padding: '4px 2px', fontSize: 11, width: '100%', cursor: 'pointer', textAlign: 'center', fontWeight: isHolWork ? 700 : 400 }}>
                           <option value="">—</option>
                           {ALL_SHIFTS.filter(Boolean).map(o => <option key={o} value={o}>{o}</option>)}
                         </select>
@@ -182,15 +193,9 @@ export default function HRSchedule() {
           <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--gold)', marginBottom: 12 }}>{format(month, 'yyyy年')} 台灣法定假日</div>
           <div style={{ padding: 12, marginBottom: 14, borderRadius: 12, background: 'rgba(196,77,77,.06)', border: '1px solid rgba(196,77,77,.15)' }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--red)', marginBottom: 6 }}>⚠️ 服務業國假上班 = 雙倍工資（勞基法§39）</div>
-            <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-              💡 <strong>省錢策略</strong>：國假只排最少人力上班，其他人排休替補。
-              智能排班已自動套用此策略。
-            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>💡 <strong>省錢策略</strong>：國假只排最少人力上班，其他人排休替補。智能排班已自動套用此策略。</div>
           </div>
-          <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 14 }}>
-            本月可休天數：<strong style={{ color: 'var(--gold)' }}>{restQuota} 天</strong>（週末{restQuota - monthHolidays.length} + 國假{monthHolidays.length}）
-          </div>
-
+          <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 14 }}>本月可休天數：<strong style={{ color: 'var(--gold)' }}>{restQuota} 天</strong>（週末{restQuota - monthHolidays.length} + 國假{monthHolidays.length}）</div>
           {monthHolidays.length > 0 && (
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--red)', marginBottom: 6 }}>本月國假 ({monthHolidays.length}天)</div>
@@ -199,21 +204,12 @@ export default function HRSchedule() {
                 const workers = scheds.filter(s => s.date === h.date && (s.shift === '早班' || s.shift === '晚班'))
                 const resters = scheds.filter(s => s.date === h.date && s.shift === '休假')
                 return <div key={h.date} className="card" style={{ padding: 12, marginBottom: 6, borderColor: 'rgba(196,77,77,.2)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 600, color: 'var(--red)' }}>🔴 {h.name}</span>
-                    <span style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{h.date.slice(5)} ({dow})</span>
-                  </div>
-                  {(workers.length > 0 || resters.length > 0) && (
-                    <div style={{ fontSize: 11, marginTop: 6, display: 'flex', gap: 10 }}>
-                      {workers.length > 0 && <span style={{ color: 'var(--red)' }}>上班(2倍)：{workers.map(w => emps.find(e => e.id === w.employee_id)?.name || w.employee_id).join('、')}</span>}
-                      {resters.length > 0 && <span style={{ color: 'var(--green)' }}>排休：{resters.map(r => emps.find(e => e.id === r.employee_id)?.name || r.employee_id).join('、')}</span>}
-                    </div>
-                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ fontWeight: 600, color: 'var(--red)' }}>🔴 {h.name}</span><span style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{h.date.slice(5)} ({dow})</span></div>
+                  {(workers.length > 0 || resters.length > 0) && (<div style={{ fontSize: 11, marginTop: 6, display: 'flex', gap: 10 }}>{workers.length > 0 && <span style={{ color: 'var(--red)' }}>上班(2倍)：{workers.map(w => emps.find(e => e.id === w.employee_id)?.name || w.employee_id).join('、')}</span>}{resters.length > 0 && <span style={{ color: 'var(--green)' }}>排休：{resters.map(r => emps.find(e => e.id === r.employee_id)?.name || r.employee_id).join('、')}</span>}</div>)}
                 </div>
               })}
             </div>
           )}
-
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--gold)', marginBottom: 6 }}>全年國定假日一覽</div>
           {Object.entries(TW_HOLIDAYS_2026).map(([date, info]) => {
             const d = new Date(date), dow = WEEKDAYS[d.getDay()]
@@ -232,39 +228,27 @@ export default function HRSchedule() {
             <input type="date" value={punchDate} onChange={e => setPunchDate(e.target.value)} style={{ width: 160, fontSize: 14, padding: 8 }} />
             <button className="btn-outline" style={{ padding: '8px 14px', fontSize: 13 }} onClick={loadPunches}>查詢</button>
           </div>
-          {punches.length === 0 ? <div className="card" style={{ textAlign: 'center', padding: 30, color: 'var(--text-dim)' }}>無打卡紀錄</div> :
-            punches.map(p => (
-              <div key={p.id} className="card" style={{ padding: 12, marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 600 }}>{p.name} · {p.punch_type}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{toTaipei(p.time, true)}</div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 14, fontFamily: 'var(--font-mono)', color: p.is_valid ? 'var(--green)' : 'var(--red)', fontWeight: 600 }}>{p.distance_m}m</div>
-                  <div style={{ fontSize: 11, color: p.is_valid ? 'var(--green)' : 'var(--red)' }}>{p.is_valid ? '✓ 有效' : '✗ 無效'}</div>
-                </div>
-              </div>
-            ))}
+          {punches.length === 0 ? <div className="card" style={{ textAlign: 'center', padding: 30, color: 'var(--text-dim)' }}>無打卡紀錄</div> : punches.map(p => (
+            <div key={p.id} className="card" style={{ padding: 12, marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div><div style={{ fontSize: 14, fontWeight: 600 }}>{p.name} · {p.punch_type}</div><div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{toTaipei(p.time, true)}</div></div>
+              <div style={{ textAlign: 'right' }}><div style={{ fontSize: 14, fontFamily: 'var(--font-mono)', color: p.is_valid ? 'var(--green)' : 'var(--red)', fontWeight: 600 }}>{p.distance_m}m</div><div style={{ fontSize: 11, color: p.is_valid ? 'var(--green)' : 'var(--red)' }}>{p.is_valid ? '✓ 有效' : '✗ 無效'}</div></div>
+            </div>
+          ))}
         </div>
       )}
 
       {tab === 'leave' && <LeaveApproval />}
-
       {tab === 'weekly' && <WeeklyReport />}
 
       {tab === 'audit' && (
         <div>
-          {logs.length === 0 ? <div className="card" style={{ textAlign: 'center', padding: 30, color: 'var(--text-dim)' }}>無日誌</div> :
-            logs.map(l => (
-              <div key={l.id} style={{ padding: '8px 0', borderBottom: '1px solid var(--border)', fontSize: 12 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--gold)', fontWeight: 600 }}>{l.event}</span>
-                  <span style={{ color: 'var(--text-muted)' }}>{l.operator}</span>
-                </div>
-                <div style={{ color: 'var(--text-dim)', marginTop: 2 }}>{l.description?.slice(0, 100)}</div>
-                <div style={{ color: 'var(--text-muted)', fontSize: 10, marginTop: 2 }}>{l.time ? new Date(l.time).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}</div>
-              </div>
-            ))}
+          {logs.length === 0 ? <div className="card" style={{ textAlign: 'center', padding: 30, color: 'var(--text-dim)' }}>無日誌</div> : logs.map(l => (
+            <div key={l.id} style={{ padding: '8px 0', borderBottom: '1px solid var(--border)', fontSize: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--gold)', fontWeight: 600 }}>{l.event}</span><span style={{ color: 'var(--text-muted)' }}>{l.operator}</span></div>
+              <div style={{ color: 'var(--text-dim)', marginTop: 2 }}>{l.description?.slice(0, 100)}</div>
+              <div style={{ color: 'var(--text-muted)', fontSize: 10, marginTop: 2 }}>{l.time ? new Date(l.time).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}</div>
+            </div>
+          ))}
         </div>
       )}
     </div>
