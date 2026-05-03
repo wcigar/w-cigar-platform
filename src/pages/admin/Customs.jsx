@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { FileText, Plus, Trash2, Download, Share2, Package, Edit3, X, ChevronRight, ChevronDown, ChevronUp, FileBadge, Link2, Copy, Check, Calculator, Settings } from 'lucide-react'
 import {
-  generateAllDocs, downloadPdf, sharePdfFiles, computeShipmentTotals,
+  generateAllDocs, generateMergedDoc, downloadPdf, sharePdfFiles, computeShipmentTotals,
 } from '../../lib/services/customsPdf'
 
 export default function Customs() {
@@ -96,8 +96,12 @@ export default function Customs() {
       { doc: docs.coo,         filename: `CertificateOfOrigin_${shipment.shipment_no}.pdf` },
       { doc: docs.invoice,     filename: `CommercialInvoice_${shipment.shipment_no}.pdf` },
     ]
-    if (action === 'share') { const r = await sharePdfFiles(files); if (r.method === 'cancelled') return }
-    else { files.forEach(f => downloadPdf(f.doc, f.filename)) }
+    if (action === 'share') {
+      const r = await sharePdfFiles(files, { fallback: () => desktopShareFallback(supplier, shipment) })
+      if (r.method === 'cancelled') return
+    } else {
+      files.forEach(f => downloadPdf(f.doc, f.filename))
+    }
     setDraft(newDraft()); setTab('list'); loadAll()
   }
 
@@ -109,8 +113,16 @@ export default function Customs() {
       { doc: docs.coo,         filename: `CertificateOfOrigin_${sh.shipment_no}.pdf` },
       { doc: docs.invoice,     filename: `CommercialInvoice_${sh.shipment_no}.pdf` },
     ]
-    if (action === 'share') await sharePdfFiles(files)
+    if (action === 'share') await sharePdfFiles(files, { fallback: () => desktopShareFallback(supplier, sh) })
     else files.forEach(f => downloadPdf(f.doc, f.filename))
+  }
+
+  // Desktop fallback: Web Share API doesn't reach LINE Desktop, so download a single merged PDF
+  // (PackingList + COO + Invoice 3 sections) for the user to drag into the LINE Desktop conversation.
+  function desktopShareFallback(supplier, shipment) {
+    const merged = generateMergedDoc({ supplier, shipment })
+    downloadPdf(merged, `Customs_${shipment.shipment_no}.pdf`)
+    alert(`已下載合併 PDF：Customs_${shipment.shipment_no}.pdf\n\n請打開 LINE Desktop，把下載資料夾的這個 PDF 拖到對話框送出。`)
   }
 
   async function deleteShipment(id) {

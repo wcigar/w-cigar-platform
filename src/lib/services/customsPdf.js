@@ -79,8 +79,8 @@ function partyBlock(doc, label, lines, x, y, w = 80) {
 }
 
 // ===== 1) Packing List =====
-export function makePackingList({ supplier, shipment }) {
-  const doc = new jsPDF({ unit: 'mm', format: 'a4' })
+export function makePackingList({ supplier, shipment }, doc) {
+  if (!doc) doc = new jsPDF({ unit: 'mm', format: 'a4' })
   header(doc, supplier); titleBar(doc, 'PACKING LIST', 48)
   infoBlock(doc, 'Date', formatDate(shipment.shipment_date), 20, 56, 40)
   infoBlock(doc, 'Country of Origin', supplier?.country || 'Dominican Republic', 65, 56, 40)
@@ -112,8 +112,8 @@ export function makePackingList({ supplier, shipment }) {
 }
 
 // ===== 2) Certificate of Origin =====
-export function makeCertificateOfOrigin({ supplier, shipment }) {
-  const doc = new jsPDF({ unit: 'mm', format: 'a4' })
+export function makeCertificateOfOrigin({ supplier, shipment }, doc) {
+  if (!doc) doc = new jsPDF({ unit: 'mm', format: 'a4' })
   header(doc, supplier); titleBar(doc, "MANUFACTURER'S DECLARATION OF ORIGIN", 48)
   doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(30, 30, 30)
   let y = 60
@@ -153,8 +153,8 @@ export function makeCertificateOfOrigin({ supplier, shipment }) {
 }
 
 // ===== 3) Commercial Invoice =====
-export function makeCommercialInvoice({ supplier, shipment }) {
-  const doc = new jsPDF({ unit: 'mm', format: 'a4' })
+export function makeCommercialInvoice({ supplier, shipment }, doc) {
+  if (!doc) doc = new jsPDF({ unit: 'mm', format: 'a4' })
   header(doc, supplier)
   doc.setFontSize(8); doc.setTextColor(80, 80, 80)
   doc.text(`RNC: ${ascii(supplier?.rnc || '')}`, 20, 44)
@@ -235,9 +235,20 @@ export function generateAllDocs({ supplier, shipment }) {
   }
 }
 
+// Single PDF with all 3 sections — used by desktop fallback so user only drags 1 file into LINE Desktop
+export function generateMergedDoc({ supplier, shipment }) {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' })
+  makePackingList({ supplier, shipment }, doc)
+  doc.addPage()
+  makeCertificateOfOrigin({ supplier, shipment }, doc)
+  doc.addPage()
+  makeCommercialInvoice({ supplier, shipment }, doc)
+  return doc
+}
+
 export function downloadPdf(doc, filename) { doc.save(filename) }
 
-export async function sharePdfFiles(files) {
+export async function sharePdfFiles(files, opts = {}) {
   const fileObjs = files.map(({ doc, filename }) => {
     const blob = doc.output('blob')
     return new File([blob], filename, { type: 'application/pdf' })
@@ -250,7 +261,12 @@ export async function sharePdfFiles(files) {
       if (e.name === 'AbortError') return { ok: false, method: 'cancelled' }
     }
   }
-  files.forEach(({ doc, filename }) => doc.save(filename))
+  // Desktop / no Web Share fallback: caller can override (e.g. download merged single PDF + show drag hint)
+  if (typeof opts.fallback === 'function') {
+    opts.fallback()
+  } else {
+    files.forEach(({ doc, filename }) => doc.save(filename))
+  }
   return { ok: true, method: 'download' }
 }
 
