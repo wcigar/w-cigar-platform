@@ -285,8 +285,8 @@ function PreferenceContent() {
         <button onClick={() => setMonth(addMonths(month, 1))} style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid var(--border-gold)', borderRadius: 10, padding: '10px 16px', color: 'var(--gold)', cursor: 'pointer', minWidth: 48, minHeight: 48, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ChevronRight size={20} /></button>
       </div>
       <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 14 }}>
-        <button onClick={() => setMonth(new Date())} style={{ padding: '10px 20px', fontSize: 14, borderRadius: 20, background: format(month, 'yyyy-MM') === format(new Date(), 'yyyy-MM') ? 'var(--gold)' : 'rgba(255,255,255,0.05)', color: format(month, 'yyyy-MM') === format(new Date(), 'yyyy-MM') ? '#000' : 'var(--text)', border: '1px solid var(--border)', cursor: 'pointer', fontWeight: 700, minHeight: 40 }}>📅 本月 ({new Date().getMonth() + 1}月)</button>
-        <button onClick={() => setMonth(addMonths(new Date(), 1))} style={{ padding: '10px 20px', fontSize: 14, borderRadius: 20, background: format(month, 'yyyy-MM') === format(addMonths(new Date(), 1), 'yyyy-MM') ? 'var(--gold)' : 'rgba(255,255,255,0.05)', color: format(month, 'yyyy-MM') === format(addMonths(new Date(), 1), 'yyyy-MM') ? '#000' : 'var(--text)', border: '1px solid var(--border)', cursor: 'pointer', fontWeight: 700, minHeight: 40 }}>📅 下月 ({addMonths(new Date(), 1).getMonth() + 1}月)</button>
+        <button onClick={() => setMonth(new Date())} style={{ padding: '10px 20px', fontSize: 14, borderRadius: 20, background: format(month, 'yyyy-MM') === format(new Date(), 'yyyy-MM') ? 'var(--gold)' : 'transparent', color: format(month, 'yyyy-MM') === format(new Date(), 'yyyy-MM') ? '#000' : 'var(--gold)', border: '2px solid var(--gold)', cursor: 'pointer', fontWeight: 700, minHeight: 40 }}>📅 本月 ({new Date().getMonth() + 1}月)</button>
+        <button onClick={() => setMonth(addMonths(new Date(), 1))} style={{ padding: '10px 20px', fontSize: 14, borderRadius: 20, background: format(month, 'yyyy-MM') === format(addMonths(new Date(), 1), 'yyyy-MM') ? 'var(--gold)' : 'transparent', color: format(month, 'yyyy-MM') === format(addMonths(new Date(), 1), 'yyyy-MM') ? '#000' : 'var(--gold)', border: '2px solid var(--gold)', cursor: 'pointer', fontWeight: 700, minHeight: 40 }}>📅 下月 ({addMonths(new Date(), 1).getMonth() + 1}月)</button>
       </div>
       {status === 'published' && (<div style={{ padding: 10, marginBottom: 10, borderRadius: 10, background: 'var(--gold-glow)', border: '1px solid var(--border-gold)', fontSize: 12, color: 'var(--gold)', textAlign: 'center', fontWeight: 600 }}>✅ 此月已發布正式排班，請以正式排班為準</div>)}
       {status === 'draft' && (<div style={{ padding: 10, marginBottom: 10, borderRadius: 10, background: 'rgba(196,77,77,.06)', border: '1px solid rgba(196,77,77,.2)', fontSize: 12, color: 'var(--red)', textAlign: 'center' }}>🔒 老闆排班中，已鎖定無法修改</div>)}
@@ -315,7 +315,7 @@ function PreferenceContent() {
       </div>
       {!locked && (
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={saveDraft} disabled={saving} className="btn-outline" style={{ flex: 1, padding: 12, fontSize: 13 }}>{saving ? '儲存中...' : '💾 暫存'}</button>
+          <button onClick={saveDraft} disabled={saving} style={{ flex: 1, padding: 12, fontSize: 13, background: 'transparent', color: 'var(--gold)', border: '2px solid var(--gold)', borderRadius: 10, fontWeight: 700, cursor: 'pointer' }}>{saving ? '儲存中...' : '💾 暫存'}</button>
           <button onClick={submit} disabled={saving} style={{ flex: 1, padding: 12, fontSize: 13, fontWeight: 700, background: 'var(--gold)', color: 'var(--black)', border: 'none', borderRadius: 10, cursor: 'pointer' }}>{saving ? '送出中...' : '✅ 提交'}</button>
         </div>
       )}
