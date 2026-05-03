@@ -102,9 +102,9 @@ function ScheduleContent() {
     <div className="fade-in">
       <div className="section-title">我的排班</div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <button style={nb} onClick={() => setMonth(subMonths(month, 1))}><ChevronLeft size={18} /></button>
-        <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--gold)' }}>{format(month, 'yyyy年M月')}</span>
-        <button style={nb} onClick={() => setMonth(addMonths(month, 1))}><ChevronRight size={18} /></button>
+        <button onClick={() => setMonth(subMonths(month, 1))} style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid var(--border-gold)', borderRadius: 10, padding: '10px 16px', color: 'var(--gold)', cursor: 'pointer', minWidth: 48, minHeight: 48, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ChevronLeft size={20} /></button>
+        <div style={{ fontSize: 20, color: 'var(--gold)', fontWeight: 700, minWidth: 140, textAlign: 'center' }}>{format(month, 'yyyy年M月')}</div>
+        <button onClick={() => setMonth(addMonths(month, 1))} style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid var(--border-gold)', borderRadius: 10, padding: '10px 16px', color: 'var(--gold)', cursor: 'pointer', minWidth: 48, minHeight: 48, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ChevronRight size={20} /></button>
       </div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
         <ST label="早班" value={dc} color="var(--green)" /><ST label="晚班" value={nc} color="var(--blue)" /><ST label="已休" value={oc + '/' + restQuota} color="var(--text)" />
