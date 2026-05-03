@@ -6,6 +6,7 @@ import { calcLaborIns, calcHealthIns, calcLaborPension, calcLaborInsER, calcHeal
 import { ChevronDown, ChevronUp, Plus, Trash2, Save, FileText, Printer, Edit3, Clock, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react'
 import { taipeiHM } from '../../lib/timezone'
 import { format, subMonths, endOfMonth } from 'date-fns'
+import { useAuth } from '../../lib/auth'
 
 /* ================================================================
    resolvePunch — 人工修正優先
@@ -164,6 +165,7 @@ function calcSalaryToDate(emp, cfg, bonusDefs, att, isCurrentMonth, targetDate) 
    主元件
    ================================================================ */
 export default function Payroll() {
+  const { user } = useAuth()
   const [tab, setTab] = useState('payroll')
   const [month, setMonth] = useState(format(new Date(), 'yyyy-MM'))
   const [emps, setEmps] = useState([])
@@ -203,8 +205,8 @@ export default function Payroll() {
     const e = isCurrentMonth ? todayStr : format(endOfMonth(new Date(month + '-01')), 'yyyy-MM-dd')
     const [eR, sR, bR, xR, scR, pR] = await Promise.all([
       supabase.from('employees').select('*').eq('enabled', true).order('name'),
-      supabase.from('salary_config').select('*'),
-      supabase.from('bonus_definitions').select('*'),
+      supabase.rpc('get_salary_configs', { p_admin_id: user?.employee_id }),
+      supabase.rpc('get_bonus_definitions', { p_admin_id: user?.employee_id }),
       supabase.from('expenses').select('*').gte('date', s).lte('date', e).order('date', { ascending: false }),
       supabase.from('schedules').select('*').gte('date', s).lte('date', e),
       supabase.from('punch_records').select('*').gte('date', s).lte('date', e),
@@ -214,7 +216,7 @@ export default function Payroll() {
     setExpenses(xR.data || []); setSchedules(scR.data || []); setPunches(pR.data || [])
     // 載入薪資手動調整
     try {
-      const { data: adjData } = await supabase.from('payroll_adjustments').select('*').eq('month', month)
+      const { data: adjData } = await supabase.rpc('get_payroll_adjustments', { p_admin_id: user?.employee_id, p_month: month })
       const adjMap = {}
       ;(adjData || []).forEach(a => { adjMap[a.employee_id] = { id: a.id, base: a.base_override, bonus: a.bonus_override, deduction: a.deduction_override, final_pay: a.final_pay_override, amount: a.amount, reason: a.reason } })
       setAdjustments(adjMap)
@@ -232,9 +234,12 @@ export default function Payroll() {
 
   async function saveSalConfig(eid) {
     if (!editingSal) return
-    const existing = salConfigs.find(s => s.employee_id === eid)
-    if (existing) await supabase.from('salary_config').update({ monthly_salary: +editingSal.monthly_salary, salary_type: editingSal.salary_type }).eq('id', existing.id)
-    else await supabase.from('salary_config').insert({ employee_id: eid, monthly_salary: +editingSal.monthly_salary, salary_type: editingSal.salary_type })
+    await supabase.rpc('upsert_salary_config', {
+      p_admin_id: user?.employee_id,
+      p_employee_id: eid,
+      p_monthly_salary: +editingSal.monthly_salary,
+      p_salary_type: editingSal.salary_type
+    })
     logAudit('Salary', `更新 ${eid} $${editingSal.monthly_salary}`, 'ADMIN')
     setEditingSal(null); load()
   }
@@ -248,12 +253,17 @@ export default function Payroll() {
       reason: adjForm.reason,
     }
     if (!row.base_override && !row.bonus_override && !row.deduction_override && !row.final_pay_override) return alert('請至少填寫一項覆寫')
-    const existing = adjustments[eid]
-    if (existing?.id) {
-      await supabase.from('payroll_adjustments').update(row).eq('id', existing.id)
-    } else {
-      await supabase.from('payroll_adjustments').insert({ employee_id: eid, month, ...row })
-    }
+    await supabase.rpc('upsert_payroll_adjustment', {
+      p_admin_id: user?.employee_id,
+      p_employee_id: eid,
+      p_month: month,
+      p_base_override: row.base_override,
+      p_bonus_override: row.bonus_override,
+      p_deduction_override: row.deduction_override,
+      p_final_pay_override: row.final_pay_override,
+      p_amount: row.amount,
+      p_reason: row.reason
+    })
     logAudit('PayrollAdjust', `${eid} 覆寫 底薪:${row.base_override||'-'} 獎金:${row.bonus_override||'-'} 扣款:${row.deduction_override||'-'} 實發:${row.final_pay_override||'-'} ${row.reason}`, 'ADMIN')
     setEditingAdj(null); setAdjForm({ base: '', bonus: '', deduction: '', final_pay: '', reason: '' }); load()
   }
@@ -262,18 +272,24 @@ export default function Payroll() {
     const existing = adjustments[eid]
     if (!existing?.id) return
     if (!confirm('確定移除此調整？')) return
-    await supabase.from('payroll_adjustments').delete().eq('id', existing.id)
+    await supabase.rpc('delete_payroll_adjustment', { p_admin_id: user?.employee_id, p_id: existing.id })
     setEditingAdj(null); load()
   }
 
   async function addBonus() {
     if (!newBonus.employee_id || !newBonus.bonus_name || !newBonus.amount) return alert('請填完')
     const name = emps.find(e => e.id === newBonus.employee_id)?.name || ''
-    await supabase.from('bonus_definitions').insert({ bonus_id: `B_${newBonus.employee_id}_${Date.now()}`, employee_id: newBonus.employee_id, name, bonus_name: newBonus.bonus_name, amount: +newBonus.amount, calc_method: '固定月額', enabled: true })
+    await supabase.rpc('add_bonus_definition', {
+      p_admin_id: user?.employee_id,
+      p_employee_id: newBonus.employee_id,
+      p_name: name,
+      p_bonus_name: newBonus.bonus_name,
+      p_amount: +newBonus.amount
+    })
     setNewBonus({ employee_id: '', bonus_name: '', amount: '' }); setShowBonusForm(false); load()
   }
-  async function toggleBonus(id, en) { await supabase.from('bonus_definitions').update({ enabled: en }).eq('id', id); load() }
-  async function deleteBonus(id) { if (!confirm('刪除？')) return; await supabase.from('bonus_definitions').delete().eq('id', id); load() }
+  async function toggleBonus(id, en) { await supabase.rpc('toggle_bonus_definition', { p_admin_id: user?.employee_id, p_id: id, p_enabled: en }); load() }
+  async function deleteBonus(id) { if (!confirm('刪除？')) return; await supabase.rpc('delete_bonus_definition', { p_admin_id: user?.employee_id, p_id: id }); load() }
   async function addExpense() {
     if (!newExp.category || !newExp.amount) return
     await supabase.from('expenses').insert({ date: newExp.date, category: newExp.category, item: newExp.item, amount: +newExp.amount, payment: newExp.payment, handler: 'ADMIN' })

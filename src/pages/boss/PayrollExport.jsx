@@ -4,8 +4,10 @@ import { Printer, FileText } from 'lucide-react'
 import { format, subMonths, endOfMonth } from 'date-fns'
 import { calcLaborIns, calcHealthIns, calcLaborPension, calcLaborInsER, calcHealthInsER, findBracket, calcOvertimePay, LABOR_INS_BRACKETS, HEALTH_INS_BRACKETS, SHIFTS, LATE_GRACE_MIN, OT_GRACE_MIN } from '../../lib/constants'
 import { taipeiHM } from '../../lib/timezone'
+import { useAuth } from '../../lib/auth'
 
 export default function PayrollExport() {
+  const { user } = useAuth()
   const [month, setMonth] = useState(format(new Date(), 'yyyy-MM'))
   const [emps, setEmps] = useState([])
   const [salConfigs, setSalConfigs] = useState([])
@@ -22,8 +24,8 @@ export default function PayrollExport() {
     const s = month + '-01', e = format(endOfMonth(new Date(month + '-01')), 'yyyy-MM-dd')
     const [eR, sR, bR, scR, pR] = await Promise.all([
       supabase.from('employees').select('*').eq('enabled', true).order('name'),
-      supabase.from('salary_config').select('*'),
-      supabase.from('bonus_definitions').select('*'),
+      supabase.rpc('get_salary_configs', { p_admin_id: user?.employee_id }),
+      supabase.rpc('get_bonus_definitions', { p_admin_id: user?.employee_id }),
       supabase.from('schedules').select('*').gte('date', s).lte('date', e),
       supabase.from('punch_records').select('*').gte('date', s).lte('date', e),
     ])
