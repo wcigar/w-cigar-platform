@@ -229,7 +229,7 @@ function PreferenceContent() {
       supabase.from('schedule_months').select('*').eq('month', monthStr).maybeSingle(),
     ])
     const map = {}
-    ;(pR.data || []).forEach(p => { map[p.date] = p.preference })
+    ;(pR.data || []).forEach(p => { map[p.date] = p.preferred_shift })
     setPrefs(map)
     setMonthInfo(mR.data || null)
     setLoading(false)
@@ -249,7 +249,7 @@ function PreferenceContent() {
   async function saveDraft() {
     setSaving(true)
     const rows = Object.entries(prefs).filter(([_, v]) => v).map(([date, preference]) => ({
-      employee_id: user.employee_id, employee_name: user.name, date, preference, month: monthStr, submitted: false,
+      employee_id: user.employee_id, employee_name: user.name, date, preferred_shift: preference, month: monthStr, submitted_at: null,
     }))
     await supabase.from('schedule_preferences').delete().eq('employee_id', user.employee_id).gte('date', format(start, 'yyyy-MM-dd')).lte('date', format(end, 'yyyy-MM-dd'))
     if (rows.length) await supabase.from('schedule_preferences').insert(rows)
@@ -261,7 +261,7 @@ function PreferenceContent() {
     if (!confirm('提交後將鎖定，確定？')) return
     setSaving(true)
     const rows = Object.entries(prefs).filter(([_, v]) => v).map(([date, preference]) => ({
-      employee_id: user.employee_id, employee_name: user.name, date, preference, month: monthStr, submitted: true,
+      employee_id: user.employee_id, employee_name: user.name, date, preferred_shift: preference, month: monthStr, submitted_at: new Date().toISOString(),
     }))
     await supabase.from('schedule_preferences').delete().eq('employee_id', user.employee_id).gte('date', format(start, 'yyyy-MM-dd')).lte('date', format(end, 'yyyy-MM-dd'))
     if (rows.length) await supabase.from('schedule_preferences').insert(rows)
