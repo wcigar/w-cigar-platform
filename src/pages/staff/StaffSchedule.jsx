@@ -316,7 +316,7 @@ function PreferenceContent() {
       {!locked && (
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={saveDraft} disabled={saving} className="btn-outline" style={{ flex: 1, padding: 12, fontSize: 13 }}>{saving ? '儲存中...' : '💾 暫存'}</button>
-          <button onClick={submit} disabled={saving} style={{ flex: 1, padding: 12, fontSize: 13, fontWeight: 700, background: 'var(--gold)', color: 'var(--black)', border: 'none', borderRadius: 10, cursor: 'pointer' }}>{saving ? '送出中...' : '✅ 提交（鎖定）'}</button>
+          <button onClick={submit} disabled={saving} style={{ flex: 1, padding: 12, fontSize: 13, fontWeight: 700, background: 'var(--gold)', color: 'var(--black)', border: 'none', borderRadius: 10, cursor: 'pointer' }}>{saving ? '送出中...' : '✅ 提交'}</button>
         </div>
       )}
     </div>
