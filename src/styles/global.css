@@ -159,3 +159,11 @@ nav button, nav a { font-size: 13px !important; padding: 8px 4px !important; }
     padding-bottom: 140px !important;
   }
 }
+
+
+/* ===== 桌機 fixed bottom action bars 上推 避開 nav 重疊 ===== */
+@media (min-width: 1025px) {
+  div[style*="position: fixed"][style*="bottom: 0px"][style*="left: 0px"][style*="right: 0px"] {
+    bottom: 64px !important;
+  }
+}
