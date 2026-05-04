@@ -68,6 +68,7 @@ import AdminOnboardingDetail from './pages/admin/OnboardingDetail'
 import AdminCustoms from './pages/admin/Customs'
 import FactorySubmit from './pages/customs/FactorySubmit'
 import SalesInput from './pages/admin/SalesInput'
+import SimpleHome, { V2Placeholder } from './pages/SimpleHome'
 
 function AppInner() {
   const { user, loading } = useAuth()
@@ -88,6 +89,8 @@ function AppInner() {
         {isBoss ? (
           <>
             <Route path="/" element={<BossHome />} />
+            <Route path="/v2" element={<SimpleHome />} />
+            <Route path="/v2/*" element={<V2Placeholder />} />
             <Route path="/operations" element={<BossOperations />} />
             <Route path="/hr" element={<BossHR />} />
             <Route path="/payroll" element={<BossPayroll />} />
