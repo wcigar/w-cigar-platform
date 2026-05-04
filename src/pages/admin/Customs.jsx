@@ -19,6 +19,7 @@ export default function Customs() {
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState(null)
   const [draft, setDraft] = useState(newDraft())
+  const [customForm, setCustomForm] = useState({ show: false, name: '', qty_pcs: '', qty_packages: '', package_type: 'Box', amount: '', weight_g: '' })
 
   function newDraft() {
     return {
@@ -59,6 +60,34 @@ export default function Customs() {
     if (!p) return
     if (draft.items.some(i => i.product_id === productId)) return
     setDraft(d => ({ ...d, items: [...d.items, { product_id: p.id, name: p.name, pcs_per_bundle: p.pcs_per_bundle, package_type: p.package_type, unit_price_usd: p.unit_price_usd, unit_weight_g: p.unit_weight_g, qty_bundles: 1, total_pcs: p.pcs_per_bundle, subtotal: +(p.pcs_per_bundle * p.unit_price_usd).toFixed(2) }] }))
+  }
+
+  function addCustomItem() {
+    const namePart = customForm.name.trim()
+    const qty_pcs = +customForm.qty_pcs || 0
+    const qty_packages = +customForm.qty_packages || 0
+    const amount = +customForm.amount || 0
+    const weight_g = +customForm.weight_g || 0
+    if (!namePart) { alert('請填寫品項名稱（前綴後面那段）'); return }
+    if (qty_pcs <= 0) { alert('數量(支) 必須大於 0'); return }
+    if (qty_packages <= 0) { alert('數量(盒/捆) 必須大於 0'); return }
+    const fullName = 'Cigars Dominican ' + namePart
+    setDraft(d => ({
+      ...d,
+      items: [...d.items, {
+        product_id: null,
+        name: fullName,
+        pcs_per_bundle: +(qty_pcs / qty_packages).toFixed(2),
+        package_type: customForm.package_type,
+        unit_price_usd: +(amount / qty_pcs).toFixed(4),
+        unit_weight_g: +(weight_g / qty_pcs).toFixed(2),
+        qty_bundles: qty_packages,
+        total_pcs: qty_pcs,
+        subtotal: +amount.toFixed(2),
+        is_custom: true,
+      }]
+    }))
+    setCustomForm({ show: false, name: '', qty_pcs: '', qty_packages: '', package_type: 'Box', amount: '', weight_g: '' })
   }
 
   function updateItem(idx, field, value) {
@@ -254,6 +283,71 @@ export default function Customs() {
                 })()}
               </div>
             ))}
+            {/* 自訂新產品 — 手動輸入 5 欄位 */}
+            <details open={customForm.show} style={{ marginTop: 8 }}>
+              <summary
+                onClick={(e) => { e.preventDefault(); setCustomForm(f => ({ ...f, show: !f.show })) }}
+                style={{ padding: '10px', background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.3)', borderRadius: 8, cursor: 'pointer', fontSize: 13, color: '#4ade80', listStyle: 'none', fontWeight: 600 }}
+              >
+                <Plus size={14} style={{ verticalAlign: -2 }} /> 自訂新產品（手動輸入）
+              </summary>
+              {customForm.show && (
+                <div style={{ marginTop: 8, padding: 12, background: 'rgba(74,222,128,0.05)', border: '1px solid rgba(74,222,128,0.2)', borderRadius: 8 }}>
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 3 }}>品項名稱</div>
+                    <div style={{ display: 'flex', alignItems: 'stretch', background: 'rgba(255,255,255,0.05)', border: '1px solid #333', borderRadius: 6, overflow: 'hidden' }}>
+                      <span style={{ padding: '8px 10px', background: 'rgba(201,168,76,0.15)', color: 'var(--gold)', fontSize: 13, fontWeight: 600, borderRight: '1px solid #333', whiteSpace: 'nowrap' }}>Cigars Dominican</span>
+                      <input
+                        value={customForm.name}
+                        onChange={e => setCustomForm(f => ({ ...f, name: e.target.value }))}
+                        placeholder="El Rey del Mundo Robusto 0.88LB"
+                        style={{ flex: 1, padding: '8px 10px', background: 'transparent', border: 'none', color: '#fff', fontSize: 13, outline: 'none' }}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                    <Field label="數量 (支)">
+                      <input type="number" min="0" step="1" value={customForm.qty_pcs} onChange={e => setCustomForm(f => ({ ...f, qty_pcs: e.target.value }))} placeholder="0" />
+                    </Field>
+                    <div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 3 }}>數量 (盒/捆) + 單位</div>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        <input
+                          type="number" min="0" step="1"
+                          value={customForm.qty_packages}
+                          onChange={e => setCustomForm(f => ({ ...f, qty_packages: e.target.value }))}
+                          placeholder="0"
+                          style={{ flex: 1, padding: '8px 10px', background: 'rgba(255,255,255,0.05)', border: '1px solid #333', borderRadius: 6, color: '#fff', fontSize: 13, boxSizing: 'border-box' }}
+                        />
+                        <select
+                          value={customForm.package_type}
+                          onChange={e => setCustomForm(f => ({ ...f, package_type: e.target.value }))}
+                          style={{ padding: '8px 10px', background: 'rgba(255,255,255,0.05)', border: '1px solid #333', borderRadius: 6, color: '#fff', fontSize: 13, cursor: 'pointer' }}
+                        >
+                          <option value="Box">Box (盒)</option>
+                          <option value="Bundle">Bundle (捆)</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <Field label="總金額 USD">
+                      <input type="number" min="0" step="0.01" value={customForm.amount} onChange={e => setCustomForm(f => ({ ...f, amount: e.target.value }))} placeholder="0.00" />
+                    </Field>
+                    <Field label="淨重 (g)">
+                      <input type="number" min="0" step="0.1" value={customForm.weight_g} onChange={e => setCustomForm(f => ({ ...f, weight_g: e.target.value }))} placeholder="0.0" />
+                    </Field>
+                  </div>
+
+                  <button onClick={addCustomItem} style={{ width: '100%', padding: 10, marginTop: 10, borderRadius: 6, background: '#4ade80', color: '#000', border: 'none', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                    <Plus size={14} style={{ verticalAlign: -2 }} /> 加入到清單
+                  </button>
+                </div>
+              )}
+            </details>
+
             <details style={{ marginTop: 8 }}>
               <summary style={{ padding: '10px', background: 'rgba(255,215,0,0.1)', borderRadius: 8, cursor: 'pointer', fontSize: 13, color: 'var(--gold)', listStyle: 'none' }}><Plus size={14} style={{ verticalAlign: -2 }} /> 加入產品...</summary>
               <div style={{ marginTop: 8, maxHeight: 300, overflow: 'auto' }}>
