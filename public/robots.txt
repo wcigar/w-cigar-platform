@@ -1,0 +1,6 @@
+# W Cigar Bar 內部營運平台
+# 此站為員工專用後台，不開放公開索引。
+# Public site: bible.wcigarbar.com
+
+User-agent: *
+Disallow: /
