@@ -5,7 +5,8 @@
 //   - Commercial Invoice (商業發票)
 // 純前端 docx + file-saver, 手機亦可用
 // ============================================================
-import { saveAs } from 'file-saver'
+import FileSaver from 'file-saver'
+const saveAs = FileSaver?.saveAs || FileSaver
 import {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
   AlignmentType, BorderStyle, HeadingLevel, WidthType, VerticalAlign,
