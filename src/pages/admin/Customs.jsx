@@ -137,10 +137,22 @@ export default function Customs() {
       total_amount_usd: totals.total_amount_usd, total_net_weight_kg: totals.total_net_weight_kg,
       status: 'issued',
     }
-    // 並行：DB 儲存（背景）+ 文件生成（前景立刻給檔案）
-    const dbPromise = editingId
-      ? supabase.from('customs_shipments').update(row).eq('id', editingId)
-      : supabase.from('customs_shipments').insert(row)
+    // 重複單號處理：insert 撞 unique 時詢問是否覆蓋既有筆
+    async function persist() {
+      if (editingId) return await supabase.from('customs_shipments').update(row).eq('id', editingId)
+      const ins = await supabase.from('customs_shipments').insert(row)
+      if (!ins.error) return ins
+      const msg = ins.error.message || ''
+      const isDup = ins.error.code === '23505' || msg.includes('duplicate key')
+      if (!isDup) return ins
+      const ok = confirm(`單號 ${shipment.shipment_no} 已存在。\n按「確定」覆蓋既有記錄；按「取消」改用其他單號。`)
+      if (!ok) return { error: { message: '已取消覆蓋，請改用其他單號' } }
+      const { data: existing, error: findErr } = await supabase
+        .from('customs_shipments').select('id').eq('shipment_no', shipment.shipment_no).maybeSingle()
+      if (findErr || !existing?.id) return { error: { message: '找不到既有記錄: ' + (findErr?.message || 'no row') } }
+      return await supabase.from('customs_shipments').update(row).eq('id', existing.id)
+    }
+    const dbPromise = persist()
 
     // 純儲存 (save) — 不產生檔案不下載
     if (action === 'save') {
