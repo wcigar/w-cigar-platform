@@ -137,34 +137,45 @@ export default function Customs() {
       total_amount_usd: totals.total_amount_usd, total_net_weight_kg: totals.total_net_weight_kg,
       status: 'issued',
     }
-    let error
-    if (editingId) {
-      // 更新既有
-      ;({ error } = await supabase.from('customs_shipments').update(row).eq('id', editingId))
-    } else {
-      // 新增
-      ;({ error } = await supabase.from('customs_shipments').insert(row))
-    }
-    if (error) { alert(editingId ? '更新失敗: ' + error.message : '儲存失敗: ' + error.message); return }
+    // 並行：DB 儲存（背景）+ 文件生成（前景立刻給檔案）
+    const dbPromise = editingId
+      ? supabase.from('customs_shipments').update(row).eq('id', editingId)
+      : supabase.from('customs_shipments').insert(row)
+
+    // PDF 同步立刻產出 + 觸發下載（不等 DB）
     const pdfs = generateAllDocs({ supplier, shipment })
-    const docxs = await generateAllDocsDocx({ supplier, shipment })
     const pdfFiles = [
       { doc: pdfs.packingList, filename: `PackingList_${shipment.shipment_no}.pdf` },
       { doc: pdfs.coo,         filename: `CertificateOfOrigin_${shipment.shipment_no}.pdf` },
       { doc: pdfs.invoice,     filename: `CommercialInvoice_${shipment.shipment_no}.pdf` },
     ]
-    const docxFiles = [
-      { blob: docxs.packingList, filename: `PackingList_${shipment.shipment_no}.docx` },
-      { blob: docxs.coo,         filename: `CertificateOfOrigin_${shipment.shipment_no}.docx` },
-      { blob: docxs.invoice,     filename: `CommercialInvoice_${shipment.shipment_no}.docx` },
-    ]
+    // Word 與 DB 並行；Word 算完才下載（PDF 已先下載完）
+    const docxPromise = generateAllDocsDocx({ supplier, shipment })
+
     if (action === 'share') {
       const r = await sharePdfFiles(pdfFiles)
-      if (r.method === 'cancelled') return
-      docxFiles.forEach(f => downloadDocx(f.blob, f.filename))
+      if (r.method === 'cancelled') { await dbPromise; return }
+      const docxs = await docxPromise
+      ;[
+        { blob: docxs.packingList, filename: `PackingList_${shipment.shipment_no}.docx` },
+        { blob: docxs.coo,         filename: `CertificateOfOrigin_${shipment.shipment_no}.docx` },
+        { blob: docxs.invoice,     filename: `CommercialInvoice_${shipment.shipment_no}.docx` },
+      ].forEach(f => downloadDocx(f.blob, f.filename))
     } else {
-      pdfFiles.forEach(f => downloadPdf(f.doc, f.filename))
-      docxFiles.forEach(f => downloadDocx(f.blob, f.filename))
+      pdfFiles.forEach(f => downloadPdf(f.doc, f.filename))      // PDF 立刻下載
+      const docxs = await docxPromise                             // Word 算完
+      ;[
+        { blob: docxs.packingList, filename: `PackingList_${shipment.shipment_no}.docx` },
+        { blob: docxs.coo,         filename: `CertificateOfOrigin_${shipment.shipment_no}.docx` },
+        { blob: docxs.invoice,     filename: `CommercialInvoice_${shipment.shipment_no}.docx` },
+      ].forEach(f => downloadDocx(f.blob, f.filename))
+    }
+
+    // 等 DB 完成回應（失敗時提示，但下載已給）
+    const { error } = await dbPromise
+    if (error) {
+      alert((editingId ? '更新失敗（檔案已下載）: ' : '儲存失敗（檔案已下載）: ') + error.message)
+      return
     }
     setEditingId(null); setDraft(newDraft()); setTab('list'); loadAll()
   }
