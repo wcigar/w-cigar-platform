@@ -349,7 +349,7 @@ export default function Customs() {
                   </div>
                 )}
                 <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
-                  <button onClick={() => regenDocs(sh, 'share')} style={{ flex: 1, padding: '8px', borderRadius: 6, background: 'var(--gold)', color: '#000', border: 'none', fontWeight: 600, fontSize: 13 }}><Share2 size={14} style={{ verticalAlign: -2 }} /> 分享 LINE</button>
+                  <button onClick={() => regenDocs(sh, 'share')} style={{ flex: 1, padding: '8px', borderRadius: 6, background: '#06c755', color: '#fff', border: 'none', fontWeight: 600, fontSize: 13 }}><Share2 size={14} style={{ verticalAlign: -2 }} /> 分享 LINE</button>
                   <button onClick={() => regenDocs(sh, 'download')} style={{ flex: 1, padding: '8px', borderRadius: 6, background: '#2a2a2a', color: '#fff', border: 'none', fontSize: 13 }}><Download size={14} style={{ verticalAlign: -2 }} /> 下載</button>
                   <button onClick={() => editShipment(sh)} style={{ padding: '8px 12px', borderRadius: 6, background: 'rgba(96,165,250,0.15)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.4)', fontSize: 13, fontWeight: 600 }}><Edit3 size={14} style={{ verticalAlign: -2 }} /> 編輯</button>
                   {(sh.declaration_no || sh.tariff_twd) && (<button onClick={() => setExpandedId(expanded ? null : sh.id)} style={{ padding: '8px 10px', borderRadius: 6, background: 'rgba(251,146,60,0.15)', color: '#fb923c', border: '1px solid rgba(251,146,60,0.3)', fontSize: 13 }}>{expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}</button>)}
