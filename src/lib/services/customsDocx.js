@@ -56,15 +56,67 @@ function thinCell({ text, bold = false, size = 18, fill, align = AlignmentType.L
   })
 }
 
+// TDE | TABACOS DON ESTEBAN logo - 用 docx Table 模擬 PDF 版面
+function logoTable() {
+  const blackBorder = { style: BorderStyle.SINGLE, size: 12, color: '141414' }
+  const noBorder = { style: BorderStyle.NIL, size: 0, color: 'FFFFFF' }
+  // 左 cell: TDE 方框（四邊黑線）
+  const tdeCell = new TableCell({
+    width: { size: 1400, type: WidthType.DXA },
+    verticalAlign: VerticalAlign.CENTER,
+    margins: { top: 100, bottom: 100, left: 80, right: 80 },
+    borders: { top: blackBorder, bottom: blackBorder, left: blackBorder, right: blackBorder },
+    children: [new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 0, after: 0 },
+      children: [new TextRun({ text: 'TDE', bold: true, size: 40, color: '141414', font: 'Calibri' })],
+    })],
+  })
+  // 右 cell: TABACOS / DON ESTEBAN（左邊一條細灰線）
+  const greyLine = { style: BorderStyle.SINGLE, size: 6, color: '808080' }
+  const nameCell = new TableCell({
+    width: { size: 3400, type: WidthType.DXA },
+    verticalAlign: VerticalAlign.CENTER,
+    margins: { top: 40, bottom: 40, left: 200, right: 80 },
+    borders: { top: noBorder, bottom: noBorder, left: greyLine, right: noBorder },
+    children: [
+      new Paragraph({
+        alignment: AlignmentType.LEFT,
+        spacing: { before: 0, after: 40 },
+        children: [new TextRun({ text: 'TABACOS', size: 18, color: '141414', characterSpacing: 60, font: 'Calibri' })],
+      }),
+      new Paragraph({
+        alignment: AlignmentType.LEFT,
+        spacing: { before: 0, after: 0 },
+        children: [new TextRun({ text: 'DON ESTEBAN', bold: true, size: 28, color: '141414', font: 'Calibri' })],
+      }),
+    ],
+  })
+  return new Table({
+    alignment: AlignmentType.CENTER,
+    width: { size: 4800, type: WidthType.DXA },
+    rows: [new TableRow({ children: [tdeCell, nameCell] })],
+    borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder, insideHorizontal: noBorder, insideVertical: noBorder },
+  })
+}
+
+function thinDivider() {
+  // 灰色細線分隔（仿 PDF doc.line(20, 28, 190, 28)）
+  return new Paragraph({
+    spacing: { before: 100, after: 80 },
+    border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: 'B4B4B4', space: 1 } },
+    children: [],
+  })
+}
+
 function headerBlock(supplier) {
-  const lines = [
-    P(supplier?.name || '', { bold: true, size: 32, align: AlignmentType.CENTER }),
-    P(supplier?.address || '', { size: 20, align: AlignmentType.CENTER, color: '505050' }),
-  ]
-  if (supplier?.country) lines.push(P(supplier.country, { size: 20, align: AlignmentType.CENTER, color: '505050' }))
-  if (supplier?.phone || supplier?.email) {
-    lines.push(P([supplier?.phone, supplier?.email].filter(Boolean).join('  ·  '), { size: 18, align: AlignmentType.CENTER, color: '707070' }))
-  }
+  const lines = [logoTable(), thinDivider()]
+  lines.push(P(supplier?.address || '', { size: 18, align: AlignmentType.CENTER, color: '505050' }))
+  const contact = [
+    supplier?.tel ? `Tel: ${supplier.tel}` : '',
+    supplier?.email ? `Email: ${supplier.email}` : '',
+  ].filter(Boolean).join('   ')
+  if (contact) lines.push(P(contact, { size: 18, align: AlignmentType.CENTER, color: '505050' }))
   return lines
 }
 
