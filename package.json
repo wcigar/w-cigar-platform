@@ -11,6 +11,8 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
     "date-fns": "^3.6.0",
+    "docx": "^9.6.1",
+    "file-saver": "^2.0.5",
     "jspdf": "^2.5.2",
     "jspdf-autotable": "^3.8.4",
     "lucide-react": "^0.441.0",
@@ -24,4 +26,3 @@
     "vite": "^5.4.0"
   }
 }
-

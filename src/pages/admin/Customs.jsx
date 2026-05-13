@@ -9,6 +9,9 @@ import { FileText, Plus, Trash2, Download, Share2, Package, Edit3, X, ChevronRig
 import {
   generateAllDocs, downloadPdf, sharePdfFiles, computeShipmentTotals,
 } from '../../lib/services/customsPdf'
+import {
+  generateAllDocsDocx, downloadDocx, shareDocxFiles,
+} from '../../lib/services/customsDocx'
 
 export default function Customs() {
   const [tab, setTab] = useState('list')
@@ -61,6 +64,25 @@ export default function Customs() {
     setDraft(d => ({ ...d, items: [...d.items, { product_id: p.id, name: p.name, pcs_per_bundle: p.pcs_per_bundle, package_type: p.package_type, unit_price_usd: p.unit_price_usd, unit_weight_g: p.unit_weight_g, qty_bundles: 1, total_pcs: p.pcs_per_bundle, subtotal: +(p.pcs_per_bundle * p.unit_price_usd).toFixed(2) }] }))
   }
 
+  // 手動新增一筆品項（不存入產品庫，僅用於本次貨單）
+  function addManualItem() {
+    setDraft(d => ({
+      ...d,
+      items: [...d.items, {
+        product_id: null,
+        manual: true,
+        name: '',
+        pcs_per_bundle: 25,
+        package_type: 'Bundle',
+        unit_price_usd: 0,
+        unit_weight_g: 15,
+        qty_bundles: 1,
+        total_pcs: 25,
+        subtotal: 0,
+      }],
+    }))
+  }
+
   function updateItem(idx, field, value) {
     setDraft(d => { const items = [...d.items]; items[idx] = { ...items[idx], [field]: value }; return { ...d, items } })
   }
@@ -90,27 +112,50 @@ export default function Customs() {
       status: 'issued',
     })
     if (error) { alert('儲存失敗: ' + error.message); return }
-    const docs = generateAllDocs({ supplier, shipment })
-    const files = [
-      { doc: docs.packingList, filename: `PackingList_${shipment.shipment_no}.pdf` },
-      { doc: docs.coo,         filename: `CertificateOfOrigin_${shipment.shipment_no}.pdf` },
-      { doc: docs.invoice,     filename: `CommercialInvoice_${shipment.shipment_no}.pdf` },
+    const pdfs = generateAllDocs({ supplier, shipment })
+    const docxs = await generateAllDocsDocx({ supplier, shipment })
+    const pdfFiles = [
+      { doc: pdfs.packingList, filename: `PackingList_${shipment.shipment_no}.pdf` },
+      { doc: pdfs.coo,         filename: `CertificateOfOrigin_${shipment.shipment_no}.pdf` },
+      { doc: pdfs.invoice,     filename: `CommercialInvoice_${shipment.shipment_no}.pdf` },
     ]
-    if (action === 'share') { const r = await sharePdfFiles(files); if (r.method === 'cancelled') return }
-    else { files.forEach(f => downloadPdf(f.doc, f.filename)) }
+    const docxFiles = [
+      { blob: docxs.packingList, filename: `PackingList_${shipment.shipment_no}.docx` },
+      { blob: docxs.coo,         filename: `CertificateOfOrigin_${shipment.shipment_no}.docx` },
+      { blob: docxs.invoice,     filename: `CommercialInvoice_${shipment.shipment_no}.docx` },
+    ]
+    if (action === 'share') {
+      const r = await sharePdfFiles(pdfFiles)
+      if (r.method === 'cancelled') return
+      docxFiles.forEach(f => downloadDocx(f.blob, f.filename))
+    } else {
+      pdfFiles.forEach(f => downloadPdf(f.doc, f.filename))
+      docxFiles.forEach(f => downloadDocx(f.blob, f.filename))
+    }
     setDraft(newDraft()); setTab('list'); loadAll()
   }
 
   async function regenDocs(sh, action) {
     if (!supplier) return
-    const docs = generateAllDocs({ supplier, shipment: sh })
-    const files = [
-      { doc: docs.packingList, filename: `PackingList_${sh.shipment_no}.pdf` },
-      { doc: docs.coo,         filename: `CertificateOfOrigin_${sh.shipment_no}.pdf` },
-      { doc: docs.invoice,     filename: `CommercialInvoice_${sh.shipment_no}.pdf` },
+    const pdfs = generateAllDocs({ supplier, shipment: sh })
+    const docxs = await generateAllDocsDocx({ supplier, shipment: sh })
+    const pdfFiles = [
+      { doc: pdfs.packingList, filename: `PackingList_${sh.shipment_no}.pdf` },
+      { doc: pdfs.coo,         filename: `CertificateOfOrigin_${sh.shipment_no}.pdf` },
+      { doc: pdfs.invoice,     filename: `CommercialInvoice_${sh.shipment_no}.pdf` },
     ]
-    if (action === 'share') await sharePdfFiles(files)
-    else files.forEach(f => downloadPdf(f.doc, f.filename))
+    const docxFiles = [
+      { blob: docxs.packingList, filename: `PackingList_${sh.shipment_no}.docx` },
+      { blob: docxs.coo,         filename: `CertificateOfOrigin_${sh.shipment_no}.docx` },
+      { blob: docxs.invoice,     filename: `CommercialInvoice_${sh.shipment_no}.docx` },
+    ]
+    if (action === 'share') {
+      await sharePdfFiles(pdfFiles)
+      docxFiles.forEach(f => downloadDocx(f.blob, f.filename))
+    } else {
+      pdfFiles.forEach(f => downloadPdf(f.doc, f.filename))
+      docxFiles.forEach(f => downloadDocx(f.blob, f.filename))
+    }
   }
 
   async function deleteShipment(id) {
@@ -128,7 +173,7 @@ export default function Customs() {
           <FileText size={22} style={{ verticalAlign: -3, marginRight: 8 }} /> 海關報關文件
         </h1>
         <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-          選產品 → 自動產生 Packing List / Certificate of Origin / Commercial Invoice
+          選產品（或手動輸入）→ 自動產生 Packing List / Certificate of Origin / Commercial Invoice，PDF + Word 各 3 份
         </div>
       </div>
       <FactoryLinkBanner />
@@ -231,12 +276,26 @@ export default function Customs() {
             {draft.items.map((it, idx) => (
               <div key={idx} style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: 10, marginBottom: 8, border: '1px solid #2a2a2a' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div style={{ flex: 1, fontSize: 13, fontWeight: 600, paddingRight: 8 }}>{it.name}</div>
+                  <div style={{ flex: 1, paddingRight: 8 }}>
+                    {it.manual ? (
+                      <input
+                        type="text"
+                        value={it.name}
+                        onChange={e => updateItem(idx, 'name', e.target.value)}
+                        placeholder="產品名稱（手動）"
+                        style={{ width: '100%', fontSize: 13, fontWeight: 600 }}
+                      />
+                    ) : (
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>{it.name}</div>
+                    )}
+                    {it.manual && <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>✏️ 手動品項（不會存入產品庫）</div>}
+                  </div>
                   <button onClick={() => removeItem(idx)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer' }}><X size={16} /></button>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6, marginTop: 8 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: it.manual ? '1fr 1fr 1fr 1fr 1fr' : '1fr 1fr 1fr 1fr', gap: 6, marginTop: 8 }}>
                   <FieldSmall label="束/盒數"><input type="number" min="0" value={it.qty_bundles} onChange={e => updateItem(idx, 'qty_bundles', +e.target.value || 0)} /></FieldSmall>
                   <FieldSmall label="支/束"><input type="number" min="0" value={it.pcs_per_bundle} onChange={e => updateItem(idx, 'pcs_per_bundle', +e.target.value || 0)} /></FieldSmall>
+                  {it.manual && <FieldSmall label="包裝"><input type="text" value={it.package_type} onChange={e => updateItem(idx, 'package_type', e.target.value)} placeholder="Bundle" /></FieldSmall>}
                   <FieldSmall label="單支重 g"><input type="number" step="0.1" min="0" value={it.unit_weight_g || 0} onChange={e => updateItem(idx, 'unit_weight_g', +e.target.value || 0)} /></FieldSmall>
                   <FieldSmall label="單價 USD"><input type="number" step="0.01" min="0" value={it.unit_price_usd} onChange={e => updateItem(idx, 'unit_price_usd', +e.target.value || 0)} /></FieldSmall>
                 </div>
@@ -254,17 +313,26 @@ export default function Customs() {
                 })()}
               </div>
             ))}
-            <details style={{ marginTop: 8 }}>
-              <summary style={{ padding: '10px', background: 'rgba(255,215,0,0.1)', borderRadius: 8, cursor: 'pointer', fontSize: 13, color: 'var(--gold)', listStyle: 'none' }}><Plus size={14} style={{ verticalAlign: -2 }} /> 加入產品...</summary>
-              <div style={{ marginTop: 8, maxHeight: 300, overflow: 'auto' }}>
-                {products.filter(p => !draft.items.some(i => i.product_id === p.id)).map(p => (
-                  <div key={p.id} onClick={() => addItem(p.id)} style={{ padding: '8px 10px', borderBottom: '1px solid #2a2a2a', cursor: 'pointer', display: 'flex', justifyContent: 'space-between' }}>
-                    <div style={{ flex: 1, fontSize: 12 }}><div>{p.name}</div><div style={{ color: 'var(--text-muted)', fontSize: 10 }}>{p.pcs_per_bundle}/{p.package_type} · ${p.unit_price_usd} · {p.unit_weight_g}g/支</div></div>
-                    <ChevronRight size={16} style={{ color: 'var(--gold)' }} />
-                  </div>
-                ))}
-              </div>
-            </details>
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 6, marginTop: 8 }}>
+              <details>
+                <summary style={{ padding: '10px', background: 'rgba(255,215,0,0.1)', borderRadius: 8, cursor: 'pointer', fontSize: 13, color: 'var(--gold)', listStyle: 'none', textAlign: 'center' }}><Plus size={14} style={{ verticalAlign: -2 }} /> 從產品庫選</summary>
+                <div style={{ marginTop: 8, maxHeight: 300, overflow: 'auto' }}>
+                  {products.filter(p => !draft.items.some(i => i.product_id === p.id)).map(p => (
+                    <div key={p.id} onClick={() => addItem(p.id)} style={{ padding: '8px 10px', borderBottom: '1px solid #2a2a2a', cursor: 'pointer', display: 'flex', justifyContent: 'space-between' }}>
+                      <div style={{ flex: 1, fontSize: 12 }}><div>{p.name}</div><div style={{ color: 'var(--text-muted)', fontSize: 10 }}>{p.pcs_per_bundle}/{p.package_type} · ${p.unit_price_usd} · {p.unit_weight_g}g/支</div></div>
+                      <ChevronRight size={16} style={{ color: 'var(--gold)' }} />
+                    </div>
+                  ))}
+                  {products.filter(p => !draft.items.some(i => i.product_id === p.id)).length === 0 && (
+                    <div style={{ padding: 12, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>產品庫的商品都已加入</div>
+                  )}
+                </div>
+              </details>
+              <button onClick={addManualItem}
+                style={{ padding: '10px', background: 'rgba(34,197,94,0.15)', borderRadius: 8, border: '1px dashed rgba(34,197,94,0.5)', color: '#22c55e', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                ✏️ 手動輸入
+              </button>
+            </div>
           </Section>
           {draft.items.length > 0 && (() => {
             const t = computeShipmentTotals([...draft.items])
@@ -272,7 +340,7 @@ export default function Customs() {
           })()}
           <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, padding: 12, background: 'rgba(0,0,0,0.95)', borderTop: '1px solid #333', display: 'flex', gap: 8, zIndex: 100 }}>
             <button onClick={() => genDocs('share')} disabled={draft.items.length === 0 || !draft.buyer_name} style={{ flex: 1, padding: 14, borderRadius: 10, background: 'var(--gold)', color: '#000', border: 'none', fontWeight: 700, fontSize: 14, opacity: (draft.items.length === 0 || !draft.buyer_name) ? 0.5 : 1 }}><Share2 size={16} style={{ verticalAlign: -3 }} /> 產生並分享 LINE</button>
-            <button onClick={() => genDocs('download')} disabled={draft.items.length === 0 || !draft.buyer_name} style={{ flex: 1, padding: 14, borderRadius: 10, background: '#2a2a2a', color: '#fff', border: '1px solid #555', fontSize: 14, opacity: (draft.items.length === 0 || !draft.buyer_name) ? 0.5 : 1 }}><Download size={16} style={{ verticalAlign: -3 }} /> 下載 3 份 PDF</button>
+            <button onClick={() => genDocs('download')} disabled={draft.items.length === 0 || !draft.buyer_name} style={{ flex: 1, padding: 14, borderRadius: 10, background: '#2a2a2a', color: '#fff', border: '1px solid #555', fontSize: 14, opacity: (draft.items.length === 0 || !draft.buyer_name) ? 0.5 : 1 }}><Download size={16} style={{ verticalAlign: -3 }} /> 下載 PDF + Word</button>
           </div>
         </div>
       )}
