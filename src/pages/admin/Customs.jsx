@@ -142,6 +142,14 @@ export default function Customs() {
       ? supabase.from('customs_shipments').update(row).eq('id', editingId)
       : supabase.from('customs_shipments').insert(row)
 
+    // 純儲存 (save) — 不產生檔案不下載
+    if (action === 'save') {
+      const { error: saveErr } = await dbPromise
+      if (saveErr) { alert((editingId ? '更新失敗: ' : '儲存失敗: ') + saveErr.message); return }
+      setEditingId(null); setDraft(newDraft()); setTab('list'); loadAll()
+      return
+    }
+
     // PDF 同步立刻產出 + 觸發下載（不等 DB）
     const pdfs = generateAllDocs({ supplier, shipment })
     const pdfFiles = [
@@ -395,8 +403,18 @@ export default function Customs() {
             return (<Section title="總計"><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 13 }}><Stat label="總束/盒數" value={t.total_bundles} /><Stat label="總支數" value={t.total_sticks} /><Stat label="總金額 USD" value={`$${t.total_amount_usd}`} hi /><Stat label="淨重 (kg)" value={t.total_net_weight_kg} /></div></Section>)
           })()}
           <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, padding: 12, background: 'rgba(0,0,0,0.95)', borderTop: '1px solid #333', display: 'flex', gap: 8, zIndex: 100 }}>
-            <button onClick={() => genDocs('share')} disabled={draft.items.length === 0 || !draft.buyer_name} style={{ flex: 1, padding: 14, borderRadius: 10, background: 'var(--gold)', color: '#000', border: 'none', fontWeight: 700, fontSize: 14, opacity: (draft.items.length === 0 || !draft.buyer_name) ? 0.5 : 1 }}><Share2 size={16} style={{ verticalAlign: -3 }} /> {editingId ? '儲存並分享 LINE' : '產生並分享 LINE'}</button>
-            <button onClick={() => genDocs('download')} disabled={draft.items.length === 0 || !draft.buyer_name} style={{ flex: 1, padding: 14, borderRadius: 10, background: '#2a2a2a', color: '#fff', border: '1px solid #555', fontSize: 14, opacity: (draft.items.length === 0 || !draft.buyer_name) ? 0.5 : 1 }}><Download size={16} style={{ verticalAlign: -3 }} /> {editingId ? '儲存並下載' : '下載 PDF + Word'}</button>
+            <button onClick={() => genDocs('share')} disabled={draft.items.length === 0 || !draft.buyer_name}
+              style={{ flex: 1, padding: 14, borderRadius: 10, background: '#06c755', color: '#fff', border: 'none', fontWeight: 700, fontSize: 14, opacity: (draft.items.length === 0 || !draft.buyer_name) ? 0.5 : 1 }}>
+              <Share2 size={16} style={{ verticalAlign: -3 }} /> 分享 LINE
+            </button>
+            <button onClick={() => genDocs('save')} disabled={draft.items.length === 0 || !draft.buyer_name}
+              style={{ flex: 1, padding: 14, borderRadius: 10, background: 'var(--gold)', color: '#000', border: 'none', fontWeight: 700, fontSize: 14, opacity: (draft.items.length === 0 || !draft.buyer_name) ? 0.5 : 1 }}>
+              💾 {editingId ? '儲存修改' : '儲存'}
+            </button>
+            <button onClick={() => genDocs('download')} disabled={draft.items.length === 0 || !draft.buyer_name}
+              style={{ flex: 1, padding: 14, borderRadius: 10, background: '#2a2a2a', color: '#fff', border: '1px solid #555', fontSize: 14, opacity: (draft.items.length === 0 || !draft.buyer_name) ? 0.5 : 1 }}>
+              <Download size={16} style={{ verticalAlign: -3 }} /> 下載
+            </button>
           </div>
         </div>
       )}
