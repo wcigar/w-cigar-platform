@@ -121,12 +121,51 @@ export default function Customs() {
     setDraft(d => ({ ...d, buyer_name: b.name, buyer_address: b.address, notify_to: b.notify_to || d.notify_to }))
   }
 
+  // 把 draft 裡所有 manual: true 的品項自動加入 customs_products（同名複用，不重複新增）
+  async function syncManualItemsToCatalog(items) {
+    const out = [...items]
+    let touched = false
+    for (let i = 0; i < out.length; i++) {
+      const it = out[i]
+      if (!it.manual || !it.name || !it.name.trim()) continue
+      const trimmedName = it.name.trim()
+      // 查同名既有產品
+      const { data: existing } = await supabase
+        .from('customs_products').select('id').eq('name', trimmedName).maybeSingle()
+      let pid = existing?.id
+      if (!pid) {
+        const ins = await supabase.from('customs_products').insert({
+          name: trimmedName,
+          pcs_per_bundle: +it.pcs_per_bundle || 25,
+          package_type: it.package_type || 'Bundle',
+          unit_price_usd: +it.unit_price_usd || 0,
+          unit_weight_g: +it.unit_weight_g || 15,
+          actual_cost_usd: 0,
+          sort_order: 999,
+          enabled: true,
+        }).select('id').single()
+        if (ins.error) { console.warn('產品庫寫入失敗:', ins.error.message); continue }
+        pid = ins.data?.id
+      }
+      if (pid) {
+        out[i] = { ...it, name: trimmedName, product_id: pid, manual: false }
+        touched = true
+      }
+    }
+    return { items: out, touched }
+  }
+
   async function genDocs(action) {
     if (!supplier) { alert('未設定供應商資料'); return }
     if (draft.items.length === 0) { alert('請至少加入一項產品'); return }
     if (!draft.buyer_name) { alert('請填寫買家'); return }
-    const totals = computeShipmentTotals(draft.items)
-    const shipment = { ...draft, ...totals }
+    // 手動品項要有名字
+    const blankManual = draft.items.find(it => it.manual && (!it.name || !it.name.trim()))
+    if (blankManual) { alert('手動品項缺名稱，請填寫'); return }
+    // 自動把手動品項寫入產品庫，並把 items 轉成附 product_id 的正式品項
+    const { items: syncedItems } = await syncManualItemsToCatalog(draft.items)
+    const totals = computeShipmentTotals(syncedItems)
+    const shipment = { ...draft, items: syncedItems, ...totals }
     const row = {
       shipment_no: shipment.shipment_no, shipment_date: shipment.shipment_date,
       supplier_id: supplier.id, buyer_name: shipment.buyer_name, buyer_address: shipment.buyer_address,
@@ -364,7 +403,7 @@ export default function Customs() {
                     ) : (
                       <div style={{ fontSize: 13, fontWeight: 600 }}>{it.name}</div>
                     )}
-                    {it.manual && <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>✏️ 手動品項（不會存入產品庫）</div>}
+                    {it.manual && <div style={{ fontSize: 9, color: '#fbbf24', marginTop: 2 }}>✏️ 手動品項（儲存時會自動加入產品庫）</div>}
                   </div>
                   <button onClick={() => removeItem(idx)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer' }}><X size={16} /></button>
                 </div>
