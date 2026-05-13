@@ -408,7 +408,7 @@ export default function Customs() {
               <Share2 size={16} style={{ verticalAlign: -3 }} /> 分享 LINE
             </button>
             <button onClick={() => genDocs('save')} disabled={draft.items.length === 0 || !draft.buyer_name}
-              style={{ flex: 1, padding: 14, borderRadius: 10, background: 'var(--gold)', color: '#000', border: 'none', fontWeight: 700, fontSize: 14, opacity: (draft.items.length === 0 || !draft.buyer_name) ? 0.5 : 1 }}>
+              style={{ flex: 1, padding: 14, borderRadius: 10, background: '#d4af37', color: '#000', border: 'none', fontWeight: 700, fontSize: 14, opacity: (draft.items.length === 0 || !draft.buyer_name) ? 0.5 : 1 }}>
               💾 {editingId ? '儲存修改' : '儲存'}
             </button>
             <button onClick={() => genDocs('download')} disabled={draft.items.length === 0 || !draft.buyer_name}
