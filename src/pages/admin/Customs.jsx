@@ -22,6 +22,32 @@ export default function Customs() {
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState(null)
   const [draft, setDraft] = useState(newDraft())
+  const [editingId, setEditingId] = useState(null)  // null = 新增, uuid = 編輯該筆
+
+  // 進入編輯模式：把現有貨件帶入 draft，切到 new tab
+  function editShipment(sh) {
+    setEditingId(sh.id)
+    setDraft({
+      shipment_no: sh.shipment_no,
+      shipment_date: sh.shipment_date,
+      buyer_name: sh.buyer_name || '',
+      buyer_address: sh.buyer_address || '',
+      shipment_method: sh.shipment_method || 'Passenger checked baggage',
+      total_packages: sh.total_packages || '1 checked baggage',
+      invoice_terms: sh.invoice_terms || 'FOB, ex-Factory',
+      notify_to: sh.notify_to || '',
+      packing_remark: sh.packing_remark || 'Net from unit weights; gross pending scale.',
+      items: Array.isArray(sh.items) ? sh.items : (sh.items ? JSON.parse(sh.items) : []),
+    })
+    setTab('new')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function cancelEdit() {
+    setEditingId(null)
+    setDraft(newDraft())
+    setTab('list')
+  }
 
   function newDraft() {
     return {
@@ -101,7 +127,7 @@ export default function Customs() {
     if (!draft.buyer_name) { alert('請填寫買家'); return }
     const totals = computeShipmentTotals(draft.items)
     const shipment = { ...draft, ...totals }
-    const { error } = await supabase.from('customs_shipments').insert({
+    const row = {
       shipment_no: shipment.shipment_no, shipment_date: shipment.shipment_date,
       supplier_id: supplier.id, buyer_name: shipment.buyer_name, buyer_address: shipment.buyer_address,
       shipment_method: shipment.shipment_method, total_packages: shipment.total_packages,
@@ -110,8 +136,16 @@ export default function Customs() {
       total_bundles: totals.total_bundles, total_sticks: totals.total_sticks,
       total_amount_usd: totals.total_amount_usd, total_net_weight_kg: totals.total_net_weight_kg,
       status: 'issued',
-    })
-    if (error) { alert('儲存失敗: ' + error.message); return }
+    }
+    let error
+    if (editingId) {
+      // 更新既有
+      ;({ error } = await supabase.from('customs_shipments').update(row).eq('id', editingId))
+    } else {
+      // 新增
+      ;({ error } = await supabase.from('customs_shipments').insert(row))
+    }
+    if (error) { alert(editingId ? '更新失敗: ' + error.message : '儲存失敗: ' + error.message); return }
     const pdfs = generateAllDocs({ supplier, shipment })
     const docxs = await generateAllDocsDocx({ supplier, shipment })
     const pdfFiles = [
@@ -132,7 +166,7 @@ export default function Customs() {
       pdfFiles.forEach(f => downloadPdf(f.doc, f.filename))
       docxFiles.forEach(f => downloadDocx(f.blob, f.filename))
     }
-    setDraft(newDraft()); setTab('list'); loadAll()
+    setEditingId(null); setDraft(newDraft()); setTab('list'); loadAll()
   }
 
   async function regenDocs(sh, action) {
@@ -180,7 +214,7 @@ export default function Customs() {
       <div style={{ display: 'flex', gap: 6, marginBottom: 16, borderBottom: '1px solid #2a2a2a' }}>
         {[
           { k: 'list',     label: '貨件記錄',  c: shipments.length },
-          { k: 'new',      label: '建立新單',  c: draft.items.length },
+          { k: 'new',      label: editingId ? '編輯貨件' : '建立新單',  c: draft.items.length },
           { k: 'products', label: '產品庫',    c: products.length },
         ].map(t => (
           <button key={t.k} onClick={() => setTab(t.k)} style={{ flex: 1, padding: '10px 8px', background: 'transparent', border: 'none', borderBottom: tab === t.k ? '2px solid var(--gold)' : '2px solid transparent', color: tab === t.k ? 'var(--gold)' : 'var(--text-muted)', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
@@ -247,6 +281,7 @@ export default function Customs() {
                 <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
                   <button onClick={() => regenDocs(sh, 'share')} style={{ flex: 1, padding: '8px', borderRadius: 6, background: 'var(--gold)', color: '#000', border: 'none', fontWeight: 600, fontSize: 13 }}><Share2 size={14} style={{ verticalAlign: -2 }} /> 分享 LINE</button>
                   <button onClick={() => regenDocs(sh, 'download')} style={{ flex: 1, padding: '8px', borderRadius: 6, background: '#2a2a2a', color: '#fff', border: 'none', fontSize: 13 }}><Download size={14} style={{ verticalAlign: -2 }} /> 下載</button>
+                  <button onClick={() => editShipment(sh)} style={{ padding: '8px 12px', borderRadius: 6, background: 'rgba(96,165,250,0.15)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.4)', fontSize: 13, fontWeight: 600 }}><Edit3 size={14} style={{ verticalAlign: -2 }} /> 編輯</button>
                   {(sh.declaration_no || sh.tariff_twd) && (<button onClick={() => setExpandedId(expanded ? null : sh.id)} style={{ padding: '8px 10px', borderRadius: 6, background: 'rgba(251,146,60,0.15)', color: '#fb923c', border: '1px solid rgba(251,146,60,0.3)', fontSize: 13 }}>{expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}</button>)}
                   <button onClick={() => deleteShipment(sh.id)} style={{ padding: '8px 10px', borderRadius: 6, background: 'transparent', color: '#ef4444', border: '1px solid #ef4444', fontSize: 13 }}><Trash2 size={14} /></button>
                 </div>
@@ -258,6 +293,16 @@ export default function Customs() {
 
       {tab === 'new' && (
         <div>
+          {editingId && (
+            <div style={{ marginBottom: 16, padding: '10px 14px', borderRadius: 8, background: 'rgba(96,165,250,0.12)', border: '1px solid rgba(96,165,250,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <div style={{ color: '#60a5fa', fontSize: 13, fontWeight: 600 }}>
+                <Edit3 size={14} style={{ verticalAlign: -2, marginRight: 6 }} />
+                編輯中：{draft.shipment_no}
+                <span style={{ color: 'var(--text-muted)', marginLeft: 8, fontWeight: 400 }}>儲存後會覆蓋原貨件記錄</span>
+              </div>
+              <button onClick={cancelEdit} style={{ padding: '6px 14px', borderRadius: 6, background: 'transparent', color: '#cbd5e1', border: '1px solid #555', fontSize: 12 }}>✕ 取消編輯</button>
+            </div>
+          )}
           <Section title="基本資訊">
             <Field label="發票號碼"><input value={draft.shipment_no} onChange={e => setDraft(d => ({ ...d, shipment_no: e.target.value }))} /></Field>
             <Field label="日期"><input type="date" value={draft.shipment_date} onChange={e => setDraft(d => ({ ...d, shipment_date: e.target.value }))} /></Field>
@@ -339,8 +384,8 @@ export default function Customs() {
             return (<Section title="總計"><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 13 }}><Stat label="總束/盒數" value={t.total_bundles} /><Stat label="總支數" value={t.total_sticks} /><Stat label="總金額 USD" value={`$${t.total_amount_usd}`} hi /><Stat label="淨重 (kg)" value={t.total_net_weight_kg} /></div></Section>)
           })()}
           <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, padding: 12, background: 'rgba(0,0,0,0.95)', borderTop: '1px solid #333', display: 'flex', gap: 8, zIndex: 100 }}>
-            <button onClick={() => genDocs('share')} disabled={draft.items.length === 0 || !draft.buyer_name} style={{ flex: 1, padding: 14, borderRadius: 10, background: 'var(--gold)', color: '#000', border: 'none', fontWeight: 700, fontSize: 14, opacity: (draft.items.length === 0 || !draft.buyer_name) ? 0.5 : 1 }}><Share2 size={16} style={{ verticalAlign: -3 }} /> 產生並分享 LINE</button>
-            <button onClick={() => genDocs('download')} disabled={draft.items.length === 0 || !draft.buyer_name} style={{ flex: 1, padding: 14, borderRadius: 10, background: '#2a2a2a', color: '#fff', border: '1px solid #555', fontSize: 14, opacity: (draft.items.length === 0 || !draft.buyer_name) ? 0.5 : 1 }}><Download size={16} style={{ verticalAlign: -3 }} /> 下載 PDF + Word</button>
+            <button onClick={() => genDocs('share')} disabled={draft.items.length === 0 || !draft.buyer_name} style={{ flex: 1, padding: 14, borderRadius: 10, background: 'var(--gold)', color: '#000', border: 'none', fontWeight: 700, fontSize: 14, opacity: (draft.items.length === 0 || !draft.buyer_name) ? 0.5 : 1 }}><Share2 size={16} style={{ verticalAlign: -3 }} /> {editingId ? '儲存並分享 LINE' : '產生並分享 LINE'}</button>
+            <button onClick={() => genDocs('download')} disabled={draft.items.length === 0 || !draft.buyer_name} style={{ flex: 1, padding: 14, borderRadius: 10, background: '#2a2a2a', color: '#fff', border: '1px solid #555', fontSize: 14, opacity: (draft.items.length === 0 || !draft.buyer_name) ? 0.5 : 1 }}><Download size={16} style={{ verticalAlign: -3 }} /> {editingId ? '儲存並下載' : '下載 PDF + Word'}</button>
           </div>
         </div>
       )}
