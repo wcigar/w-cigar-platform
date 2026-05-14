@@ -281,6 +281,7 @@ export default function Customs() {
         </div>
       </div>
       <FactoryLinkBanner />
+      <CompanyDocsBanner />
       <div style={{ display: 'flex', gap: 6, marginBottom: 16, borderBottom: '1px solid #2a2a2a' }}>
         {[
           { k: 'list',     label: '貨件記錄',  c: shipments.length },
@@ -571,6 +572,32 @@ function ProductManager({ products, onChange }) {
             </div>
           )}
         </div>
+      ))}
+    </div>
+  )
+}
+
+function CompanyDocsBanner() {
+  const docs = [
+    { label: '進出口許可證', filename: 'import-export-license.pdf', desc: 'W Cigar Bar 公司進出口許可證' },
+  ]
+  return (
+    <div style={{ background: 'rgba(212,175,55,0.08)', border: '1px solid rgba(212,175,55,0.3)', borderRadius: 10, padding: 12, marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+        <FileBadge size={14} style={{ color: '#d4af37' }} />
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#d4af37' }}>公司證照</div>
+      </div>
+      {docs.map(d => (
+        <a key={d.filename} href={`/docs/${d.filename}`} download={d.filename}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, background: 'rgba(0,0,0,0.4)', padding: '10px 12px', borderRadius: 6, textDecoration: 'none', color: '#fff' }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>{d.label}</div>
+            <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 2 }}>{d.desc}</div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#d4af37', fontSize: 12, fontWeight: 700 }}>
+            <Download size={14} /> 下載 PDF
+          </div>
+        </a>
       ))}
     </div>
   )
