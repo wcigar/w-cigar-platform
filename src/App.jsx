@@ -69,7 +69,6 @@ import AdminCustoms from './pages/admin/Customs'
 import FactorySubmit from './pages/customs/FactorySubmit'
 import SalesInput from './pages/admin/SalesInput'
 import BossAdminPunch from './pages/boss/AdminPunch'
-import InvestmentDashboard from './pages/investment/InvestmentDashboard'
 
 function AppInner() {
   const { user, loading } = useAuth()
@@ -78,7 +77,6 @@ function AppInner() {
   if (window.location.pathname.startsWith('/join')) return <JoinPage />
   if (window.location.pathname.startsWith('/qrcode')) return <QRCodePage />
   if (window.location.pathname.startsWith('/customs/submit')) return <FactorySubmit />
-  if (window.location.pathname.startsWith('/investment-dashboard')) return <InvestmentDashboard />
   if (window.location.pathname.startsWith('/vip-cellar')) return (<Routes><Route path="/vip-cellar/*" element={<VipCellar />} /></Routes>)
   if (window.location.pathname.startsWith('/pos-app')) return (<Routes><Route path="/pos-app/*" element={<PosApp />} /></Routes>)
   if (window.location.pathname.startsWith('/ambassador')) return (<Routes><Route path="/ambassador/*" element={<AmbassadorApp />} /></Routes>)
