@@ -197,7 +197,16 @@ export default function Payroll() {
   const [yr, mo] = month.split('-').map(Number)
   const daysInMonth = new Date(yr, mo, 0).getDate()
 
-  useEffect(() => { load() }, [month])
+  useEffect(() => {
+    load()
+    const onVis = () => { if (document.visibilityState === 'visible') load() }
+    document.addEventListener('visibilitychange', onVis)
+    window.addEventListener('focus', onVis)
+    return () => {
+      document.removeEventListener('visibilitychange', onVis)
+      window.removeEventListener('focus', onVis)
+    }
+  }, [month])
 
   async function load() {
     setLoading(true)
