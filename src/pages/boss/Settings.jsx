@@ -58,16 +58,20 @@ function EmployeeManager() {
 
   async function saveEdit() {
     if (!editing) return
-    await supabase.from('employees').update({
-      name: editing.name,
-      title: editing.title,
-      login_code: editing.login_code,
-      emp_type: editing.emp_type,
-      salary_type: editing.salary_type,
-      salary_amount: Number(editing.salary_amount || 0),
-      phone: editing.phone || '',
-      hire_date: editing.hire_date || null
-    }).eq('id', editing.id)
+    const adminId = JSON.parse(localStorage.getItem('user') || '{}')?.employee_id || 'ADMIN'
+    const { data, error } = await supabase.rpc('admin_update_employee', {
+      p_admin_employee_id: adminId,
+      p_target_employee_id: editing.id,
+      p_name: editing.name,
+      p_title: editing.title,
+      p_login_code: editing.login_code,
+      p_emp_type: editing.emp_type,
+      p_salary_type: editing.salary_type,
+      p_salary_amount: Number(editing.salary_amount || 0),
+      p_phone: editing.phone || '',
+      p_hire_date: editing.hire_date || null
+    })
+    if (error) { alert('儲存失敗：' + error.message); return }
     setEditing(null); load()
   }
 
