@@ -59,7 +59,14 @@ function EmployeeManager() {
   async function saveEdit() {
     if (!editing) return
     await supabase.from('employees').update({
-      name: editing.name, title: editing.title, login_code: editing.login_code, emp_type: editing.emp_type
+      name: editing.name,
+      title: editing.title,
+      login_code: editing.login_code,
+      emp_type: editing.emp_type,
+      salary_type: editing.salary_type,
+      salary_amount: Number(editing.salary_amount || 0),
+      phone: editing.phone || '',
+      hire_date: editing.hire_date || null
     }).eq('id', editing.id)
     setEditing(null); load()
   }
@@ -87,6 +94,17 @@ function EmployeeManager() {
                   <option>正職</option><option>PT</option>
                 </select>
               </div>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+                <select value={editing.salary_type || '月薪'} onChange={e => setEditing(p => ({ ...p, salary_type: e.target.value }))} style={{ width: 100, fontSize: 13, padding: 8 }}>
+                  <option>月薪</option><option>時薪</option>
+                </select>
+                <input value={editing.salary_amount || 0} onChange={e => setEditing(p => ({ ...p, salary_amount: e.target.value }))} type="number" inputMode="numeric" placeholder={editing.salary_type === '時薪' ? '時薪(元)' : '月薪(元)'} style={{ flex: 1, minWidth: 100, fontSize: 13, padding: 8 }} />
+                <input value={editing.phone || ''} onChange={e => setEditing(p => ({ ...p, phone: e.target.value }))} placeholder="手機" style={{ flex: 1, minWidth: 100, fontSize: 13, padding: 8 }} />
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>入職</label>
+                <input type="date" value={editing.hire_date || ''} onChange={e => setEditing(p => ({ ...p, hire_date: e.target.value }))} style={{ width: 140, fontSize: 13, padding: 8 }} />
+              </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <input value={editing.login_code} onChange={e => setEditing(p => ({ ...p, login_code: e.target.value }))} placeholder="登入碼" type="password" style={{ flex: 1, fontSize: 13, padding: 8 }} />
                 <button className="btn-gold" style={{ padding: '8px 14px', fontSize: 12 }} onClick={saveEdit}><Save size={12} /> 儲存</button>
@@ -105,7 +123,10 @@ function EmployeeManager() {
                 }}>{emp.name?.charAt(0)}</div>
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 500, color: emp.enabled ? 'var(--text)' : 'var(--text-muted)' }}>{emp.name}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{emp.id} · {emp.title} · <span style={{ color: emp.emp_type === '正職' ? 'var(--green)' : 'var(--blue)' }}>{emp.emp_type}</span></div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                    {emp.id} · {emp.title} · <span style={{ color: emp.emp_type === '正職' ? 'var(--green)' : 'var(--blue)' }}>{emp.emp_type}</span>
+                    {emp.salary_amount > 0 && <span style={{ color: 'var(--gold)', marginLeft: 6 }}>· {emp.salary_type}{(+emp.salary_amount).toLocaleString()}</span>}
+                  </div>
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 4 }}>
