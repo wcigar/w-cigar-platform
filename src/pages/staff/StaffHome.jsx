@@ -32,6 +32,7 @@ export default function StaffHome() {
   const [colleagues, setColleagues] = useState([])
   const [invReminder, setInvReminder] = useState([])
   const [crossDayPunchDate, setCrossDayPunchDate] = useState(null)
+  const [punchStatus, setPunchStatus] = useState(null) // 跨夜安全的打卡狀態 (RPC)
   const [showPerformance, setShowPerformance] = useState(false)
   const today = format(new Date(), 'yyyy-MM-dd')
   const punchCamRef = useRef(null)
@@ -46,27 +47,29 @@ export default function StaffHome() {
 
   async function load() {
     setLoading(true)
-    const [sRes, tRes, pRes, nRes, lbRes] = await Promise.all([
+    const [sRes, tRes, pRes, nRes, lbRes, psRes] = await Promise.all([
       supabase.from('schedules').select('*').eq('employee_id', user.employee_id).eq('date', today).maybeSingle(),
       supabase.from('task_status').select('*').eq('owner', user.employee_id).eq('date', today).order('task_id'),
       supabase.from('punch_records').select('*').eq('employee_id', user.employee_id).eq('date', today).order('time', { ascending: true }),
       supabase.from('notices').select('*').eq('enabled', true).order('created_at', { ascending: false }).limit(3),
       supabase.from('task_status').select('completed_by').eq('owner', 'ALL').eq('completed', true).gte('date', month + '-01').lte('date', format(endOfMonth(new Date(month + '-01')), 'yyyy-MM-dd')),
+      supabase.rpc('staff_get_punch_status', { p_employee_id: user.employee_id }),
     ])
     setShift(sRes.data); setTasks(tRes.data || []); setPunch(pRes.data); setNotices(nRes.data || [])
-    const punchRecords = pRes.data || []
-    let pIn = punchRecords.find(r => r.punch_type === '上班')
-    let pOut = [...punchRecords].reverse().find(r => r.punch_type === '下班')
-    setCrossDayPunchDate(null)
-    const hour = new Date().getHours()
-    // 跨日晚班：凌晨 0-6 點查昨天有沒有「有上班沒下班」（支援加班到凌晨 3 點）
-    if (hour < 6) {
-      const yesterday = format(new Date(Date.now() - 86400000), 'yyyy-MM-dd')
-      const { data: yPunches } = await supabase.from('punch_records').select('*').eq('employee_id', user.employee_id).eq('date', yesterday).order('time', { ascending: true })
-      const yIn = (yPunches || []).find(r => r.punch_type === '上班')
-      const yOut = [...(yPunches || [])].reverse().find(r => r.punch_type === '下班')
-      if (yIn && !yOut) { pIn = yIn; pOut = null; setCrossDayPunchDate(yesterday) }
+    const ps = psRes?.data || null
+    setPunchStatus(ps)
+    // 跨夜：若 RPC 顯示 active_date 不是今天（晚班跨午夜的下班場景），改抓 active_date 的打卡記錄
+    const activeDate = ps?.active_date || today
+    let punchRecords = pRes.data || []
+    if (activeDate !== today) {
+      const { data: aPunches } = await supabase.from('punch_records').select('*').eq('employee_id', user.employee_id).eq('date', activeDate).order('time', { ascending: true })
+      punchRecords = aPunches || []
+      setCrossDayPunchDate(activeDate)
+    } else {
+      setCrossDayPunchDate(null)
     }
+    const pIn = punchRecords.find(r => r.punch_type === '上班')
+    const pOut = [...punchRecords].reverse().find(r => r.punch_type === '下班')
     setPunchIn(pIn || null); setPunchOut(pOut || null)
     const counts = {}
     ;(lbRes.data || []).forEach(r => { if (r.completed_by) counts[r.completed_by] = (counts[r.completed_by] || 0) + 1 })
@@ -135,7 +138,8 @@ export default function StaffHome() {
       const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat * Math.PI / 180) * Math.cos(25.0269184 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
       const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
       const valid = dist <= 100
-      const punchDate = (type === '下班' && crossDayPunchDate) ? crossDayPunchDate : today
+      // 跨夜安全：punch_records.date 必須用 RPC 回傳的 active_date，避免晚班跨午夜後寫成隔天日期
+      const punchDate = punchStatus?.active_date || ((type === '下班' && crossDayPunchDate) ? crossDayPunchDate : today)
       await supabase.from('punch_records').insert({ date: punchDate, employee_id: user.employee_id, name: user.name, punch_type: type, photo_url: photoUrl || null, lat, lng, distance_m: Math.round(dist), is_valid: valid })
       if (valid) {
         const msgs = ['今天也是充滿雪茄香氣的一天！🚬','每一支雪茄背後都有你的專業服務 💎','好的開始是成功的一半，準備好迎接貴客了！✨','專業、熱情、細心 — 這就是你 🌟','讓每位客人都感受到 VIP 尊榮 👑','今天的努力是明天的業績 💰','雪茄不只是商品，是一種生活態度 🎩','服務從微笑開始，業績從細節累積 📈','你的專業讓每支雪茄都更有價值 🏆','準備好了嗎？今天又是滿分服務日！⭐','細心呵護每一位會員的窖藏 🗄️','用心推薦，讓客人找到命定的那支 💫','每一次開櫃都是信任的延續 🔑','你不只是店員，你是雪茄管家 🎯','今天的一杯好茶配一支好茄 = 完美 ☕']
@@ -146,7 +150,12 @@ export default function StaffHome() {
     }, () => alert('請開啟GPS'))
   }
 
-  const shiftName = shift?.shift
+  // 顯示用：以 RPC 的 schedule 為準（跨夜時會自動指向昨天的晚班），fallback 才用今天的 schedules
+  const displayShiftName = punchStatus?.schedule?.shift || shift?.shift
+  const shiftName = displayShiftName
+  // can_punch / punch_action 由 RPC 決定（已涵蓋跨夜情境）
+  const canPunch = !!punchStatus?.can_punch
+  const punchAction = punchStatus?.punch_action // '上班' or '下班'
   const shiftInfo = shiftName ? SHIFTS[shiftName] : null
   const done = tasks.filter(t => t.completed).length
   const hh = new Date().getHours()
@@ -221,15 +230,16 @@ export default function StaffHome() {
             <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:12,margin:'8px 0',lineHeight:1}}><span style={{fontFamily:'JetBrains Mono,monospace',fontSize:32,fontWeight:300,letterSpacing:4,color:'#f0e8d8'}}>{shiftInfo.start}</span><span style={{fontSize:20,color:'rgba(196,163,90,.3)'}}>—</span><span style={{fontFamily:'JetBrains Mono,monospace',fontSize:32,fontWeight:300,letterSpacing:4,color:'#f0e8d8'}}>{shiftInfo.end}</span></div>
           ) : <div style={{fontFamily:'var(--serif)',fontSize:18,color:'rgba(196,163,90,.4)',margin:'16px 0'}}>{shiftName ? `今日${shiftName}` : '尚未排班'}</div>}
 
-          {shiftInfo?.start && <>
+          {(shiftInfo?.start || canPunch) && <>
             <div style={{display:'flex',gap:16,justifyContent:'center',alignItems:'center',margin:'16px 0'}}>
               <div style={{display:'flex',alignItems:'center',gap:8}}><span style={{fontFamily:'var(--mono)',fontSize:9,color:'rgba(196,163,90,.3)',letterSpacing:1}}>CLOCK IN{crossDayPunchDate?` (${crossDayPunchDate.slice(5)})`:''}</span><span style={{fontFamily:'var(--mono)',fontSize:16,fontWeight:400,color:punchIn?(crossDayPunchDate?'#f59e0b':'rgba(100,170,100,.8)'):'rgba(196,163,90,.2)'}}>{punchIn?toTaipei(punchIn.time,true):'—:—'}</span></div>
               <div style={{width:1,height:16,background:'rgba(196,163,90,.1)'}}/>
               <div style={{display:'flex',alignItems:'center',gap:8}}><span style={{fontFamily:'var(--mono)',fontSize:9,color:'rgba(196,163,90,.3)',letterSpacing:1}}>OUT</span><span style={{fontFamily:'var(--mono)',fontSize:16,fontWeight:400,color:punchOut?'rgba(100,140,170,.8)':'rgba(196,163,90,.2)'}}>{punchOut?toTaipei(punchOut.time,true):'—:—'}</span></div>
             </div>
             <div style={{display:'flex',gap:10}}>
-              <button className="wcb-btn-gold" style={{flex:1,letterSpacing:3}} onClick={() => openPunchCam('上班')}>上班打卡</button>
-              <button className="wcb-btn-outline" style={{flex:1,padding:16,letterSpacing:3}} onClick={() => openPunchCam('下班')}>下班打卡</button>
+              {canPunch && punchAction === '上班' && <button className="wcb-btn-gold" style={{flex:1,letterSpacing:3}} onClick={() => openPunchCam('上班')}>上班打卡</button>}
+              {canPunch && punchAction === '下班' && <button className="wcb-btn-outline" style={{flex:1,padding:16,letterSpacing:3}} onClick={() => openPunchCam('下班')}>下班打卡{crossDayPunchDate?` (${crossDayPunchDate.slice(5)})`:''}</button>}
+              {!canPunch && <div style={{flex:1,padding:'14px 16px',textAlign:'center',fontFamily:'var(--serif)',fontSize:13,color:'rgba(196,163,90,.4)',border:'1px dashed rgba(196,163,90,.15)',borderRadius:8}}>本班已完成打卡</div>}
             </div>
           </>}
         </div>
