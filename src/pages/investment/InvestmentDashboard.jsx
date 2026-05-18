@@ -77,6 +77,47 @@ function PasswordGate({ children }) {
   );
 }
 
+const SORT_OPTIONS = [
+  { key: 'danger', label: '🚨 依危險度（距停損）' },
+  { key: 'pnl', label: '💰 依損益' },
+  { key: 'value', label: '📊 依市值' },
+  { key: 'category', label: '🏷️ 依分類' },
+];
+
+function sortHoldings(holdings, sortBy) {
+  const arr = [...holdings];
+  const num = (v) => (v === null || v === undefined ? null : parseFloat(v));
+  if (sortBy === 'danger') {
+    // 距停損百分比升序；null 擺最後
+    return arr.sort((a, b) => {
+      const av = num(a.distance_to_stop_pct);
+      const bv = num(b.distance_to_stop_pct);
+      if (av === null) return 1;
+      if (bv === null) return -1;
+      return av - bv;
+    });
+  }
+  if (sortBy === 'pnl') {
+    return arr.sort((a, b) => (num(b.unrealized_pnl) ?? 0) - (num(a.unrealized_pnl) ?? 0));
+  }
+  if (sortBy === 'value') {
+    return arr.sort((a, b) => (num(b.market_value) ?? 0) - (num(a.market_value) ?? 0));
+  }
+  if (sortBy === 'category') {
+    const order = { underperform: 0, core: 1, defensive: 2, reference: 3 };
+    return arr.sort((a, b) => (order[a.category] ?? 99) - (order[b.category] ?? 99));
+  }
+  return arr;
+}
+
+// 套牢回本所需漲幅：若現價 = 成本 × (1+r)，回本需 1/(1+r) - 1
+function requiredRecoveryPct(returnPct) {
+  if (returnPct === null || returnPct === undefined) return null;
+  const r = parseFloat(returnPct) / 100;
+  if (isNaN(r) || r >= 0) return null;
+  return ((1 / (1 + r)) - 1) * 100;
+}
+
 function InvestmentDashboardInner() {
   const [positions, setPositions] = useState([]);
   const [summary, setSummary] = useState(null);
@@ -84,6 +125,8 @@ function InvestmentDashboardInner() {
   const [lastUpdate, setLastUpdate] = useState(null);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [sortBy, setSortBy] = useState('danger');
+  const [showRecovery, setShowRecovery] = useState(false);
 
   async function loadData() {
     setLoading(true);
@@ -128,8 +171,12 @@ function InvestmentDashboardInner() {
     return () => clearInterval(interval);
   }, []);
 
-  const holdings = positions.filter((p) => p.shares > 0);
+  const allHoldings = positions.filter((p) => p.shares > 0);
+  const holdings = sortHoldings(allHoldings, sortBy);
   const references = positions.filter((p) => p.category === 'reference');
+  const underwaterHoldings = allHoldings
+    .filter((p) => parseFloat(p.return_pct) < 0)
+    .sort((a, b) => parseFloat(a.return_pct) - parseFloat(b.return_pct));
 
   return (
     <div style={{ minHeight: '100vh', background: '#0f0f0f', color: '#e5e5e5', padding: '20px', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
@@ -205,10 +252,82 @@ function InvestmentDashboardInner() {
           </div>
         )}
 
+        {/* Underwater Recovery Analysis */}
+        {underwaterHoldings.length > 0 && (
+          <div style={{ marginBottom: 24, background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: 8 }}>
+            <button
+              type="button"
+              onClick={() => setShowRecovery((s) => !s)}
+              style={{ width: '100%', background: 'transparent', border: 'none', color: '#fff', padding: '14px 16px', textAlign: 'left', fontSize: 14, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+            >
+              <span>
+                📉 套牢回本分析 <span style={{ color: '#888', fontSize: 12, marginLeft: 8 }}>({underwaterHoldings.length} 檔負損益)</span>
+              </span>
+              <span style={{ color: '#888', fontSize: 12 }}>{showRecovery ? '收合 ▲' : '展開 ▼'}</span>
+            </button>
+            {showRecovery && (
+              <div style={{ padding: '0 16px 16px', overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ color: '#888' }}>
+                      <th style={{ padding: '8px', textAlign: 'left' }}>股票</th>
+                      <th style={{ padding: '8px', textAlign: 'right' }}>成本</th>
+                      <th style={{ padding: '8px', textAlign: 'right' }}>現價</th>
+                      <th style={{ padding: '8px', textAlign: 'right' }}>損益%</th>
+                      <th style={{ padding: '8px', textAlign: 'right', color: '#f59e0b' }}>需回本%</th>
+                      <th style={{ padding: '8px', textAlign: 'right' }} title="現價再跌 5% 的價位">再跌 5%</th>
+                      <th style={{ padding: '8px', textAlign: 'right' }} title="現價再跌 10% 的價位">再跌 10%</th>
+                      <th style={{ padding: '8px', textAlign: 'right' }} title="現價再跌 15% 的價位">再跌 15%</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {underwaterHoldings.map((p) => {
+                      const cost = parseFloat(p.avg_cost);
+                      const needPct = requiredRecoveryPct(p.return_pct);
+                      return (
+                        <tr key={p.id} style={{ borderTop: '1px solid #2a2a2a' }}>
+                          <td style={{ padding: '8px' }}>
+                            <strong style={{ color: '#fff' }}>{p.symbol}</strong>
+                            <span style={{ color: '#666', marginLeft: 6 }}>{p.name}</span>
+                          </td>
+                          <td style={{ padding: '8px', textAlign: 'right', color: '#999' }}>{cost ? cost.toFixed(2) : '-'}</td>
+                          <td style={{ padding: '8px', textAlign: 'right' }}>{p.current_price ? parseFloat(p.current_price).toFixed(2) : '-'}</td>
+                          <td style={{ padding: '8px', textAlign: 'right', color: '#15803d', fontWeight: 600 }}>{fmtPct(p.return_pct)}</td>
+                          <td style={{ padding: '8px', textAlign: 'right', color: '#f59e0b', fontWeight: 600 }}>
+                            {needPct !== null ? `+${needPct.toFixed(1)}%` : '-'}
+                          </td>
+                          <td style={{ padding: '8px', textAlign: 'right', color: '#666' }}>{p.current_price ? (parseFloat(p.current_price) * 0.95).toFixed(2) : '-'}</td>
+                          <td style={{ padding: '8px', textAlign: 'right', color: '#666' }}>{p.current_price ? (parseFloat(p.current_price) * 0.90).toFixed(2) : '-'}</td>
+                          <td style={{ padding: '8px', textAlign: 'right', color: '#666' }}>{p.current_price ? (parseFloat(p.current_price) * 0.85).toFixed(2) : '-'}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                <p style={{ color: '#666', fontSize: 11, marginTop: 12, marginBottom: 0, lineHeight: 1.5 }}>
+                  💡 「需回本%」= 從現價回到成本價所需漲幅。套牢越深、回本越難（-50% 需要 +100% 回本）。<br/>
+                  「再跌 X%」= 現價往下 5/10/15% 的分批加碼參考點，非建議；攤平有風險，請評估資金與基本面。
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Holdings Table */}
-        <h2 style={{ color: '#fff', fontSize: 14, marginBottom: 12, borderBottom: '1px solid #2a2a2a', paddingBottom: 8 }}>
-          📊 持股明細 ({holdings.length})
-        </h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, borderBottom: '1px solid #2a2a2a', paddingBottom: 8 }}>
+          <h2 style={{ color: '#fff', fontSize: 14, margin: 0 }}>
+            📊 持股明細 ({holdings.length})
+          </h2>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            style={{ background: '#1a1a1a', color: '#e5e5e5', border: '1px solid #2a2a2a', borderRadius: 4, padding: '6px 10px', fontSize: 12, cursor: 'pointer' }}
+          >
+            {SORT_OPTIONS.map((o) => (
+              <option key={o.key} value={o.key}>{o.label}</option>
+            ))}
+          </select>
+        </div>
         <div style={{ overflowX: 'auto', marginBottom: 24 }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', background: '#1a1a1a', borderRadius: 8, overflow: 'hidden' }}>
             <thead>
