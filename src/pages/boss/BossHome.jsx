@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useNavigate } from 'react-router-dom'
-import { Briefcase, Users, DollarSign, Settings, AlertTriangle, Trophy, Clock, Package, FileText, CheckCircle2, XCircle, Flame, BarChart3, UserCheck, Megaphone, QrCode, Wine, Building2, Truck, Receipt, Coins } from 'lucide-react'
+import { Briefcase, Users, DollarSign, Settings, AlertTriangle, Trophy, Clock, Package, FileText, CheckCircle2, XCircle, Flame, BarChart3, UserCheck, Edit3, Megaphone, QrCode, Wine, Building2, Truck, Receipt, Coins } from 'lucide-react'
 import { format, endOfMonth } from 'date-fns'
 import { zhTW } from 'date-fns/locale'
 import { getTaskUrgency } from '../../lib/taskUtils'
@@ -137,6 +137,7 @@ export default function BossHome() {
     { icon: Users, label: '人事排班', sub: '今日 ' + stats.working + ' 人・假單 ' + stats.leavePending, path: '/hr', color: '#4da86c' },
     { icon: DollarSign, label: '薪資財務', sub: '薪資・支出・勞健保', path: '/payroll', color: '#4d8ac4' },
     { icon: Package, label: '庫存盤點', sub: '進貨・庫存・盤點・調整', path: '/boss-inventory', color: '#7a8c4d' },
+    { icon: Edit3, label: '補打卡', sub: '老闆/會計代員工補登打卡', path: '/admin-punch', color: '#a47a4a' },
     { icon: Settings, label: '系統設定', sub: '員工・SOP定義・KPI考核', path: '/settings', color: '#c44d4d' },
     { icon: FileText, label: '報關', sub: '裝箱單・產地證・發票', path: '/admin/customs', color: '#7d6e5c' },
     { icon: BarChart3, label: 'CRM 儀表板', sub: '客戶分析・RFM・生命週期', path: '/crm', color: '#e67e22' },
