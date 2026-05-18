@@ -68,6 +68,7 @@ import AdminOnboardingDetail from './pages/admin/OnboardingDetail'
 import AdminCustoms from './pages/admin/Customs'
 import FactorySubmit from './pages/customs/FactorySubmit'
 import SalesInput from './pages/admin/SalesInput'
+import BossAdminPunch from './pages/boss/AdminPunch'
 
 function AppInner() {
   const { user, loading } = useAuth()
@@ -94,6 +95,7 @@ function AppInner() {
             <Route path="/boss-inventory" element={<BossInventory />} />
             <Route path="/commission" element={<Commission />} />
             <Route path="/customers" element={<Customers />} />
+<Route path="/admin-punch" element={<BossAdminPunch />} />
             <Route path="/dealer-orders" element={<DealerOrders />} />
             <Route path="/pos" element={<StaffPOS />} />
             <Route path="/revenue" element={<StaffRevenue />} />
