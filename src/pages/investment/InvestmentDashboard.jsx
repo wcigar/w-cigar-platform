@@ -271,6 +271,9 @@ function InvestmentDashboardInner() {
   const [showFinancials, setShowFinancials] = useState(true);
   const [finSyncing, setFinSyncing] = useState(false);
   const [finSyncMsg, setFinSyncMsg] = useState('');
+  const [notifPermission, setNotifPermission] = useState(
+    typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'
+  );
 
   async function loadData() {
     setLoading(true);
@@ -405,6 +408,98 @@ function InvestmentDashboardInner() {
     return () => clearInterval(interval);
   }, []);
 
+  // 偵測新 alert → 跳通知
+  useEffect(() => {
+    if (notifPermission !== 'granted' || alerts.length === 0) return;
+    const lastSeen = parseInt(localStorage.getItem('iw_last_alert_id') || '0');
+    const newAlerts = alerts.filter((a) => a.id > lastSeen);
+    newAlerts.forEach((a) => {
+      let title;
+      if (a.alert_type === 'big_drop') title = `🚨 快評估賣出 / 停損`;
+      else if (a.alert_type === 'big_rise') title = `🎯 快評估獲利了結`;
+      else title = `⚠️ 警示：${a.alert_type}`;
+      try {
+        new Notification(title, {
+          body: a.message,
+          icon: '/favicon.ico',
+          tag: `alert-${a.id}`,
+          requireInteraction: a.alert_level === 'critical',
+        });
+      } catch (_) {}
+    });
+    if (newAlerts.length > 0) {
+      const maxId = Math.max(...alerts.map((a) => a.id));
+      localStorage.setItem('iw_last_alert_id', String(maxId));
+    }
+  }, [alerts, notifPermission]);
+
+  // 偵測達停利/停損 → 跳通知（純前端 derive、不需後端 alert）
+  useEffect(() => {
+    if (notifPermission !== 'granted' || positions.length === 0) return;
+    const triggered = (() => {
+      try { return JSON.parse(localStorage.getItem('iw_triggered_actions') || '{}'); }
+      catch { return {}; }
+    })();
+    const now = Date.now();
+    const COOLDOWN = 30 * 60 * 1000; // 30 分鐘同一檔同一事件只通知 1 次
+
+    positions.filter((p) => p.shares > 0).forEach((p) => {
+      const cur = parseFloat(p.current_price);
+      const profit = parseFloat(p.take_profit);
+      const stop = parseFloat(p.stop_loss);
+      if (!cur) return;
+      // 達停利
+      if (profit > 0 && cur >= profit) {
+        const key = `${p.symbol}:hit_profit`;
+        if (!triggered[key] || now - triggered[key] > COOLDOWN) {
+          try {
+            new Notification(`🎯 快賣！${p.symbol} ${p.name} 達停利`, {
+              body: `現價 ${cur.toFixed(2)} 元 ≥ 停利 ${profit.toFixed(2)} 元 — 考慮分批了結`,
+              icon: '/favicon.ico',
+              tag: `profit-${p.symbol}`,
+              requireInteraction: true,
+            });
+          } catch (_) {}
+          triggered[key] = now;
+        }
+      }
+      // 達停損
+      if (stop > 0 && cur <= stop) {
+        const key = `${p.symbol}:hit_stop`;
+        if (!triggered[key] || now - triggered[key] > COOLDOWN) {
+          try {
+            new Notification(`🚨 快停損！${p.symbol} ${p.name} 跌破停損`, {
+              body: `現價 ${cur.toFixed(2)} 元 ≤ 停損 ${stop.toFixed(2)} 元 — 應出場`,
+              icon: '/favicon.ico',
+              tag: `stop-${p.symbol}`,
+              requireInteraction: true,
+            });
+          } catch (_) {}
+          triggered[key] = now;
+        }
+      }
+    });
+    try { localStorage.setItem('iw_triggered_actions', JSON.stringify(triggered)); }
+    catch (_) {}
+  }, [positions, notifPermission]);
+
+  async function requestNotifications() {
+    if (typeof Notification === 'undefined') {
+      alert('此瀏覽器不支援桌面通知');
+      return;
+    }
+    const p = await Notification.requestPermission();
+    setNotifPermission(p);
+    if (p === 'granted') {
+      try {
+        new Notification('🔔 通知已啟用', {
+          body: 'W Investment Watch — 達停利停損、大跌大漲時會主動提醒',
+          icon: '/favicon.ico',
+        });
+      } catch (_) {}
+    }
+  }
+
   const allHoldings = positions.filter((p) => p.shares > 0);
   const holdings = sortHoldings(allHoldings, sortBy);
   const references = positions.filter((p) => p.category === 'reference');
@@ -425,13 +520,29 @@ function InvestmentDashboardInner() {
               雪茄王子 Wilson Tsai · 最後更新: {lastUpdate ? lastUpdate.toLocaleTimeString('zh-TW') : '載入中'}
             </p>
           </div>
-          <button
-            onClick={refreshPrices}
-            disabled={refreshing}
-            style={{ background: refreshing ? '#444' : '#b8956a', color: '#1a1a1a', border: 'none', padding: '10px 20px', borderRadius: 6, fontSize: 17, fontWeight: 600, cursor: refreshing ? 'wait' : 'pointer', letterSpacing: 1 }}
-          >
-            {refreshing ? '抓取中…' : '🔄 立即抓取最新股價'}
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            {notifPermission === 'default' && (
+              <button
+                type="button"
+                onClick={requestNotifications}
+                style={{ background: '#1d4ed8', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: 6, fontSize: 15, fontWeight: 600, cursor: 'pointer' }}
+                title="達停利/停損、大跌大漲時主動推播到桌面"
+              >🔔 啟用即時通知</button>
+            )}
+            {notifPermission === 'granted' && (
+              <span style={{ color: '#15803d', fontSize: 14, padding: '6px 10px', background: 'rgba(21, 128, 61, 0.15)', borderRadius: 4 }} title="通知已啟用">🔔 通知已啟用</span>
+            )}
+            {notifPermission === 'denied' && (
+              <span style={{ color: '#dc2626', fontSize: 14, padding: '6px 10px', background: 'rgba(220, 38, 38, 0.15)', borderRadius: 4 }} title="點瀏覽器網址列鎖頭可恢復通知">🔕 通知被封鎖</span>
+            )}
+            <button
+              onClick={refreshPrices}
+              disabled={refreshing}
+              style={{ background: refreshing ? '#444' : '#b8956a', color: '#1a1a1a', border: 'none', padding: '10px 20px', borderRadius: 6, fontSize: 17, fontWeight: 600, cursor: refreshing ? 'wait' : 'pointer', letterSpacing: 1 }}
+            >
+              {refreshing ? '抓取中…' : '🔄 立即抓取最新股價'}
+            </button>
+          </div>
         </div>
 
         {/* Summary Cards */}
