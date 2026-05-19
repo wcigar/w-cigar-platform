@@ -129,9 +129,6 @@ function InvestmentDashboardInner() {
   const [showRecovery, setShowRecovery] = useState(false);
   const [dividends, setDividends] = useState([]);
   const [showDividends, setShowDividends] = useState(true);
-  const [divForm, setDivForm] = useState({ symbol: '', ex_date: '', cash_dividend: '', payment_date: '' });
-  const [divSaving, setDivSaving] = useState(false);
-  const [divError, setDivError] = useState('');
   const [divSyncing, setDivSyncing] = useState(false);
   const [divSyncMsg, setDivSyncMsg] = useState('');
 
@@ -158,34 +155,6 @@ function InvestmentDashboardInner() {
       console.error('Load error:', e);
     }
     setLoading(false);
-  }
-
-  async function addDividend(e) {
-    e.preventDefault();
-    setDivError('');
-    if (!divForm.symbol || !divForm.ex_date || !divForm.cash_dividend) {
-      setDivError('股票、除權息日、現金股利必填');
-      return;
-    }
-    setDivSaving(true);
-    const stock = positions.find((p) => p.symbol === divForm.symbol);
-    const { error } = await supabase.from('investment_dividends').insert({
-      symbol: divForm.symbol,
-      market: stock?.market || 'TW',
-      ex_date: divForm.ex_date,
-      payment_date: divForm.payment_date || null,
-      cash_dividend: parseFloat(divForm.cash_dividend),
-      fiscal_year: new Date(divForm.ex_date).getFullYear() - 1,
-      status: 'announced',
-      source: 'manual',
-    });
-    setDivSaving(false);
-    if (error) {
-      setDivError(error.message);
-      return;
-    }
-    setDivForm({ symbol: '', ex_date: '', cash_dividend: '', payment_date: '' });
-    await loadData();
   }
 
   async function deleteDividend(id) {
@@ -433,55 +402,10 @@ function InvestmentDashboardInner() {
                   </table>
                 </div>
               )}
-              {/* Add Form */}
-              <form onSubmit={addDividend} style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', padding: 12, background: '#0f0f0f', borderRadius: 6, border: '1px dashed #2a2a2a' }}>
-                <select
-                  value={divForm.symbol}
-                  onChange={(e) => setDivForm((f) => ({ ...f, symbol: e.target.value }))}
-                  style={{ background: '#1a1a1a', color: '#e5e5e5', border: '1px solid #2a2a2a', borderRadius: 4, padding: '6px 10px', fontSize: 15, minWidth: 160 }}
-                >
-                  <option value="">— 選股票 —</option>
-                  {positions.filter((p) => p.shares > 0).map((p) => (
-                    <option key={p.symbol} value={p.symbol}>{p.symbol} {p.name}</option>
-                  ))}
-                </select>
-                <input
-                  type="date"
-                  value={divForm.ex_date}
-                  onChange={(e) => setDivForm((f) => ({ ...f, ex_date: e.target.value }))}
-                  placeholder="除權息日"
-                  style={{ background: '#1a1a1a', color: '#e5e5e5', border: '1px solid #2a2a2a', borderRadius: 4, padding: '6px 10px', fontSize: 15 }}
-                />
-                <input
-                  type="number"
-                  step="0.01"
-                  value={divForm.cash_dividend}
-                  onChange={(e) => setDivForm((f) => ({ ...f, cash_dividend: e.target.value }))}
-                  placeholder="現金股利 元/股"
-                  style={{ background: '#1a1a1a', color: '#e5e5e5', border: '1px solid #2a2a2a', borderRadius: 4, padding: '6px 10px', fontSize: 15, width: 150 }}
-                />
-                <input
-                  type="date"
-                  value={divForm.payment_date}
-                  onChange={(e) => setDivForm((f) => ({ ...f, payment_date: e.target.value }))}
-                  placeholder="發放日 (選填)"
-                  style={{ background: '#1a1a1a', color: '#e5e5e5', border: '1px solid #2a2a2a', borderRadius: 4, padding: '6px 10px', fontSize: 15 }}
-                  title="發放日（選填）"
-                />
-                <button
-                  type="submit"
-                  disabled={divSaving}
-                  style={{ background: divSaving ? '#444' : '#b8956a', color: '#1a1a1a', border: 'none', padding: '7px 16px', borderRadius: 4, fontSize: 15, fontWeight: 600, cursor: divSaving ? 'wait' : 'pointer' }}
-                >
-                  {divSaving ? '儲存中…' : '+ 新增'}
-                </button>
-                {divError && <span style={{ color: '#dc2626', fontSize: 14 }}>{divError}</span>}
-              </form>
               <p style={{ color: '#666', fontSize: 13, marginTop: 8, marginBottom: 0, lineHeight: 1.6 }}>
                 💡 預估可領 = 持股數 × 現金股利。<strong style={{ color: '#888' }}>「擬議」金額</strong>為董事會通過、待股東會確認；
                 <strong style={{ color: '#888' }}>「待公告」</strong>為除息日尚未確定。<br/>
-                📡 資料來源：TWSE OpenAPI（公司股利分派情形 t187ap45_L）+ 手動補充。
-                <span style={{ color: '#555' }}>同一檔同年度不能重複新增（如要改，請先刪除）。</span>
+                📡 資料來源：TWSE OpenAPI（公司股利分派情形 t187ap45_L）— 點上方「🔄 同步 TWSE」自動更新。
               </p>
             </div>
           )}
