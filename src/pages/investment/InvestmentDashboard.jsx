@@ -132,6 +132,8 @@ function InvestmentDashboardInner() {
   const [divForm, setDivForm] = useState({ symbol: '', ex_date: '', cash_dividend: '', payment_date: '' });
   const [divSaving, setDivSaving] = useState(false);
   const [divError, setDivError] = useState('');
+  const [divSyncing, setDivSyncing] = useState(false);
+  const [divSyncMsg, setDivSyncMsg] = useState('');
 
   async function loadData() {
     setLoading(true);
@@ -194,6 +196,25 @@ function InvestmentDashboardInner() {
       return;
     }
     await loadData();
+  }
+
+  async function syncDividends() {
+    setDivSyncing(true);
+    setDivSyncMsg('');
+    try {
+      const { data, error } = await supabase.functions.invoke('investment-sync-dividends', { body: {} });
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.error || '未知錯誤');
+      const parts = [];
+      parts.push(`✓ 已同步 ${data.synced} 檔`);
+      if (data.skipped_no_dividend?.length) parts.push(`不配息 ${data.skipped_no_dividend.length} 檔`);
+      if (data.not_in_twse?.length) parts.push(`ETF/未公告 ${data.not_in_twse.length} 檔`);
+      setDivSyncMsg(parts.join(' · '));
+      await loadData();
+    } catch (e) {
+      setDivSyncMsg('❌ 同步失敗：' + (e.message || e));
+    }
+    setDivSyncing(false);
   }
 
   async function refreshPrices() {
@@ -306,19 +327,44 @@ function InvestmentDashboardInner() {
           >
             <span>
               💰 除權息日曆
-              {dividends.length > 0 && (
-                <span style={{ color: '#b8956a', fontSize: 15, marginLeft: 12 }}>
-                  未來可領 NT$ {fmtMoney(dividends.filter((d) => d.days_until_ex !== null && d.days_until_ex >= 0).reduce((s, d) => s + parseFloat(d.estimated_cash_payout || 0), 0))}
-                </span>
-              )}
+              {dividends.length > 0 && (() => {
+                const confirmedTotal = dividends.filter((d) => d.days_until_ex !== null && d.days_until_ex >= 0).reduce((s, d) => s + parseFloat(d.estimated_cash_payout || 0), 0);
+                const pendingTotal = dividends.filter((d) => d.ex_date === null).reduce((s, d) => s + parseFloat(d.estimated_cash_payout || 0), 0);
+                return (
+                  <>
+                    <span style={{ color: '#b8956a', fontSize: 15, marginLeft: 12 }} title="已公告除息日的擬議/確定金額加總">
+                      已排程 NT$ {fmtMoney(confirmedTotal)}
+                    </span>
+                    {pendingTotal > 0 && (
+                      <span style={{ color: '#666', fontSize: 14, marginLeft: 8 }} title="董事會已擬議但除息日尚未公告">
+                        + 待公告 NT$ {fmtMoney(pendingTotal)}
+                      </span>
+                    )}
+                  </>
+                );
+              })()}
             </span>
             <span style={{ color: '#888', fontSize: 15 }}>{showDividends ? '收合 ▲' : '展開 ▼'}</span>
           </button>
           {showDividends && (
             <div style={{ padding: '0 16px 16px' }}>
+              {/* Sync Button */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, padding: '4px 0 12px', borderBottom: '1px solid #2a2a2a', marginBottom: 12 }}>
+                <span style={{ color: '#888', fontSize: 14 }}>
+                  {divSyncMsg || '點右側按鈕從 TWSE OpenAPI 自動同步台股最新除權息公告'}
+                </span>
+                <button
+                  type="button"
+                  onClick={syncDividends}
+                  disabled={divSyncing}
+                  style={{ background: divSyncing ? '#444' : '#1d4ed8', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 4, fontSize: 15, fontWeight: 600, cursor: divSyncing ? 'wait' : 'pointer', letterSpacing: 1 }}
+                >
+                  {divSyncing ? '同步中…' : '🔄 同步 TWSE'}
+                </button>
+              </div>
               {dividends.length === 0 ? (
                 <p style={{ color: '#666', fontSize: 15, margin: '0 0 16px' }}>
-                  尚無除權息資料 — 從下方表單新增第一筆（資料來源建議：MOPS 公開資訊觀測站、Goodinfo、券商 App）
+                  尚無除權息資料 — 點上方「🔄 同步 TWSE」一鍵抓取，或手動從下方表單新增
                 </p>
               ) : (
                 <div style={{ overflowX: 'auto', marginBottom: 16 }}>
@@ -340,25 +386,37 @@ function InvestmentDashboardInner() {
                       {dividends.map((d) => {
                         const days = d.days_until_ex;
                         const isPast = days !== null && days < 0;
-                        const isSoon = days !== null && days >= 0 && days <= 14;
+                        const isImminent = days !== null && days >= 0 && days <= 7;
+                        const isSoon = days !== null && days > 7 && days <= 14;
+                        const isProposed = d.status === 'proposed';
+                        const rowBg = isImminent ? 'rgba(245, 158, 11, 0.08)' : 'transparent';
                         return (
-                          <tr key={d.id} style={{ borderTop: '1px solid #2a2a2a', opacity: isPast ? 0.5 : 1 }}>
+                          <tr key={d.id} style={{ borderTop: '1px solid #2a2a2a', opacity: isPast ? 0.5 : 1, background: rowBg }}>
                             <td style={{ padding: '8px' }}>
                               <strong style={{ color: '#fff' }}>{d.symbol}</strong>
                               <span style={{ color: '#666', marginLeft: 6 }}>{d.name}</span>
                             </td>
-                            <td style={{ padding: '8px', textAlign: 'right' }}>{d.ex_date || '-'}</td>
-                            <td style={{ padding: '8px', textAlign: 'right', color: isSoon ? '#f59e0b' : '#999', fontWeight: isSoon ? 600 : 400 }}>
-                              {days === null ? '-' : isPast ? `已過 ${-days} 天` : `${days} 天`}
+                            <td style={{ padding: '8px', textAlign: 'right', color: d.ex_date ? '#e5e5e5' : '#666', fontStyle: d.ex_date ? 'normal' : 'italic' }}>
+                              {d.ex_date || '待公告'}
                             </td>
-                            <td style={{ padding: '8px', textAlign: 'right' }}>{d.cash_dividend ? parseFloat(d.cash_dividend).toFixed(2) : '-'}</td>
+                            <td style={{ padding: '8px', textAlign: 'right', color: isImminent ? '#f59e0b' : isSoon ? '#fbbf24' : '#999', fontWeight: (isImminent || isSoon) ? 700 : 400 }}>
+                              {days === null ? '-' : isPast ? `已過 ${-days} 天` : isImminent ? `⏰ ${days} 天` : `${days} 天`}
+                            </td>
+                            <td style={{ padding: '8px', textAlign: 'right' }}>
+                              {d.cash_dividend ? parseFloat(d.cash_dividend).toFixed(2) : '-'}
+                              {isProposed && (
+                                <span title="董事會擬議中，最終金額以股東會通過為準" style={{ color: '#666', fontSize: 12, marginLeft: 4 }}>(擬)</span>
+                              )}
+                            </td>
                             <td style={{ padding: '8px', textAlign: 'right', color: '#999' }}>{d.shares?.toLocaleString()}</td>
                             <td style={{ padding: '8px', textAlign: 'right', color: '#b8956a', fontWeight: 600 }}>
                               NT$ {fmtMoney(d.estimated_cash_payout)}
                             </td>
                             <td style={{ padding: '8px', textAlign: 'right', color: '#999' }}>{d.payment_date || '-'}</td>
-                            <td style={{ padding: '8px', textAlign: 'center', fontSize: 14, color: '#666' }}>
-                              {d.status === 'paid' ? '✓ 已發放' : d.status === 'proposed' ? '提案中' : '已公告'}
+                            <td style={{ padding: '8px', textAlign: 'center', fontSize: 14 }}>
+                              {d.status === 'paid' ? <span style={{ color: '#15803d' }}>✓ 已發放</span>
+                                : d.status === 'proposed' ? <span style={{ color: '#f59e0b' }}>● 董事會擬議</span>
+                                : <span style={{ color: '#1d4ed8' }}>● 股東會通過</span>}
                             </td>
                             <td style={{ padding: '8px', textAlign: 'right' }}>
                               <button
@@ -419,8 +477,11 @@ function InvestmentDashboardInner() {
                 </button>
                 {divError && <span style={{ color: '#dc2626', fontSize: 14 }}>{divError}</span>}
               </form>
-              <p style={{ color: '#666', fontSize: 13, marginTop: 8, marginBottom: 0 }}>
-                💡 預估可領 = 持股數 × 現金股利。同一檔同年度不能重複新增（如要改，請先刪除）。
+              <p style={{ color: '#666', fontSize: 13, marginTop: 8, marginBottom: 0, lineHeight: 1.6 }}>
+                💡 預估可領 = 持股數 × 現金股利。<strong style={{ color: '#888' }}>「擬議」金額</strong>為董事會通過、待股東會確認；
+                <strong style={{ color: '#888' }}>「待公告」</strong>為除息日尚未確定。<br/>
+                📡 資料來源：TWSE OpenAPI（公司股利分派情形 t187ap45_L）+ 手動補充。
+                <span style={{ color: '#555' }}>同一檔同年度不能重複新增（如要改，請先刪除）。</span>
               </p>
             </div>
           )}
