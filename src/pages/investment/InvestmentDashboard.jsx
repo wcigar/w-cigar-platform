@@ -263,11 +263,15 @@ function InvestmentDashboardInner() {
   const [divSyncMsg, setDivSyncMsg] = useState('');
   const [expandedAlerts, setExpandedAlerts] = useState({});
   const [analyzingAlerts, setAnalyzingAlerts] = useState({});
+  const [news, setNews] = useState([]);
+  const [showNews, setShowNews] = useState(true);
+  const [newsSyncing, setNewsSyncing] = useState(false);
+  const [newsSyncMsg, setNewsSyncMsg] = useState('');
 
   async function loadData() {
     setLoading(true);
     try {
-      const [posRes, sumRes, alertRes, divRes] = await Promise.all([
+      const [posRes, sumRes, alertRes, divRes, newsRes] = await Promise.all([
         supabase.from('investment_portfolio_summary').select('*'),
         supabase.from('investment_account_summary').select('*').single(),
         supabase
@@ -277,11 +281,17 @@ function InvestmentDashboardInner() {
           .order('created_at', { ascending: false })
           .limit(20),
         supabase.from('investment_upcoming_dividends').select('*'),
+        supabase
+          .from('investment_news')
+          .select('*')
+          .order('published_at', { ascending: false })
+          .limit(60),
       ]);
       if (posRes.data) setPositions(posRes.data);
       if (sumRes.data) setSummary(sumRes.data);
       if (alertRes.data) setAlerts(alertRes.data);
       if (divRes.data) setDividends(divRes.data);
+      if (newsRes.data) setNews(newsRes.data);
       setLastUpdate(new Date());
     } catch (e) {
       console.error('Load error:', e);
@@ -317,6 +327,22 @@ function InvestmentDashboardInner() {
       alert('分析失敗：' + (e.message || e));
     }
     setAnalyzingAlerts((s) => ({ ...s, [alertId]: false }));
+  }
+
+  async function syncNews() {
+    setNewsSyncing(true);
+    setNewsSyncMsg('');
+    try {
+      const { data, error } = await supabase.functions.invoke('investment-fetch-news', { body: {} });
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.error || '未知錯誤');
+      const symbols = Object.keys(data.by_symbol || {});
+      setNewsSyncMsg(`✓ 同步 ${data.inserted} 則新聞，${symbols.length} 檔有更新`);
+      await loadData();
+    } catch (e) {
+      setNewsSyncMsg('❌ 同步失敗：' + (e.message || e));
+    }
+    setNewsSyncing(false);
   }
 
   async function syncDividends() {
@@ -674,6 +700,93 @@ function InvestmentDashboardInner() {
                     📋 <strong style={{ color: '#b8956a' }}>建議動作</strong>規則：達停利 → 賣 1/3 分批；達停損 → 全清；深套 → 認賠 1/3 換股或先過息；大幅獲利 → 鎖利 1/4；接近停利 → 過息再決定。<br/>
                     🔄 <strong>時時更新</strong>：每 60 秒從 DB 拉最新股價、即時重算所有建議。即將除息（≤30 天 + 領取 ≥NT$3,000）會優先建議「過息再賣」。<br/>
                     ⚠️ 這只是規則參考、非投資建議。法人目標價 / 公司消息 / 財報待後續整合。
+                  </p>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* Stock News */}
+        {(() => {
+          const newsBySymbol = {};
+          news.forEach((n) => {
+            if (!newsBySymbol[n.symbol]) newsBySymbol[n.symbol] = [];
+            newsBySymbol[n.symbol].push(n);
+          });
+          const symbolsWithNews = Object.keys(newsBySymbol).sort((a, b) => newsBySymbol[b].length - newsBySymbol[a].length);
+          const totalNews = news.length;
+          const stockNameMap = {};
+          positions.forEach((p) => { stockNameMap[p.symbol] = p.name; });
+
+          return (
+            <div style={{ marginBottom: 24, background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: 8 }}>
+              <button
+                type="button"
+                onClick={() => setShowNews((s) => !s)}
+                style={{ width: '100%', background: 'transparent', border: 'none', color: '#fff', padding: '14px 16px', textAlign: 'left', fontSize: 17, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+              >
+                <span>
+                  📰 個股新聞
+                  {totalNews > 0 ? (
+                    <span style={{ color: '#888', fontSize: 15, marginLeft: 12 }}>
+                      {totalNews} 則 · {symbolsWithNews.length} 檔有更新
+                    </span>
+                  ) : (
+                    <span style={{ color: '#888', fontSize: 15, marginLeft: 12 }}>尚無資料</span>
+                  )}
+                </span>
+                <span style={{ color: '#888', fontSize: 15 }}>{showNews ? '收合 ▲' : '展開 ▼'}</span>
+              </button>
+              {showNews && (
+                <div style={{ padding: '0 16px 16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, padding: '4px 0 12px', borderBottom: '1px solid #2a2a2a', marginBottom: 12 }}>
+                    <span style={{ color: '#888', fontSize: 14 }}>
+                      {newsSyncMsg || '點右側按鈕從鉅亨網抓取最近 150 則台股新聞中與你持股相關的'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={syncNews}
+                      disabled={newsSyncing}
+                      style={{ background: newsSyncing ? '#444' : '#1d4ed8', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 4, fontSize: 15, fontWeight: 600, cursor: newsSyncing ? 'wait' : 'pointer', letterSpacing: 1 }}
+                    >
+                      {newsSyncing ? '同步中…' : '🔄 同步新聞'}
+                    </button>
+                  </div>
+                  {symbolsWithNews.length === 0 ? (
+                    <p style={{ color: '#666', fontSize: 15, margin: '0 0 12px' }}>
+                      尚無相關新聞 — 點「🔄 同步新聞」抓取（資料來源：鉅亨網 tw_stock_news）
+                    </p>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 12 }}>
+                      {symbolsWithNews.map((symbol) => {
+                        const list = newsBySymbol[symbol].slice(0, 3);
+                        return (
+                          <div key={symbol} style={{ background: '#0f0f0f', padding: 12, borderRadius: 6, border: '1px solid #2a2a2a' }}>
+                            <div style={{ marginBottom: 8, paddingBottom: 6, borderBottom: '1px solid #2a2a2a' }}>
+                              <strong style={{ color: '#fff', fontSize: 16 }}>{symbol}</strong>
+                              <span style={{ color: '#666', marginLeft: 6, fontSize: 14 }}>{stockNameMap[symbol] || ''}</span>
+                              <span style={{ color: '#888', fontSize: 13, marginLeft: 8 }}>· {newsBySymbol[symbol].length} 則</span>
+                            </div>
+                            {list.map((n) => (
+                              <div key={n.id} style={{ marginBottom: 8 }}>
+                                <a href={n.url} target="_blank" rel="noopener noreferrer" style={{ color: '#e5e5e5', fontSize: 14, lineHeight: 1.5, textDecoration: 'none' }}>
+                                  {n.title}
+                                </a>
+                                <div style={{ color: '#666', fontSize: 12, marginTop: 2 }}>
+                                  {n.source}
+                                  {n.published_at && ` · ${new Date(n.published_at).toLocaleString('zh-TW', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Taipei' })}`}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <p style={{ color: '#666', fontSize: 13, marginTop: 12, marginBottom: 0, lineHeight: 1.6 }}>
+                    📡 資料來源：鉅亨網 tw_stock_news 分類前 150 則、依新聞自帶的 stock array 精準對應到持股 — 不靠關鍵字、無誤判。<br/>
+                    冷門股可能短期內無新聞屬正常。Phase 2 可整合 Yahoo / 經濟日報 擴大涵蓋。
                   </p>
                 </div>
               )}
