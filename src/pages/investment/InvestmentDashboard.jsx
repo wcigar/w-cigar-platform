@@ -110,6 +110,25 @@ function sortHoldings(holdings, sortBy) {
   return arr;
 }
 
+// 簡單 markdown 渲染：只處理 [text](url) link，其餘純文字（白名單，避免 XSS）
+function renderMarkdownLite(text) {
+  if (!text) return null;
+  const linkRe = /\[([^\]]+)\]\(([^)]+)\)/g;
+  const parts = [];
+  let lastIdx = 0;
+  let m;
+  while ((m = linkRe.exec(text)) !== null) {
+    if (m.index > lastIdx) parts.push(text.slice(lastIdx, m.index));
+    parts.push({ link: { text: m[1], url: m[2] } });
+    lastIdx = m.index + m[0].length;
+  }
+  if (lastIdx < text.length) parts.push(text.slice(lastIdx));
+  return parts.map((p, i) =>
+    typeof p === 'string' ? <span key={i}>{p}</span> :
+    <a key={i} href={p.link.url} target="_blank" rel="noopener noreferrer" style={{ color: '#60a5fa', textDecoration: 'underline', wordBreak: 'break-all' }}>{p.link.text}</a>
+  );
+}
+
 // 套牢回本所需漲幅：若現價 = 成本 × (1+r)，回本需 1/(1+r) - 1
 function requiredRecoveryPct(returnPct) {
   if (returnPct === null || returnPct === undefined) return null;
@@ -242,6 +261,8 @@ function InvestmentDashboardInner() {
   const [showDividends, setShowDividends] = useState(true);
   const [divSyncing, setDivSyncing] = useState(false);
   const [divSyncMsg, setDivSyncMsg] = useState('');
+  const [expandedAlerts, setExpandedAlerts] = useState({});
+  const [analyzingAlerts, setAnalyzingAlerts] = useState({});
 
   async function loadData() {
     setLoading(true);
@@ -276,6 +297,26 @@ function InvestmentDashboardInner() {
       return;
     }
     await loadData();
+  }
+
+  async function analyzeAlert(alertId, hasAnalysis) {
+    // 已有分析 → 純展開/折疊
+    if (hasAnalysis) {
+      setExpandedAlerts((s) => ({ ...s, [alertId]: !s[alertId] }));
+      return;
+    }
+    // 沒有分析 → 呼叫 EF
+    setAnalyzingAlerts((s) => ({ ...s, [alertId]: true }));
+    try {
+      const { data, error } = await supabase.functions.invoke('investment-analyze-alert', { body: { alert_id: alertId } });
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.error || '未知錯誤');
+      await loadData();
+      setExpandedAlerts((s) => ({ ...s, [alertId]: true }));
+    } catch (e) {
+      alert('分析失敗：' + (e.message || e));
+    }
+    setAnalyzingAlerts((s) => ({ ...s, [alertId]: false }));
   }
 
   async function syncDividends() {
@@ -372,29 +413,56 @@ function InvestmentDashboardInner() {
             <h2 style={{ color: '#fff', fontSize: 17, marginBottom: 12, borderBottom: '1px solid #2a2a2a', paddingBottom: 8 }}>
               🚨 警示中心 ({alerts.length})
             </h2>
-            {alerts.map((a) => (
-              <div
-                key={a.id}
-                style={{
-                  background: a.alert_level === 'critical' ? '#7f1d1d' : '#92400e',
-                  padding: '12px 16px',
-                  marginBottom: 8,
-                  borderRadius: 6,
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                <div>
-                  <span style={{ fontSize: 21, marginRight: 8 }}>{a.alert_level === 'critical' ? '🔴' : '🟡'}</span>
-                  <strong style={{ marginRight: 8 }}>{a.alert_type}</strong>
-                  <span style={{ fontSize: 16, opacity: 0.95 }}>{a.message}</span>
+            {alerts.map((a) => {
+              const hasAnalysis = !!a.analysis;
+              const isExpanded = !!expandedAlerts[a.id];
+              const isAnalyzing = !!analyzingAlerts[a.id];
+              const supportsAnalysis = a.alert_type === 'big_drop' || a.alert_type === 'big_rise';
+              return (
+                <div
+                  key={a.id}
+                  style={{
+                    background: a.alert_level === 'critical' ? '#7f1d1d' : '#92400e',
+                    padding: '12px 16px',
+                    marginBottom: 8,
+                    borderRadius: 6,
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ fontSize: 21, marginRight: 8 }}>{a.alert_level === 'critical' ? '🔴' : '🟡'}</span>
+                      <strong style={{ marginRight: 8 }}>{a.alert_type}</strong>
+                      <span style={{ fontSize: 16, opacity: 0.95 }}>{a.message}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {supportsAnalysis && (
+                        <button
+                          type="button"
+                          onClick={() => analyzeAlert(a.id, hasAnalysis)}
+                          disabled={isAnalyzing}
+                          style={{ background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', padding: '5px 12px', borderRadius: 4, fontSize: 14, fontWeight: 600, cursor: isAnalyzing ? 'wait' : 'pointer' }}
+                        >
+                          {isAnalyzing ? '分析中…' : hasAnalysis ? (isExpanded ? '收合 ▲' : '📖 查看分析') : '🔍 分析原因'}
+                        </button>
+                      )}
+                      <span style={{ fontSize: 14, opacity: 0.6, whiteSpace: 'nowrap' }}>
+                        {new Date(a.created_at).toLocaleString('zh-TW', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  </div>
+                  {hasAnalysis && isExpanded && (
+                    <div style={{ marginTop: 12, padding: 14, background: 'rgba(0,0,0,0.35)', borderRadius: 4, fontSize: 15, lineHeight: 1.8, whiteSpace: 'pre-wrap', color: '#f3f4f6', borderLeft: '3px solid rgba(255,255,255,0.3)' }}>
+                      {renderMarkdownLite(a.analysis)}
+                      {a.analyzed_at && (
+                        <div style={{ marginTop: 10, fontSize: 12, opacity: 0.6 }}>
+                          分析時間: {new Date(a.analyzed_at).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <span style={{ fontSize: 14, opacity: 0.6 }}>
-                  {new Date(a.created_at).toLocaleString('zh-TW', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                </span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
