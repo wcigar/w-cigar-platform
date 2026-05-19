@@ -247,6 +247,115 @@ function computeAction(p, adv, nextDiv) {
   return { action: '持有觀察', when: '持續監控', urgency: 'low' };
 }
 
+
+// 美股大盤 + AI 龍頭股區塊
+function USMarketSection() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  async function load() {
+    try {
+      const r = await fetch("https://yzujoxdltvklrehphzsl.supabase.co/functions/v1/us-market-snapshot");
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error || "fetch failed");
+      setData(j);
+      setError(null);
+    } catch (e) {
+      setError(e.message || "載入失敗");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    load();
+    const t = setInterval(load, 60000);
+    return () => clearInterval(t);
+  }, []);
+
+  function pctColor(pct) {
+    if (pct == null) return "#999";
+    return pct >= 0 ? "#ef5350" : "#26a69a";
+  }
+  function fmtPct(pct) {
+    if (pct == null || isNaN(pct)) return "—";
+    return (pct >= 0 ? "+" : "") + pct.toFixed(2) + "%";
+  }
+  function fmtPrice(p) {
+    if (p == null || isNaN(p)) return "—";
+    return p.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  const indices = (data?.indices || []).filter(x => ["^DJI","^IXIC","^SOX"].includes(x.symbol));
+  const leaders = data?.ai_leaders || [];
+
+  return (
+    <div style={{ marginBottom: 24 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <h2 style={{ fontSize: 16, fontWeight: 600, color: "#e5e5e5", margin: 0 }}>
+          🇺🇸 美股大盤 ＋ AI 龍頭
+        </h2>
+        <span style={{ fontSize: 11, color: "#666" }}>
+          {data?.synced_at ? new Date(data.synced_at).toLocaleTimeString("zh-TW", { hour12: false }) : ""}
+          {loading && " · 載入中"}
+        </span>
+      </div>
+
+      {error && (
+        <div style={{ padding: 12, background: "#3a1a1a", border: "1px solid #c44d4d", borderRadius: 8, color: "#ff8a80", fontSize: 13, marginBottom: 12 }}>
+          ⚠️ {error}
+        </div>
+      )}
+
+      {/* 三大指數 */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 12 }}>
+        {indices.map(idx => {
+          const q = idx.quote || {};
+          const pct = q.change_pct;
+          const chg = q.change;
+          return (
+            <div key={idx.symbol} style={{ background: "#1a1a1a", border: "1px solid #2a2a2a", borderRadius: 10, padding: 14 }}>
+              <div style={{ fontSize: 11, color: "#888", marginBottom: 4 }}>{idx.short}</div>
+              <div style={{ fontSize: 13, color: "#ccc", marginBottom: 8 }}>{idx.label}</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: "#e5e5e5", letterSpacing: 0.3 }}>
+                {fmtPrice(q.price)}
+              </div>
+              <div style={{ fontSize: 13, color: pctColor(pct), marginTop: 4, fontWeight: 600 }}>
+                {chg != null && (chg >= 0 ? "▲ " : "▼ ") + Math.abs(chg).toFixed(2)} ({fmtPct(pct)})
+              </div>
+              {q.market_state && (
+                <div style={{ fontSize: 10, color: "#666", marginTop: 4 }}>{q.market_state}</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* AI 龍頭 */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 8 }}>
+        {leaders.map(s => {
+          const q = s.quote || {};
+          const pct = q.change_pct;
+          return (
+            <div key={s.symbol} style={{ background: "#161616", border: "1px solid #262626", borderRadius: 8, padding: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 2 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#e5e5e5" }}>{s.symbol}</span>
+                <span style={{ fontSize: 10, color: "#777" }}>{s.tag}</span>
+              </div>
+              <div style={{ fontSize: 10, color: "#888", marginBottom: 4 }}>{s.label}</div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: "#e5e5e5" }}>{fmtPrice(q.price)}</span>
+                <span style={{ fontSize: 11, color: pctColor(pct), fontWeight: 600 }}>{fmtPct(pct)}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function InvestmentDashboardInner() {
   const [positions, setPositions] = useState([]);
   const [summary, setSummary] = useState(null);
@@ -544,6 +653,9 @@ function InvestmentDashboardInner() {
             </button>
           </div>
         </div>
+
+        {/* 美股大盤 + AI 龍頭 */}
+        <USMarketSection />
 
         {/* Summary Cards */}
         {summary && (
