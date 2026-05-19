@@ -267,11 +267,15 @@ function InvestmentDashboardInner() {
   const [showNews, setShowNews] = useState(true);
   const [newsSyncing, setNewsSyncing] = useState(false);
   const [newsSyncMsg, setNewsSyncMsg] = useState('');
+  const [financials, setFinancials] = useState([]);
+  const [showFinancials, setShowFinancials] = useState(true);
+  const [finSyncing, setFinSyncing] = useState(false);
+  const [finSyncMsg, setFinSyncMsg] = useState('');
 
   async function loadData() {
     setLoading(true);
     try {
-      const [posRes, sumRes, alertRes, divRes, newsRes] = await Promise.all([
+      const [posRes, sumRes, alertRes, divRes, newsRes, finRes] = await Promise.all([
         supabase.from('investment_portfolio_summary').select('*'),
         supabase.from('investment_account_summary').select('*').single(),
         supabase
@@ -286,12 +290,14 @@ function InvestmentDashboardInner() {
           .select('*')
           .order('published_at', { ascending: false })
           .limit(60),
+        supabase.from('investment_latest_financials').select('*'),
       ]);
       if (posRes.data) setPositions(posRes.data);
       if (sumRes.data) setSummary(sumRes.data);
       if (alertRes.data) setAlerts(alertRes.data);
       if (divRes.data) setDividends(divRes.data);
       if (newsRes.data) setNews(newsRes.data);
+      if (finRes.data) setFinancials(finRes.data);
       setLastUpdate(new Date());
     } catch (e) {
       console.error('Load error:', e);
@@ -327,6 +333,21 @@ function InvestmentDashboardInner() {
       alert('分析失敗：' + (e.message || e));
     }
     setAnalyzingAlerts((s) => ({ ...s, [alertId]: false }));
+  }
+
+  async function syncFinancials() {
+    setFinSyncing(true);
+    setFinSyncMsg('');
+    try {
+      const { data, error } = await supabase.functions.invoke('investment-fetch-fundamentals', { body: {} });
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.error || '未知錯誤');
+      setFinSyncMsg(`✓ 同步 ${data.inserted} 檔財報 (TWSE 損益表)`);
+      await loadData();
+    } catch (e) {
+      setFinSyncMsg('❌ 同步失敗：' + (e.message || e));
+    }
+    setFinSyncing(false);
   }
 
   async function syncNews() {
@@ -787,6 +808,113 @@ function InvestmentDashboardInner() {
                   <p style={{ color: '#666', fontSize: 13, marginTop: 12, marginBottom: 0, lineHeight: 1.6 }}>
                     📡 資料來源：鉅亨網 tw_stock_news 分類前 150 則、依新聞自帶的 stock array 精準對應到持股 — 不靠關鍵字、無誤判。<br/>
                     冷門股可能短期內無新聞屬正常。Phase 2 可整合 Yahoo / 經濟日報 擴大涵蓋。
+                  </p>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* Financials Summary */}
+        {(() => {
+          const finMap = {};
+          financials.forEach((f) => { finMap[f.symbol] = f; });
+          const stocksWithFin = positions.filter((p) => p.shares > 0 && finMap[p.symbol]);
+          const lossCount = stocksWithFin.filter((p) => parseFloat(finMap[p.symbol].eps) < 0).length;
+
+          return (
+            <div style={{ marginBottom: 24, background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: 8 }}>
+              <button
+                type="button"
+                onClick={() => setShowFinancials((s) => !s)}
+                style={{ width: '100%', background: 'transparent', border: 'none', color: '#fff', padding: '14px 16px', textAlign: 'left', fontSize: 17, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+              >
+                <span>
+                  📊 基本面 / 財報摘要
+                  {financials.length > 0 ? (
+                    <>
+                      <span style={{ color: '#888', fontSize: 15, marginLeft: 12 }}>{stocksWithFin.length} 檔已更新</span>
+                      {lossCount > 0 && (
+                        <span style={{ color: '#dc2626', fontSize: 15, marginLeft: 8, fontWeight: 600 }}>
+                          ⚠️ {lossCount} 檔虧損
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <span style={{ color: '#888', fontSize: 15, marginLeft: 12 }}>尚無資料</span>
+                  )}
+                </span>
+                <span style={{ color: '#888', fontSize: 15 }}>{showFinancials ? '收合 ▲' : '展開 ▼'}</span>
+              </button>
+              {showFinancials && (
+                <div style={{ padding: '0 16px 16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, padding: '4px 0 12px', borderBottom: '1px solid #2a2a2a', marginBottom: 12 }}>
+                    <span style={{ color: '#888', fontSize: 14 }}>
+                      {finSyncMsg || '點右側按鈕從 TWSE 損益表 (t187ap14_L) 抓最新季財報 EPS / 營業收入'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={syncFinancials}
+                      disabled={finSyncing}
+                      style={{ background: finSyncing ? '#444' : '#1d4ed8', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 4, fontSize: 15, fontWeight: 600, cursor: finSyncing ? 'wait' : 'pointer', letterSpacing: 1 }}
+                    >
+                      {finSyncing ? '同步中…' : '🔄 同步財報'}
+                    </button>
+                  </div>
+                  {stocksWithFin.length === 0 ? (
+                    <p style={{ color: '#666', fontSize: 15, margin: '0 0 12px' }}>
+                      尚無財報資料 — 點「🔄 同步財報」抓取
+                    </p>
+                  ) : (
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 15 }}>
+                        <thead>
+                          <tr style={{ color: '#888' }}>
+                            <th style={{ padding: '8px', textAlign: 'left' }}>股票</th>
+                            <th style={{ padding: '8px', textAlign: 'left' }}>產業</th>
+                            <th style={{ padding: '8px', textAlign: 'center' }}>季別</th>
+                            <th style={{ padding: '8px', textAlign: 'right' }}>EPS<br/><span style={{ fontSize: 11, color: '#666' }}>元/股</span></th>
+                            <th style={{ padding: '8px', textAlign: 'right' }}>營收<br/><span style={{ fontSize: 11, color: '#666' }}>千元</span></th>
+                            <th style={{ padding: '8px', textAlign: 'left' }}>評級</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {stocksWithFin.map((p) => {
+                            const f = finMap[p.symbol];
+                            const eps = parseFloat(f.eps);
+                            const rev = parseFloat(f.revenue || 0);
+                            let tag, tagColor;
+                            if (eps < 0) { tag = '🔴 虧損'; tagColor = '#dc2626'; }
+                            else if (eps < 0.5) { tag = '🟠 微利'; tagColor = '#f59e0b'; }
+                            else if (eps < 2) { tag = '🟡 一般'; tagColor = '#fbbf24'; }
+                            else if (eps < 5) { tag = '🟢 不錯'; tagColor = '#15803d'; }
+                            else { tag = '⭐ 優異'; tagColor = '#15803d'; }
+                            return (
+                              <tr key={p.symbol} style={{ borderTop: '1px solid #2a2a2a', background: eps < 0 ? 'rgba(220, 38, 38, 0.08)' : 'transparent' }}>
+                                <td style={{ padding: '8px' }}>
+                                  <strong style={{ color: '#fff' }}>{p.symbol}</strong>
+                                  <span style={{ color: '#666', marginLeft: 6 }}>{p.name}</span>
+                                </td>
+                                <td style={{ padding: '8px', color: '#999' }}>{f.industry || '-'}</td>
+                                <td style={{ padding: '8px', textAlign: 'center', color: '#999' }}>{f.fiscal_year}Q{f.fiscal_quarter}</td>
+                                <td style={{ padding: '8px', textAlign: 'right', fontWeight: 700, color: eps < 0 ? '#dc2626' : eps > 2 ? '#15803d' : '#e5e5e5' }}>
+                                  {eps >= 0 ? eps.toFixed(2) : eps.toFixed(2)}
+                                </td>
+                                <td style={{ padding: '8px', textAlign: 'right', color: '#999' }}>
+                                  {rev > 0 ? Math.round(rev).toLocaleString() : '-'}
+                                </td>
+                                <td style={{ padding: '8px', color: tagColor, fontWeight: 600, whiteSpace: 'nowrap' }}>{tag}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  <p style={{ color: '#666', fontSize: 13, marginTop: 12, marginBottom: 0, lineHeight: 1.6 }}>
+                    📡 資料來源：TWSE OpenAPI t187ap14_L 損益表（最新季）。<br/>
+                    💡 評級：⭐ EPS≥5 / 🟢 ≥2 / 🟡 ≥0.5 / 🟠 ≥0 / 🔴 虧損。<br/>
+                    ETF (00915) 不發財報、新上市或財報未報送的股票無資料。
                   </p>
                 </div>
               )}
