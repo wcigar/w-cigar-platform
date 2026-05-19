@@ -118,6 +118,54 @@ function requiredRecoveryPct(returnPct) {
   return ((1 / (1 + r)) - 1) * 100;
 }
 
+// 進出場建議：用既有 stop_loss / take_profit + 現價 + 報酬率 算
+// urgency 越大代表越該注意（達停損/停利優先擺前）
+function computeAdvice(p) {
+  const cur = parseFloat(p.current_price || 0);
+  const stop = parseFloat(p.stop_loss || 0);
+  const profit = parseFloat(p.take_profit || 0);
+  const ret = parseFloat(p.return_pct || 0);
+  const distStop = p.distance_to_stop_pct === null || p.distance_to_stop_pct === undefined ? null : parseFloat(p.distance_to_stop_pct);
+  const distTarget = p.distance_to_target_pct === null || p.distance_to_target_pct === undefined ? null : parseFloat(p.distance_to_target_pct);
+
+  // 建議買入 (加碼點): 避開停損下方 — 取 max(現價 -10%, 停損 +5%)
+  let buyPrice = null;
+  if (cur > 0) {
+    const a = cur * 0.9;
+    const b = stop > 0 ? stop * 1.05 : 0;
+    buyPrice = Math.max(a, b);
+  }
+  // 建議賣出: 你設的停利價、或預設現價 +20%
+  const sellPrice = profit > 0 ? profit : (cur > 0 ? cur * 1.2 : null);
+  const sellIsDefault = profit <= 0;
+
+  // 狀態 + 急迫度 (0=持有, 越大越緊急)
+  let status, color, urgency;
+  if (profit > 0 && cur >= profit) {
+    status = '🎯 達停利 考慮出場'; color = '#dc2626'; urgency = 100;
+  } else if (stop > 0 && cur <= stop) {
+    status = '🚨 達停損 應出場'; color = '#dc2626'; urgency = 100;
+  } else if (distStop !== null && distStop < 5) {
+    status = '⚠️ 接近停損'; color = '#f59e0b'; urgency = 90;
+  } else if (distTarget !== null && distTarget < 10) {
+    status = '⏰ 接近停利'; color = '#15803d'; urgency = 80;
+  } else if (ret < -30) {
+    status = '📉 深度套牢 重新評估'; color = '#dc2626'; urgency = 70;
+  } else if (ret < -15) {
+    status = '🔻 套牢中'; color = '#f59e0b'; urgency = 50;
+  } else if (ret > 20) {
+    status = '📈 大幅獲利'; color = '#15803d'; urgency = 30;
+  } else if (ret > 5) {
+    status = '📈 獲利中'; color = '#15803d'; urgency = 20;
+  } else if (ret < -5) {
+    status = '🔻 小幅虧損'; color = '#f59e0b'; urgency = 15;
+  } else {
+    status = '— 持有'; color = '#888'; urgency = 10;
+  }
+
+  return { buyPrice, sellPrice, sellIsDefault, status, color, urgency, distStop, distTarget };
+}
+
 function InvestmentDashboardInner() {
   const [positions, setPositions] = useState([]);
   const [summary, setSummary] = useState(null);
@@ -127,6 +175,7 @@ function InvestmentDashboardInner() {
   const [refreshing, setRefreshing] = useState(false);
   const [sortBy, setSortBy] = useState('danger');
   const [showRecovery, setShowRecovery] = useState(false);
+  const [showAdvice, setShowAdvice] = useState(true);
   const [dividends, setDividends] = useState([]);
   const [showDividends, setShowDividends] = useState(true);
   const [divSyncing, setDivSyncing] = useState(false);
@@ -410,6 +459,86 @@ function InvestmentDashboardInner() {
             </div>
           )}
         </div>
+
+        {/* Action Advice — 進出場參考 */}
+        {allHoldings.length > 0 && (() => {
+          const advices = allHoldings.map((p) => ({ p, adv: computeAdvice(p) }));
+          advices.sort((a, b) => b.adv.urgency - a.adv.urgency);
+          const urgentCount = advices.filter((a) => a.adv.urgency >= 80).length;
+          return (
+            <div style={{ marginBottom: 24, background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: 8 }}>
+              <button
+                type="button"
+                onClick={() => setShowAdvice((s) => !s)}
+                style={{ width: '100%', background: 'transparent', border: 'none', color: '#fff', padding: '14px 16px', textAlign: 'left', fontSize: 17, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+              >
+                <span>
+                  📋 進出場參考
+                  {urgentCount > 0 ? (
+                    <span style={{ color: '#dc2626', fontSize: 15, marginLeft: 12, fontWeight: 600 }}>
+                      ⚠️ {urgentCount} 檔需注意
+                    </span>
+                  ) : (
+                    <span style={{ color: '#888', fontSize: 15, marginLeft: 12 }}>
+                      全部持有觀望
+                    </span>
+                  )}
+                </span>
+                <span style={{ color: '#888', fontSize: 15 }}>{showAdvice ? '收合 ▲' : '展開 ▼'}</span>
+              </button>
+              {showAdvice && (
+                <div style={{ padding: '0 16px 16px', overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 15 }}>
+                    <thead>
+                      <tr style={{ color: '#888' }}>
+                        <th style={{ padding: '8px', textAlign: 'left' }}>狀態</th>
+                        <th style={{ padding: '8px', textAlign: 'left' }}>股票</th>
+                        <th style={{ padding: '8px', textAlign: 'right' }}>成本</th>
+                        <th style={{ padding: '8px', textAlign: 'right' }}>現價</th>
+                        <th style={{ padding: '8px', textAlign: 'right', color: '#15803d' }}>建議買入</th>
+                        <th style={{ padding: '8px', textAlign: 'right', color: '#dc2626' }}>建議賣出</th>
+                        <th style={{ padding: '8px', textAlign: 'right' }}>距停損</th>
+                        <th style={{ padding: '8px', textAlign: 'right' }}>距停利</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {advices.map(({ p, adv }) => (
+                        <tr key={p.id} style={{ borderTop: '1px solid #2a2a2a', background: adv.urgency >= 90 ? 'rgba(220, 38, 38, 0.08)' : adv.urgency >= 80 ? 'rgba(245, 158, 11, 0.06)' : 'transparent' }}>
+                          <td style={{ padding: '8px', color: adv.color, fontWeight: adv.urgency >= 80 ? 700 : 500, whiteSpace: 'nowrap' }}>{adv.status}</td>
+                          <td style={{ padding: '8px' }}>
+                            <strong style={{ color: '#fff' }}>{p.symbol}</strong>
+                            <span style={{ color: '#666', marginLeft: 6 }}>{p.name}</span>
+                          </td>
+                          <td style={{ padding: '8px', textAlign: 'right', color: '#999' }}>{p.avg_cost ? parseFloat(p.avg_cost).toFixed(2) : '-'}</td>
+                          <td style={{ padding: '8px', textAlign: 'right', fontWeight: 600 }}>{p.current_price ? parseFloat(p.current_price).toFixed(2) : '-'}</td>
+                          <td style={{ padding: '8px', textAlign: 'right', color: '#15803d', fontWeight: 600 }}>
+                            {adv.buyPrice ? adv.buyPrice.toFixed(2) : '-'}
+                          </td>
+                          <td style={{ padding: '8px', textAlign: 'right', color: '#dc2626', fontWeight: 600 }}>
+                            {adv.sellPrice ? adv.sellPrice.toFixed(2) : '-'}
+                            {adv.sellIsDefault && <span title="未設停利價，顯示現價 +20% 作為參考" style={{ color: '#666', fontSize: 12, marginLeft: 4 }}>*</span>}
+                          </td>
+                          <td style={{ padding: '8px', textAlign: 'right', color: adv.distStop !== null && adv.distStop < 10 ? '#f59e0b' : '#666' }}>
+                            {adv.distStop !== null ? `${adv.distStop.toFixed(1)}%` : '-'}
+                          </td>
+                          <td style={{ padding: '8px', textAlign: 'right', color: adv.distTarget !== null && adv.distTarget < 10 ? '#15803d' : '#666' }}>
+                            {adv.distTarget !== null ? `${adv.distTarget.toFixed(1)}%` : '-'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <p style={{ color: '#666', fontSize: 13, marginTop: 12, marginBottom: 0, lineHeight: 1.6 }}>
+                    💡 <strong style={{ color: '#15803d' }}>建議買入</strong> = max(現價 −10%, 停損價 +5%) — 避免設在停損之下；
+                    <strong style={{ color: '#dc2626' }}> 建議賣出</strong> = 你設定的停利價（無則顯示現價 +20%、標記 <code>*</code>）。<br/>
+                    📋 排序：達停利/停損 → 接近停利/停損 → 深套牢 → 獲利中 → 持有。<br/>
+                    ⚠️ 這只是參考規則、非投資建議。法人目標價 / 公司消息 / 財報待後續整合（Phase B/C/D）。
+                  </p>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Underwater Recovery Analysis */}
         {underwaterHoldings.length > 0 && (
