@@ -141,22 +141,43 @@ function requiredRecoveryPct(returnPct) {
 // urgency 越大代表越該注意（達停損/停利優先擺前）
 function computeAdvice(p) {
   const cur = parseFloat(p.current_price || 0);
+  const cost = parseFloat(p.avg_cost || 0);
   const stop = parseFloat(p.stop_loss || 0);
   const profit = parseFloat(p.take_profit || 0);
   const ret = parseFloat(p.return_pct || 0);
   const distStop = p.distance_to_stop_pct === null || p.distance_to_stop_pct === undefined ? null : parseFloat(p.distance_to_stop_pct);
   const distTarget = p.distance_to_target_pct === null || p.distance_to_target_pct === undefined ? null : parseFloat(p.distance_to_target_pct);
 
-  // 建議買入 (加碼點): 避開停損下方 — 取 max(現價 -10%, 停損 +5%)
+  // 建議買入：對比你的成本決定策略
+  // - 套牢 (現價 < 成本)：建議攤平、買價用現價 ×0.9（再往下加 = 拉低均價）
+  // - 獲利 (現價 > 成本)：建議等回到成本附近、否則加碼會拉高均價
   let buyPrice = null;
-  if (cur > 0) {
+  let buyHint = null; // 'averaging-down' | 'wait-back-to-cost' | 'fresh'
+  if (cur > 0 && cost > 0) {
+    if (cur < cost) {
+      // 套牢 → 攤平
+      const a = cur * 0.9;
+      const b = stop > 0 ? stop * 1.05 : 0;
+      buyPrice = Math.max(a, b);
+      buyHint = 'averaging-down';
+    } else {
+      // 獲利 → 建議等回到成本（或成本 +3% 緩衝）再加碼
+      buyPrice = cost * 1.03;
+      buyHint = 'wait-back-to-cost';
+    }
+  } else if (cur > 0) {
+    // 無成本資料（如 ETF 沒設）：回退舊邏輯
     const a = cur * 0.9;
     const b = stop > 0 ? stop * 1.05 : 0;
     buyPrice = Math.max(a, b);
+    buyHint = 'fresh';
   }
   // 建議賣出: 你設的停利價、或預設現價 +20%
   const sellPrice = profit > 0 ? profit : (cur > 0 ? cur * 1.2 : null);
   const sellIsDefault = profit <= 0;
+
+  // 距成本%
+  const costGap = (cur > 0 && cost > 0) ? ((cur - cost) / cost) * 100 : null;
 
   // 狀態 + 急迫度 (0=持有, 越大越緊急)
   let status, color, urgency;
@@ -182,10 +203,26 @@ function computeAdvice(p) {
     status = '— 持有'; color = '#888'; urgency = 10;
   }
 
-  return { buyPrice, sellPrice, sellIsDefault, status, color, urgency, distStop, distTarget };
+  return { buyPrice, sellPrice, sellIsDefault, buyHint, costGap, status, color, urgency, distStop, distTarget };
 }
 
-// 具體動作：賣幾張 / 時機（會考慮即將除息）
+// 攤平計算：若加 lots 張、平均成本會變多少
+function computeAveragingDown(p, addLots) {
+  const cost = parseFloat(p.avg_cost || 0);
+  const cur = parseFloat(p.current_price || 0);
+  const shares = parseInt(p.shares || 0);
+  if (cost <= 0 || cur <= 0 || shares <= 0 || addLots <= 0) return null;
+  const oldTotal = cost * shares;
+  const addShares = addLots * 1000;
+  const addCost = cur * addShares;
+  const newTotal = oldTotal + addCost;
+  const newShares = shares + addShares;
+  const newAvg = newTotal / newShares;
+  const reductionPct = ((cost - newAvg) / cost) * 100;
+  return { newAvg, addCost, reductionPct };
+}
+
+// 具體動作：賣幾張 / 時機（會考慮即將除息 + 成本攤平）
 function computeAction(p, adv, nextDiv) {
   const shares = parseInt(p.shares || 0);
   const lots = Math.floor(shares / 1000);
@@ -193,22 +230,29 @@ function computeAction(p, adv, nextDiv) {
   const lotQuarter = Math.max(1, Math.round(lots / 4));
   const stop = parseFloat(p.stop_loss || 0);
   const profit = parseFloat(p.take_profit || 0);
+  const cost = parseFloat(p.avg_cost || 0);
+  const cur = parseFloat(p.current_price || 0);
   const ret = parseFloat(p.return_pct || 0);
   const daysToDiv = nextDiv?.days_until_ex;
   const exDate = nextDiv?.ex_date;
-  const cashDiv = parseFloat(nextDiv?.cash_dividend || 0);
   const divPayout = parseFloat(nextDiv?.estimated_cash_payout || 0);
 
-  // 即將除息且金額有意義 (>NT$3000) — 接近停利的優先建議過息
+  // 即將除息且金額有意義
   const divIncentive = daysToDiv !== null && daysToDiv !== undefined && daysToDiv >= 0 && daysToDiv <= 30 && divPayout >= 3000 && exDate;
 
+  // 攤平試算：套牢時加 1 張會把均成本降到哪
+  const averaging = (cur > 0 && cost > 0 && cur < cost) ? computeAveragingDown(p, 1) : null;
+  const avgHint = averaging ? `加 1 張 ${cur.toFixed(2)}×1000=NT$ ${Math.round(averaging.addCost).toLocaleString()}、均成本 ${cost.toFixed(2)}→${averaging.newAvg.toFixed(2)} (-${averaging.reductionPct.toFixed(1)}%)` : null;
+
   // 達停利
-  if (profit > 0 && parseFloat(p.current_price) >= profit) {
-    return { action: `分批停利 → 先賣 ${lotOneThird} 張`, when: '立即（已達停利價）', urgency: 'high' };
+  if (profit > 0 && cur >= profit) {
+    const gain = cost > 0 ? ((cur - cost) / cost * 100).toFixed(0) : null;
+    return { action: `分批停利 → 先賣 ${lotOneThird} 張`, when: gain ? `立即（已賺 +${gain}%、達停利價）` : '立即（已達停利價）', urgency: 'high' };
   }
   // 達停損
-  if (stop > 0 && parseFloat(p.current_price) <= stop) {
-    return { action: `全清 ${lots} 張`, when: '立即（已達停損價）', urgency: 'high' };
+  if (stop > 0 && cur <= stop) {
+    const loss = cost > 0 ? ((cur - cost) / cost * 100).toFixed(0) : null;
+    return { action: `全清 ${lots} 張`, when: loss ? `立即（虧 ${loss}%、達停損）` : '立即（已達停損價）', urgency: 'high' };
   }
   // 接近停損
   if (adv.distStop !== null && adv.distStop < 5) {
@@ -221,15 +265,21 @@ function computeAction(p, adv, nextDiv) {
     }
     return { action: `分批 → 賣 ${lotOneThird} 張`, when: `達 ${profit.toFixed(2)} 元觸發`, urgency: 'med' };
   }
-  // 深套牢
+  // 深套牢 — 加攤平建議
   if (ret < -30) {
     if (divIncentive) {
       return { action: `先過息再評估`, when: `過 ${exDate} 息後（NT$ ${Math.round(divPayout).toLocaleString()}）`, urgency: 'med' };
     }
+    if (avgHint) {
+      return { action: `攤平 or 認賠（任選）`, when: avgHint, urgency: 'med' };
+    }
     return { action: `認賠換股 → 賣 ${lotOneThird} 張`, when: '評估基本面後', urgency: 'med' };
   }
-  // 套牢中 -15% ~ -30%
+  // 套牢中 -15% ~ -30% — 顯示攤平資訊
   if (ret < -15) {
+    if (avgHint) {
+      return { action: '持有或攤平', when: avgHint, urgency: 'low' };
+    }
     return { action: '持有觀察', when: '下次季報', urgency: 'low' };
   }
   // 大幅獲利
@@ -239,11 +289,15 @@ function computeAction(p, adv, nextDiv) {
     }
     return { action: `達停利鎖利 ${lotQuarter} 張`, when: profit > 0 ? `達 ${profit.toFixed(2)} 元觸發` : '持續觀察', urgency: 'low' };
   }
-  // 即將除息 — 無論其他狀態，提醒過息
+  // 即將除息
   if (divIncentive) {
     return { action: '持有過息', when: `過 ${exDate} 息（NT$ ${Math.round(divPayout).toLocaleString()}）`, urgency: 'low' };
   }
-  // 其他 — 獲利中、小幅虧損、持有
+  // 小幅虧損 — 接近成本、可少量攤平
+  if (ret < -5 && avgHint) {
+    return { action: '持有或少量攤平', when: avgHint, urgency: 'low' };
+  }
+  // 其他 — 獲利中、平盤
   return { action: '持有觀察', when: '持續監控', urgency: 'low' };
 }
 
@@ -923,9 +977,27 @@ function InvestmentDashboardInner() {
                               <br/>
                               <span style={{ color: '#666', fontSize: 13 }}>持有 {Math.floor(p.shares / 1000)} 張 ({p.shares?.toLocaleString()} 股)</span>
                             </td>
-                            <td style={{ padding: '8px', textAlign: 'right', fontWeight: 600 }}>{p.current_price ? parseFloat(p.current_price).toFixed(2) : '-'}</td>
+                            <td style={{ padding: '8px', textAlign: 'right' }}>
+                              <div style={{ fontWeight: 600 }}>{p.current_price ? parseFloat(p.current_price).toFixed(2) : '-'}</div>
+                              {p.avg_cost && (
+                                <div style={{ fontSize: 12, color: '#666' }}>
+                                  成本 {parseFloat(p.avg_cost).toFixed(2)}
+                                  {adv.costGap !== null && (
+                                    <span style={{ marginLeft: 4, color: adv.costGap > 0 ? '#15803d' : '#dc2626', fontWeight: 600 }}>
+                                      ({adv.costGap > 0 ? '+' : ''}{adv.costGap.toFixed(0)}%)
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </td>
                             <td style={{ padding: '8px', textAlign: 'right', color: '#15803d', fontWeight: 600 }}>
-                              {adv.buyPrice ? adv.buyPrice.toFixed(2) : '-'}
+                              <div>{adv.buyPrice ? adv.buyPrice.toFixed(2) : '-'}</div>
+                              {adv.buyHint === 'wait-back-to-cost' && (
+                                <div style={{ fontSize: 11, color: '#888', fontWeight: 400 }} title="現價高於成本，加碼會拉高均價。等回到成本附近再加">等回成本</div>
+                              )}
+                              {adv.buyHint === 'averaging-down' && (
+                                <div style={{ fontSize: 11, color: '#f59e0b', fontWeight: 400 }} title="現價低於成本，加碼可降低平均成本">攤平點</div>
+                              )}
                             </td>
                             <td style={{ padding: '8px', textAlign: 'right', color: '#dc2626', fontWeight: 600 }}>
                               {adv.sellPrice ? adv.sellPrice.toFixed(2) : '-'}
@@ -939,11 +1011,12 @@ function InvestmentDashboardInner() {
                     </tbody>
                   </table>
                   <p style={{ color: '#666', fontSize: 13, marginTop: 12, marginBottom: 0, lineHeight: 1.7 }}>
-                    💡 <strong style={{ color: '#15803d' }}>建議買入</strong> = max(現價 −10%, 停損 +5%)；
-                    <strong style={{ color: '#dc2626' }}> 建議賣出</strong> = 你設的停利價（無則現價 +20% 加 <code>*</code>）。<br/>
-                    📋 <strong style={{ color: '#b8956a' }}>建議動作</strong>規則：達停利 → 賣 1/3 分批；達停損 → 全清；深套 → 認賠 1/3 換股或先過息；大幅獲利 → 鎖利 1/4；接近停利 → 過息再決定。<br/>
-                    🔄 <strong>時時更新</strong>：每 60 秒從 DB 拉最新股價、即時重算所有建議。即將除息（≤30 天 + 領取 ≥NT$3,000）會優先建議「過息再賣」。<br/>
-                    ⚠️ 這只是規則參考、非投資建議。法人目標價 / 公司消息 / 財報待後續整合。
+                    💰 <strong>對比成本架構</strong>：現價欄含成本對比 <code>+X%</code> 紅綠標示。
+                    <strong style={{ color: '#15803d' }}> 建議買入</strong>會看你目前是賺是賠：<br/>
+                    　• <strong style={{ color: '#f59e0b' }}>套牢 (現價 &lt; 成本)</strong> → 顯示「攤平點」、買價用現價 ×0.9（可降平均成本）<br/>
+                    　• <strong style={{ color: '#15803d' }}>獲利 (現價 &gt; 成本)</strong> → 顯示「等回成本」、買價設成本 +3%（避免加碼拉高均價）<br/>
+                    📋 <strong style={{ color: '#b8956a' }}>建議動作</strong>整合：達停利/停損 → 賣張數；套牢 → 試算「加 1 張均成本降到 X 元」；除息 → 過息再決定。<br/>
+                    🔄 <strong>時時更新</strong>：每 60 秒從 DB 拉最新股價、即時重算所有建議。
                   </p>
                 </div>
               )}
