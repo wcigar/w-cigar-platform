@@ -869,15 +869,25 @@ function InvestmentDashboardInner() {
                               <span style={{ color: '#666', marginLeft: 6 }}>{d.name}</span>
                             </td>
                             <td style={{ padding: '8px', textAlign: 'right', color: d.ex_date ? '#e5e5e5' : '#666', fontStyle: d.ex_date ? 'normal' : 'italic' }}>
-                              {d.ex_date || '待公告'}
+                              {d.ex_date ? (
+                                <>
+                                  {d.ex_date}
+                                  {d.status === 'proposed' && (
+                                    <div style={{ fontSize: 11, color: '#f59e0b', fontStyle: 'italic', marginTop: 2 }} title="草案、實際日期會變">(草案、會變)</div>
+                                  )}
+                                </>
+                              ) : '待公告'}
                             </td>
                             <td style={{ padding: '8px', textAlign: 'right', color: isImminent ? '#f59e0b' : isSoon ? '#fbbf24' : '#999', fontWeight: (isImminent || isSoon) ? 700 : 400 }}>
                               {days === null ? '-' : isPast ? `已過 ${-days} 天` : isImminent ? `⏰ ${days} 天` : `${days} 天`}
                             </td>
                             <td style={{ padding: '8px', textAlign: 'right' }}>
                               {d.cash_dividend ? parseFloat(d.cash_dividend).toFixed(2) : '-'}
-                              {isProposed && (
-                                <span title="董事會擬議中，最終金額以股東會通過為準" style={{ color: '#666', fontSize: 12, marginLeft: 4 }}>(擬)</span>
+                              {d.status === 'proposed' && (
+                                <span title="董事會草案、會變" style={{ color: '#f59e0b', fontSize: 12, marginLeft: 4 }}>(草)</span>
+                              )}
+                              {d.status === 'board_decided' && (
+                                <span title="董事會正式決議、待股東會確認金額細項" style={{ color: '#3b82f6', fontSize: 12, marginLeft: 4 }}>(暫)</span>
                               )}
                             </td>
                             <td style={{ padding: '8px', textAlign: 'right', color: '#999' }}>{d.shares?.toLocaleString()}</td>
@@ -887,8 +897,10 @@ function InvestmentDashboardInner() {
                             <td style={{ padding: '8px', textAlign: 'right', color: '#999' }}>{d.payment_date || '-'}</td>
                             <td style={{ padding: '8px', textAlign: 'center', fontSize: 14 }}>
                               {d.status === 'paid' ? <span style={{ color: '#15803d' }}>✓ 已發放</span>
-                                : d.status === 'proposed' ? <span style={{ color: '#f59e0b' }}>● 董事會擬議</span>
-                                : <span style={{ color: '#1d4ed8' }}>● 股東會通過</span>}
+                                : d.status === 'shareholder_confirmed' ? <span style={{ color: '#15803d' }} title="股東會確認、最終確定">✓ 股東會確認</span>
+                                : d.status === 'board_decided' ? <span style={{ color: '#3b82f6' }} title="公司董事會正式通過、待股東會確認細項與除息日">● 董事會決議</span>
+                                : d.status === 'proposed' ? <span style={{ color: '#f59e0b' }} title="草案、可能會變">○ 董事會擬議</span>
+                                : <span style={{ color: '#888' }}>未知</span>}
                             </td>
                             <td style={{ padding: '8px', textAlign: 'right' }}>
                               <button
@@ -905,10 +917,12 @@ function InvestmentDashboardInner() {
                   </table>
                 </div>
               )}
-              <p style={{ color: '#666', fontSize: 13, marginTop: 8, marginBottom: 0, lineHeight: 1.6 }}>
-                💡 預估可領 = 持股數 × 現金股利。<strong style={{ color: '#888' }}>「擬議」金額</strong>為董事會通過、待股東會確認；
-                <strong style={{ color: '#888' }}>「待公告」</strong>為除息日尚未確定。<br/>
-                📡 資料來源：TWSE OpenAPI（公司股利分派情形 t187ap45_L）— 點上方「🔄 同步 TWSE」自動更新。
+              <p style={{ color: '#666', fontSize: 13, marginTop: 8, marginBottom: 0, lineHeight: 1.7 }}>
+                💡 預估可領 = 持股數 × 現金股利。狀態 3 級確定度（左低→右高）：<br/>
+                ○ <strong style={{ color: '#f59e0b' }}>董事會擬議 (草)</strong> 草案、日期金額會變
+                　● <strong style={{ color: '#3b82f6' }}>董事會決議 (暫)</strong> 公司正式通過、待股東會確認細項
+                　✓ <strong style={{ color: '#15803d' }}>股東會確認</strong> 最終、不再變動<br/>
+                📡 資料來源：TWSE OpenAPI <code>t187ap45_L</code>「公司股利分派情形」— 每天 08:15 自動同步、可手動「🔄 同步 TWSE」立即抓最新。
               </p>
             </div>
           )}
