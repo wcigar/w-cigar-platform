@@ -1294,64 +1294,62 @@ function InvestmentDashboardInner() {
             ))}
           </select>
         </div>
-        <div style={{ overflowX: 'auto', marginBottom: 24 }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', background: '#1a1a1a', borderRadius: 8, overflow: 'hidden' }}>
-            <thead>
-              <tr style={{ background: '#2a2a2a', color: '#999', fontSize: 15 }}>
-                <th style={{ padding: '12px', textAlign: 'left' }}>分類</th>
-                <th style={{ padding: '12px', textAlign: 'left' }}>股票</th>
-                <th style={{ padding: '12px', textAlign: 'right' }}>股數</th>
-                <th style={{ padding: '12px', textAlign: 'right' }}>成本價</th>
-                <th style={{ padding: '12px', textAlign: 'right' }}>現價</th>
-                <th style={{ padding: '12px', textAlign: 'right' }}>今日</th>
-                <th style={{ padding: '12px', textAlign: 'right' }}>市值</th>
-                <th style={{ padding: '12px', textAlign: 'right' }}>未實現損益</th>
-                <th style={{ padding: '12px', textAlign: 'right' }}>距停損</th>
-              </tr>
-            </thead>
-            <tbody>
-              {holdings.map((p) => {
-                const cat = CATEGORY_LABELS[p.category] || { label: p.category, color: '#888' };
-                return (
-                  <tr key={p.id} style={{ borderBottom: '1px solid #2a2a2a', fontSize: 16 }}>
-                    <td style={{ padding: '12px' }}>
-                      <span style={{ background: cat.color, color: '#fff', padding: '2px 8px', borderRadius: 4, fontSize: 14 }}>
-                        {cat.label}
-                      </span>
-                    </td>
-                    <td style={{ padding: '12px' }}>
-                      <strong style={{ color: '#fff' }}>{p.symbol}</strong>
-                      <br />
-                      <span style={{ color: '#888', fontSize: 14 }}>{p.name}</span>
-                    </td>
-                    <td style={{ padding: '12px', textAlign: 'right' }}>{p.shares}</td>
-                    <td style={{ padding: '12px', textAlign: 'right', color: '#999' }}>{p.avg_cost ? parseFloat(p.avg_cost).toFixed(2) : '-'}</td>
-                    <td style={{ padding: '12px', textAlign: 'right', fontWeight: 600 }}>
-                      {p.current_price ? parseFloat(p.current_price).toFixed(2) : '-'}
-                    </td>
-                    <td style={{ padding: '12px', textAlign: 'right', color: pnlColor(p.today_change_pct) }}>
-                      {fmtPct(p.today_change_pct)}
-                    </td>
-                    <td style={{ padding: '12px', textAlign: 'right' }}>{fmtMoney(p.market_value)}</td>
-                    <td style={{ padding: '12px', textAlign: 'right', color: pnlColor(p.unrealized_pnl), fontWeight: 600 }}>
-                      {fmtMoney(p.unrealized_pnl)}
-                      <br />
-                      <span style={{ fontSize: 14 }}>{fmtPct(p.return_pct)}</span>
-                    </td>
-                    <td style={{ padding: '12px', textAlign: 'right', fontSize: 15 }}>
-                      {p.distance_to_stop_pct !== null && p.distance_to_stop_pct !== undefined ? (
-                        <span style={{ color: parseFloat(p.distance_to_stop_pct) < 10 ? '#f59e0b' : '#666' }}>
-                          {parseFloat(p.distance_to_stop_pct).toFixed(1)}%
-                        </span>
-                      ) : (
-                        '-'
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10, marginBottom: 24 }}>
+          {holdings.map((p) => {
+            const cat = CATEGORY_LABELS[p.category] || { label: p.category, color: '#888' };
+            const cur = p.current_price ? parseFloat(p.current_price) : null;
+            const cost = p.avg_cost ? parseFloat(p.avg_cost) : null;
+            const todayPct = p.today_change_pct !== null && p.today_change_pct !== undefined ? parseFloat(p.today_change_pct) : null;
+            const retPct = p.return_pct !== null && p.return_pct !== undefined ? parseFloat(p.return_pct) : null;
+            const distStop = p.distance_to_stop_pct !== null && p.distance_to_stop_pct !== undefined ? parseFloat(p.distance_to_stop_pct) : null;
+            const pnl = p.unrealized_pnl !== null && p.unrealized_pnl !== undefined ? parseFloat(p.unrealized_pnl) : null;
+            return (
+              <div key={p.id} style={{ background: '#161616', border: '1px solid #262626', borderRadius: 10, padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {/* 頂部：股票代碼 + 分類標籤 */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: '#fff', letterSpacing: 0.3 }}>{p.symbol}</div>
+                    <div style={{ fontSize: 13, color: '#888', marginTop: 2 }}>{p.name}</div>
+                  </div>
+                  <span style={{ background: cat.color, color: '#fff', padding: '3px 10px', borderRadius: 4, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                    {cat.label}
+                  </span>
+                </div>
+
+                {/* 持股 / 成本 */}
+                <div style={{ fontSize: 12, color: '#666' }}>
+                  {p.shares?.toLocaleString()} 股 · 成本 {cost ? cost.toFixed(2) : '-'}
+                </div>
+
+                {/* 主數字：現價 + 今日 */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingTop: 4, borderTop: '1px solid #262626' }}>
+                  <span style={{ fontSize: 26, fontWeight: 700, color: '#fff', letterSpacing: 0.3 }}>
+                    {cur ? cur.toFixed(2) : '—'}
+                  </span>
+                  <span style={{ fontSize: 14, color: pnlColor(todayPct), fontWeight: 600 }}>
+                    {todayPct !== null ? `${todayPct > 0 ? '▲ ' : todayPct < 0 ? '▼ ' : ''}${fmtPct(todayPct)}` : '—'}
+                  </span>
+                </div>
+
+                {/* 未實現損益 */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                  <span style={{ fontSize: 13, color: '#666' }}>未實現</span>
+                  <span style={{ fontSize: 16, color: pnlColor(pnl), fontWeight: 700 }}>
+                    {pnl !== null ? (pnl >= 0 ? '+' : '') + fmtMoney(pnl) : '—'}
+                    <span style={{ fontSize: 13, marginLeft: 6, fontWeight: 500 }}>{retPct !== null ? `(${fmtPct(retPct)})` : ''}</span>
+                  </span>
+                </div>
+
+                {/* 市值 + 距停損 */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#666', paddingTop: 4, borderTop: '1px dashed #262626' }}>
+                  <span>市值 NT$ {fmtMoney(p.market_value)}</span>
+                  <span style={{ color: distStop !== null && distStop < 10 ? '#f59e0b' : '#666' }}>
+                    {distStop !== null ? `距停損 ${distStop.toFixed(1)}%` : '無設停損'}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         {/* Market Reference */}
