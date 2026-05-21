@@ -1294,7 +1294,7 @@ function InvestmentDashboardInner() {
             ))}
           </select>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10, marginBottom: 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: 12, marginBottom: 24 }}>
           {holdings.map((p) => {
             const cat = CATEGORY_LABELS[p.category] || { label: p.category, color: '#888' };
             const cur = p.current_price ? parseFloat(p.current_price) : null;
@@ -1302,48 +1302,102 @@ function InvestmentDashboardInner() {
             const todayPct = p.today_change_pct !== null && p.today_change_pct !== undefined ? parseFloat(p.today_change_pct) : null;
             const retPct = p.return_pct !== null && p.return_pct !== undefined ? parseFloat(p.return_pct) : null;
             const distStop = p.distance_to_stop_pct !== null && p.distance_to_stop_pct !== undefined ? parseFloat(p.distance_to_stop_pct) : null;
+            const distTarget = p.distance_to_target_pct !== null && p.distance_to_target_pct !== undefined ? parseFloat(p.distance_to_target_pct) : null;
             const pnl = p.unrealized_pnl !== null && p.unrealized_pnl !== undefined ? parseFloat(p.unrealized_pnl) : null;
+            const stop = p.stop_loss ? parseFloat(p.stop_loss) : 0;
+            const profit = p.take_profit ? parseFloat(p.take_profit) : 0;
+
+            // 卡片狀態：決定 accent / tint / badge
+            let accent = '#262626';
+            let cardBg = '#161616';
+            let badge = null;
+            if (profit > 0 && cur && cur >= profit) {
+              accent = '#dc2626'; cardBg = 'rgba(220, 38, 38, 0.08)';
+              badge = { text: '🎯 達停利', color: '#dc2626' };
+            } else if (stop > 0 && cur && cur <= stop) {
+              accent = '#7f1d1d'; cardBg = 'rgba(127, 29, 29, 0.18)';
+              badge = { text: '🚨 達停損', color: '#fff', bg: '#7f1d1d' };
+            } else if (distStop !== null && distStop < 5) {
+              accent = '#f59e0b'; cardBg = 'rgba(245, 158, 11, 0.10)';
+              badge = { text: '⚠️ 近停損', color: '#f59e0b' };
+            } else if (distTarget !== null && distTarget < 10) {
+              accent = '#15803d'; cardBg = 'rgba(21, 128, 61, 0.08)';
+              badge = { text: '⏰ 近停利', color: '#15803d' };
+            } else if (retPct !== null && retPct < -30) {
+              accent = '#7c2d12'; cardBg = 'rgba(124, 45, 18, 0.12)';
+              badge = { text: '📉 深套', color: '#fbbf24' };
+            } else if (retPct !== null && retPct < -15) {
+              accent = '#f59e0b'; cardBg = 'rgba(245, 158, 11, 0.04)';
+            } else if (retPct !== null && retPct > 20) {
+              accent = '#dc2626'; cardBg = 'rgba(220, 38, 38, 0.05)';
+              badge = { text: '🔥 大賺', color: '#dc2626' };
+            } else if (retPct !== null && retPct > 5) {
+              accent = '#dc2626';
+            }
+
+            // 距停損視覺強化
+            const distStopColor = distStop === null ? '#555' : distStop < 5 ? '#dc2626' : distStop < 10 ? '#f59e0b' : distStop < 20 ? '#fbbf24' : '#888';
+
             return (
-              <div key={p.id} style={{ background: '#161616', border: '1px solid #262626', borderRadius: 10, padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {/* 頂部：股票代碼 + 分類標籤 */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div>
-                    <div style={{ fontSize: 18, fontWeight: 700, color: '#fff', letterSpacing: 0.3 }}>{p.symbol}</div>
-                    <div style={{ fontSize: 13, color: '#888', marginTop: 2 }}>{p.name}</div>
+              <div key={p.id} style={{
+                background: cardBg,
+                border: `1px solid ${accent === '#262626' ? '#262626' : accent + '55'}`,
+                borderLeft: `4px solid ${accent}`,
+                borderRadius: 10,
+                padding: '14px 16px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 10,
+                position: 'relative',
+                transition: 'transform 0.15s ease',
+              }}>
+                {/* 頂部：股票代碼 + 分類 + 狀態 badge */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 20, fontWeight: 800, color: '#fff', letterSpacing: 0.5, lineHeight: 1.1 }}>{p.symbol}</div>
+                    <div style={{ fontSize: 14, color: '#bbb', marginTop: 3, fontWeight: 500 }}>{p.name}</div>
                   </div>
-                  <span style={{ background: cat.color, color: '#fff', padding: '3px 10px', borderRadius: 4, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>
-                    {cat.label}
-                  </span>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                    <span style={{ background: cat.color, color: '#fff', padding: '3px 10px', borderRadius: 4, fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', letterSpacing: 1 }}>
+                      {cat.label}
+                    </span>
+                    {badge && (
+                      <span style={{ color: badge.color, background: badge.bg || 'transparent', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, whiteSpace: 'nowrap', padding: badge.bg ? '2px 6px' : 0, borderRadius: 3 }}>
+                        {badge.text}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 {/* 持股 / 成本 */}
-                <div style={{ fontSize: 12, color: '#666' }}>
-                  {p.shares?.toLocaleString()} 股 · 成本 {cost ? cost.toFixed(2) : '-'}
+                <div style={{ fontSize: 13, color: '#999', display: 'flex', justifyContent: 'space-between' }}>
+                  <span>{p.shares?.toLocaleString()} 股</span>
+                  <span>成本 <strong style={{ color: '#ccc' }}>{cost ? cost.toFixed(2) : '-'}</strong></span>
                 </div>
 
-                {/* 主數字：現價 + 今日 */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingTop: 4, borderTop: '1px solid #262626' }}>
-                  <span style={{ fontSize: 26, fontWeight: 700, color: '#fff', letterSpacing: 0.3 }}>
+                {/* 主數字：現價 + 今日 (大字+紅綠超明顯) */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingTop: 8, borderTop: '1px solid #2a2a2a' }}>
+                  <span style={{ fontSize: 32, fontWeight: 800, color: '#fff', letterSpacing: 0.5, lineHeight: 1 }}>
                     {cur ? cur.toFixed(2) : '—'}
                   </span>
-                  <span style={{ fontSize: 14, color: pnlColor(todayPct), fontWeight: 600 }}>
+                  <span style={{ fontSize: 17, color: pnlColor(todayPct), fontWeight: 800, letterSpacing: 0.3 }}>
                     {todayPct !== null ? `${todayPct > 0 ? '▲ ' : todayPct < 0 ? '▼ ' : ''}${fmtPct(todayPct)}` : '—'}
                   </span>
                 </div>
 
                 {/* 未實現損益 */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                  <span style={{ fontSize: 13, color: '#666' }}>未實現</span>
-                  <span style={{ fontSize: 16, color: pnlColor(pnl), fontWeight: 700 }}>
+                  <span style={{ fontSize: 12, color: '#888', letterSpacing: 0.5 }}>未實現損益</span>
+                  <span style={{ fontSize: 19, color: pnlColor(pnl), fontWeight: 800, letterSpacing: 0.3 }}>
                     {pnl !== null ? (pnl >= 0 ? '+' : '') + fmtMoney(pnl) : '—'}
-                    <span style={{ fontSize: 13, marginLeft: 6, fontWeight: 500 }}>{retPct !== null ? `(${fmtPct(retPct)})` : ''}</span>
+                    <span style={{ fontSize: 14, marginLeft: 8, fontWeight: 700 }}>{retPct !== null ? `(${fmtPct(retPct)})` : ''}</span>
                   </span>
                 </div>
 
                 {/* 市值 + 距停損 */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#666', paddingTop: 4, borderTop: '1px dashed #262626' }}>
-                  <span>市值 NT$ {fmtMoney(p.market_value)}</span>
-                  <span style={{ color: distStop !== null && distStop < 10 ? '#f59e0b' : '#666' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, paddingTop: 8, borderTop: '1px dashed #2a2a2a' }}>
+                  <span style={{ color: '#888' }}>市值 <strong style={{ color: '#ccc', fontSize: 13 }}>NT$ {fmtMoney(p.market_value)}</strong></span>
+                  <span style={{ color: distStopColor, fontWeight: 700, fontSize: 13, letterSpacing: 0.3 }}>
                     {distStop !== null ? `距停損 ${distStop.toFixed(1)}%` : '無設停損'}
                   </span>
                 </div>
