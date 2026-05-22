@@ -712,24 +712,43 @@ function InvestmentDashboardInner() {
         <USMarketSection />
 
         {/* Summary Cards */}
-        {summary && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 24 }}>
-            <Card label="總市值" value={`NT$ ${fmtMoney(summary.total_market_value)}`} />
-            <Card label="總成本" value={`NT$ ${fmtMoney(summary.total_cost)}`} subtle />
-            <Card
-              label="未實現損益"
-              value={fmtMoney(summary.total_pnl)}
-              sub={fmtPct(summary.total_return_pct)}
-              color={pnlColor(summary.total_pnl)}
-            />
-            <Card
-              label="今日損益"
-              value={fmtMoney(summary.today_pnl_estimate)}
-              color={pnlColor(summary.today_pnl_estimate)}
-            />
-            <Card label="持股檔數" value={summary.holdings_count} subtle />
-          </div>
-        )}
+        {summary && (() => {
+          const todayPnl = parseFloat(summary.today_pnl_estimate || 0);
+          const totalPnl = parseFloat(summary.total_pnl || 0);
+          // 昨日累積損益 = 今日累積 − 今日變化
+          const yesterdayPnl = totalPnl - todayPnl;
+          const yesterdayStatus = yesterdayPnl >= 0 ? '昨日累積 賺' : '昨日累積 虧';
+          const changeArrow = todayPnl > 0 ? '▲' : todayPnl < 0 ? '▼' : '—';
+          const changeText = todayPnl > 0 ? `比昨天多賺 ${fmtMoney(Math.abs(todayPnl))}`
+            : todayPnl < 0 ? `比昨天少賺 ${fmtMoney(Math.abs(todayPnl))}`
+            : '與昨天相同';
+          return (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 24 }}>
+              <Card label="總市值" value={`NT$ ${fmtMoney(summary.total_market_value)}`} />
+              <Card label="總成本" value={`NT$ ${fmtMoney(summary.total_cost)}`} subtle />
+              <Card
+                label="未實現損益（累積）"
+                value={fmtMoney(summary.total_pnl)}
+                sub={fmtPct(summary.total_return_pct)}
+                color={pnlColor(summary.total_pnl)}
+              />
+              <Card
+                label={`昨日收盤累積（${yesterdayPnl >= 0 ? '賺' : '虧'}）`}
+                value={(yesterdayPnl >= 0 ? '+' : '') + fmtMoney(yesterdayPnl)}
+                sub="昨收價×持股 − 成本"
+                color={pnlColor(yesterdayPnl)}
+                subtle
+              />
+              <Card
+                label="今日損益（今天 vs 昨天）"
+                value={(todayPnl >= 0 ? '+' : '') + fmtMoney(todayPnl)}
+                sub={`${changeArrow} ${changeText}`}
+                color={pnlColor(todayPnl)}
+              />
+              <Card label="持股檔數" value={summary.holdings_count} subtle />
+            </div>
+          );
+        })()}
 
         {/* Alerts */}
         {alerts.length > 0 && (
