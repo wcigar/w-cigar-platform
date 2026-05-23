@@ -2,8 +2,8 @@ import LeaveRequest from './LeaveRequest'
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
-import { SHIFTS, LEAVE_TYPES } from '../../lib/constants'
-import { toTaipei } from '../../lib/timezone'
+import { SHIFTS, LEAVE_TYPES, LATE_GRACE_MIN } from '../../lib/constants'
+import { toTaipei, taipeiHM } from '../../lib/timezone'
 import { isHoliday, getHolidayName, calcMonthRestDays } from '../../lib/holidays'
 import { ChevronLeft, ChevronRight, Clock } from 'lucide-react'
 import { format, startOfMonth, endOfMonth, addMonths, subMonths, eachDayOfInterval, isSameDay, getDay } from 'date-fns'
@@ -28,6 +28,7 @@ function ScheduleContent() {
   const [emps, setEmps] = useState([])
   const [punchMonth, setPunchMonth] = useState(format(new Date(), 'yyyy-MM'))
   const [punches, setPunches] = useState([])
+  const [punchMonthSchedules, setPunchMonthSchedules] = useState([])
   const [loading, setLoading] = useState(true)
   const [pageMode, setPageMode] = useState('schedule')
   const [leaveMenu, setLeaveMenu] = useState(null)
@@ -55,8 +56,14 @@ function ScheduleContent() {
   }
 
   async function loadPunches() {
-    const { data } = await supabase.from('punch_records').select('*').eq('employee_id', user.employee_id).gte('date', punchMonth + '-01').lte('date', format(endOfMonth(new Date(punchMonth + '-01')), 'yyyy-MM-dd')).order('date', { ascending: false }).order('time', { ascending: false })
-    setPunches(data || [])
+    const s = punchMonth + '-01'
+    const e = format(endOfMonth(new Date(punchMonth + '-01')), 'yyyy-MM-dd')
+    const [pR, sR] = await Promise.all([
+      supabase.from('punch_records').select('*').eq('employee_id', user.employee_id).gte('date', s).lte('date', e).order('date', { ascending: false }).order('time', { ascending: false }),
+      supabase.from('schedules').select('date, shift').eq('employee_id', user.employee_id).gte('date', s).lte('date', e),
+    ])
+    setPunches(pR.data || [])
+    setPunchMonthSchedules(sR.data || [])
   }
 
   async function requestLeave(dateStr, leaveType) {
@@ -95,6 +102,40 @@ function ScheduleContent() {
 
   const punchByDate = {}
   punches.forEach(p => { if (!punchByDate[p.date]) punchByDate[p.date] = []; punchByDate[p.date].push(p) })
+
+  // 每日工時 + 遲到/早退診斷
+  const isPT = user?.employee_type === 'PT'
+  const punchDayDiag = {}
+  punchMonthSchedules.forEach(s => {
+    const recs = punchByDate[s.date] || []
+    const inP = recs.find(r => r.punch_type === '上班')
+    const outP = recs.find(r => r.punch_type === '下班')
+    const shift = (s.shift === '早班' || s.shift === '晚班' || s.shift === '單人班') ? SHIFTS[s.shift] : null
+    const flexible = s.shift === '彈性班' || isPT || !shift
+    let lateMin = 0, earlyMin = 0, hours = null
+    if (inP && shift && !flexible) {
+      const [h, m] = taipeiHM(inP.time)
+      const pm = h * 60 + m, sm = shift.startH * 60 + shift.startM + LATE_GRACE_MIN
+      if (pm > sm) lateMin = pm - sm
+    }
+    if (outP && shift && !flexible) {
+      const [h, m] = taipeiHM(outP.time)
+      let pm = h * 60 + m
+      if (s.shift === '晚班' && h < 12) pm += 1440
+      const em = shift.endH * 60 + shift.endM
+      if (pm < em) earlyMin = em - pm
+    }
+    if (inP && outP) {
+      const inT = new Date(inP.time).getTime()
+      const outT = new Date(outP.time).getTime()
+      if (outT > inT) hours = +((outT - inT) / 3600000).toFixed(2)
+    }
+    const today = format(new Date(), 'yyyy-MM-dd')
+    const missing = s.shift !== '休假' && !LEAVE_TYPES.includes(s.shift) && s.date <= today
+      ? (!inP && !outP ? '未打卡' : !inP ? '缺上班' : !outP ? '缺下班' : null)
+      : null
+    punchDayDiag[s.date] = { shift: s.shift, lateMin, earlyMin, hours, missing, flexible }
+  })
 
   if (loading) return <div className="page-container"><div className="loading-shimmer" style={{ height: 300 }} /></div>
 
@@ -175,16 +216,35 @@ function ScheduleContent() {
           <span style={{ fontSize: 14, fontWeight: 600, color: '#c9a84c', display: 'flex', alignItems: 'center', gap: 6 }}><Clock size={14} /> {punchMonth} 打卡紀錄</span>
           <button style={nb} onClick={() => { const d = new Date(punchMonth + '-01'); d.setMonth(d.getMonth() + 1); setPunchMonth(format(d, 'yyyy-MM')) }}><ChevronRight size={16} /></button>
         </div>
-        {Object.keys(punchByDate).length === 0 ? <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-dim)', fontSize: 13 }}>本月無打卡紀錄</div> :
-          Object.entries(punchByDate).map(([date, recs]) => (
-            <div key={date} className="card" style={{ padding: 12, marginBottom: 6 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: '#c9a84c', marginBottom: 6 }}>{date}</div>
-              {recs.map(r => <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '3px 0', borderBottom: '1px dotted var(--border)' }}>
-                <span>{r.punch_type} {toTaipei(r.time, true)}</span>
-                <span style={{ color: r.is_valid ? 'var(--green)' : 'var(--red)', fontWeight: 600 }}>{r.distance_m}m {r.is_valid ? '✓' : '✗'}</span>
-              </div>)}
-            </div>
-          ))}
+        {(() => {
+          // 合併「有打卡的天」+「有排班但缺打卡的天」一起列
+          const allDates = new Set([...Object.keys(punchByDate), ...Object.keys(punchDayDiag).filter(d => punchDayDiag[d].missing)])
+          if (allDates.size === 0) return <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-dim)', fontSize: 13 }}>本月無打卡紀錄</div>
+          const sorted = [...allDates].sort((a, b) => b.localeCompare(a))
+          return sorted.map(date => {
+            const recs = punchByDate[date] || []
+            const diag = punchDayDiag[date] || {}
+            const leftBar = diag.missing ? '#ef4444' : diag.lateMin ? 'var(--red)' : diag.earlyMin ? '#f59e0b' : 'transparent'
+            return (
+              <div key={date} className="card" style={{ padding: 12, marginBottom: 6, borderLeft: `3px solid ${leftBar}` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#c9a84c' }}>{date}{diag.shift && <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 6 }}>· {diag.shift}</span>}</span>
+                  <div style={{ display: 'flex', gap: 6, fontSize: 10 }}>
+                    {diag.hours != null && <span style={{ color: 'var(--text-dim)' }}>{diag.hours} hr</span>}
+                    {diag.lateMin > 0 && <span style={{ color: 'var(--red)', fontWeight: 700 }}>🔴遲{diag.lateMin}分</span>}
+                    {diag.earlyMin > 0 && <span style={{ color: '#f59e0b', fontWeight: 700 }}>🟡早{diag.earlyMin}分</span>}
+                    {diag.flexible && <span style={{ color: '#c9a84c' }}>彈性</span>}
+                  </div>
+                </div>
+                {diag.missing && <div style={{ fontSize: 11, color: '#ef4444', fontWeight: 600, marginBottom: 4 }}>⚠️ {diag.missing} — 請聯絡老闆補登</div>}
+                {recs.map(r => <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '3px 0', borderBottom: '1px dotted var(--border)' }}>
+                  <span>{r.punch_type} {toTaipei(r.time, true)}{r.manual_override && <span style={{ fontSize: 9, color: 'var(--blue)', marginLeft: 4 }}>✏️補</span>}</span>
+                  <span style={{ color: r.is_valid ? 'var(--green)' : 'var(--red)', fontWeight: 600 }}>{r.distance_m != null ? `${r.distance_m}m` : ''} {r.is_valid ? '✓' : '✗'}</span>
+                </div>)}
+              </div>
+            )
+          })
+        })()}
       </div>
     </div>
   )

@@ -244,6 +244,9 @@ export default function StaffHome() {
               {!canPunch && <div style={{flex:1,padding:'14px 16px',textAlign:'center',fontFamily:'var(--serif)',fontSize:13,color:'rgba(196,163,90,.4)',border:'1px dashed rgba(196,163,90,.15)',borderRadius:8}}>本班已完成打卡</div>}
             </div>
           </>}
+          <button onClick={() => navigate('/schedule')} style={{marginTop:14,width:'100%',padding:'10px 12px',background:'transparent',border:'1px solid rgba(196,163,90,.2)',borderRadius:8,color:'rgba(196,163,90,.8)',fontSize:12,fontFamily:'var(--serif)',cursor:'pointer',letterSpacing:2,display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
+            <Clock size={12}/> 我的打卡紀錄
+          </button>
         </div>
 
         {/* 盤點提醒 */}
