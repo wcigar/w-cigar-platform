@@ -32,7 +32,9 @@ export default function Layout({ children }) {
   const navigate = useNavigate()
   const location = useLocation()
   const isBoss = user?.role === 'boss'
-  const nav = isBoss ? BOSS_NAV : STAFF_NAV
+  const isPT = user?.employee_type === 'PT'
+  // PT 員工不顯示「酒店」（管理用功能，PT 不需要）
+  const nav = isBoss ? BOSS_NAV : (isPT ? STAFF_NAV.filter(n => n.path !== '/admin/venue-hub') : STAFF_NAV)
 
   // POS uses its own fullscreen layout — skip header, nav, and bottom padding
   const isFullscreen = location.pathname === '/pos' || location.pathname.startsWith('/vip-cellar')
