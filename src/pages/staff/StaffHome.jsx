@@ -226,7 +226,9 @@ export default function StaffHome() {
         {/* 打卡卡片 */}
         <div className="wcb-card" style={{background:'linear-gradient(160deg,rgba(30,24,18,.96),rgba(14,12,10,.99))',borderColor:'rgba(196,163,90,.15)',padding:'28px 24px',textAlign:'center'}}>
           <div style={{fontFamily:'Cormorant Garamond,serif',fontSize:11,fontStyle:'italic',color:'rgba(196,163,90,.4)',letterSpacing:4}}>Current Shift</div>
-          {shiftInfo?.start ? (
+          {user?.employee_type === 'PT' ? (
+            <div style={{fontFamily:'var(--serif)',fontSize:18,color:'#c9a84c',margin:'16px 0',letterSpacing:2}}>PT 彈性工時{shiftName?` · ${shiftName}`:''}<div style={{fontFamily:'Cormorant Garamond,serif',fontSize:10,fontStyle:'italic',color:'rgba(196,163,90,.4)',letterSpacing:3,marginTop:4}}>Hours by Punch</div></div>
+          ) : shiftInfo?.start ? (
             <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:12,margin:'8px 0',lineHeight:1}}><span style={{fontFamily:'JetBrains Mono,monospace',fontSize:32,fontWeight:300,letterSpacing:4,color:'#f0e8d8'}}>{shiftInfo.start}</span><span style={{fontSize:20,color:'rgba(196,163,90,.3)'}}>—</span><span style={{fontFamily:'JetBrains Mono,monospace',fontSize:32,fontWeight:300,letterSpacing:4,color:'#f0e8d8'}}>{shiftInfo.end}</span></div>
           ) : <div style={{fontFamily:'var(--serif)',fontSize:18,color:'rgba(196,163,90,.4)',margin:'16px 0'}}>{shiftName ? `今日${shiftName}` : '尚未排班'}</div>}
 

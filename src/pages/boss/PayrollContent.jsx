@@ -37,9 +37,44 @@ function resolvePunch(punch) {
 /* ================================================================
    出勤統計
    ================================================================ */
-function getAttendanceData(eid, schedules, punches) {
+function getAttendanceData(eid, schedules, punches, emp) {
   const es = schedules.filter(s => s.employee_id === eid)
   const ep = punches.filter(p => p.employee_id === eid && p.is_valid)
+  const isPT = emp?.emp_type === 'PT'
+
+  // PT：彈性工時，依打卡 in/out 累計時數，不計遲到/早退/缺勤扣款
+  if (isPT) {
+    let totalMinutes = 0, workDays = 0
+    let missingPunch = []
+    const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' })
+    const dates = [...new Set(ep.map(p => p.date))].sort()
+    const dailyHours = []
+    dates.forEach(d => {
+      const day = ep.filter(p => p.date === d).sort((a, b) => (a.time || '').localeCompare(b.time || ''))
+      const ins = day.filter(p => p.punch_type === '上班')
+      const outs = day.filter(p => p.punch_type === '下班')
+      if (ins.length === 0 && outs.length === 0) return
+      if (ins.length === 0 || outs.length === 0) {
+        if (d < today) missingPunch.push({ date: d, missing: ins.length ? '下班' : '上班' })
+        return
+      }
+      const inT = new Date(ins[0].time).getTime()
+      const outT = new Date(outs[outs.length - 1].time).getTime()
+      const mins = Math.max(0, Math.round((outT - inT) / 60000))
+      if (mins > 0) {
+        totalMinutes += mins; workDays++
+        dailyHours.push({ date: d, hours: +(mins / 60).toFixed(2), minutes: mins })
+      }
+    })
+    return {
+      isPT: true, work: workDays, sick: 0, personal: 0, off: 0, special: 0, absent: 0, total: es.length,
+      lateCount: 0, lateMinutes: 0, lateDetails: [], earlyCount: 0, earlyMinutes: 0, earlyDetails: [],
+      otTotalMin: 0, otDetails: [], overrideCount: 0, missingPunch,
+      totalPunchMinutes: totalMinutes, totalPunchHours: +(totalMinutes / 60).toFixed(2),
+      dailyHours,
+    }
+  }
+
   let work = 0, sick = 0, personal = 0, off = 0, special = 0, absent = 0
   let lateCount = 0, lateMinutes = 0, earlyCount = 0, earlyMinutes = 0
   let otTotalMin = 0, otDetails = [], lateDetails = [], earlyDetails = []
@@ -120,6 +155,30 @@ function calcSalaryToDate(emp, cfg, bonusDefs, att, isCurrentMonth, targetDate) 
   const year = targetDate.getFullYear(), monthNum = targetDate.getMonth() + 1
   const daysInMonth = new Date(year, monthNum, 0).getDate()
   const dayOfMonth = targetDate.getDate()
+
+  // PT：純時薪制 — 打卡時數 × 時薪，無遲到/早退/勞健保扣款
+  if (att?.isPT || emp?.emp_type === 'PT') {
+    const hourlyBase = +(cfg.hourly_rate || cfg.monthly_salary || 0)
+    const totalHours = +att.totalPunchHours || 0
+    const proratedBase = Math.round(totalHours * hourlyBase)
+    const empBonuses = (bonusDefs || []).filter(b => b.employee_id === emp.id && b.enabled)
+    const otherBonuses = empBonuses.map(b => ({ ...b, originalAmount: b.amount || 0, amount: b.amount || 0 }))
+    const otherBonusTotal = otherBonuses.reduce((s, b) => s + (b.amount || 0), 0)
+    return {
+      monthlyBase: 0, daysInMonth, dayOfMonth, dailyBase: 0, hourlyBase,
+      actualWorkedDays: att.work, proratedBase,
+      empBonuses, otherBonuses,
+      attendanceBonus: { def: null, amount: 0, status: 'na', effective: 0 },
+      otPay: 0, otDetails: [],
+      sickDeduct: 0, personalDeduct: 0, absentDeduct: 0,
+      li: 0, hi: 0, lp: 0, liER: 0, hiER: 0, lb: null,
+      totalBonuses: otherBonusTotal, totalDeductions: 0,
+      currentPayable: proratedBase + otherBonusTotal,
+      erCost: proratedBase + otherBonusTotal,
+      att, isPT: true,
+    }
+  }
+
   const monthlyBase = cfg.monthly_salary || 0
   const dailyBase = monthlyBase > 0 ? Math.round(monthlyBase / daysInMonth) : 0
   const hourlyBase = dailyBase > 0 ? Math.round(dailyBase / 8) : 0
@@ -236,7 +295,7 @@ export default function Payroll() {
   function getCfg(eid) { return salConfigs.find(s => s.employee_id === eid) || {} }
   function getCalc(emp) {
     const cfg = getCfg(emp.id)
-    const att = getAttendanceData(emp.id, schedules, punches)
+    const att = getAttendanceData(emp.id, schedules, punches, emp)
     const targetDate = isCurrentMonth ? today : new Date(yr, mo - 1, daysInMonth)
     return calcSalaryToDate(emp, cfg, bonuses, att, isCurrentMonth, targetDate)
   }
