@@ -175,13 +175,13 @@ export default function PunchAll() {
         <ArrowLeft size={14} /> 返回
       </button>
 
-      <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 22, color: 'var(--gold)', fontWeight: 600, margin: '0 0 4px' }}>全員打卡紀錄</h2>
+      <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 22, color: '#c9a84c', fontWeight: 600, margin: '0 0 4px' }}>全員打卡紀錄</h2>
       <p style={{ fontSize: 12, color: 'var(--text-dim)', margin: 0, marginBottom: 14 }}>檢視每位員工每天上下班打卡 · 老闆可修正時間（自動記錄稽核軌跡）· 紅色 = 遲到</p>
 
       {/* 月份切換 */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, background: 'var(--black-card)', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)' }}>
         <button onClick={() => setMonth(format(subMonths(new Date(month + '-01'), 1), 'yyyy-MM'))} style={navBtn}><ChevronLeft size={16} /></button>
-        <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--gold)', fontFamily: 'var(--font-mono)' }}>{month}</span>
+        <span style={{ fontSize: 16, fontWeight: 600, color: '#c9a84c', fontFamily: 'var(--font-mono)' }}>{month}</span>
         <button onClick={() => setMonth(format(addMonths(new Date(month + '-01'), 1), 'yyyy-MM'))} style={navBtn}><ChevronRight size={16} /></button>
       </div>
 
@@ -196,7 +196,7 @@ export default function PunchAll() {
 
       {/* Filters */}
       <div className="card" style={{ padding: 10, marginBottom: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, fontSize: 12, color: 'var(--gold)' }}><Filter size={12} /> 篩選</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, fontSize: 12, color: '#c9a84c' }}><Filter size={12} /> 篩選</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
           <select value={filterEmp} onChange={e => setFilterEmp(e.target.value)} style={inp}>
             <option value="ALL">全員</option>
@@ -215,7 +215,7 @@ export default function PunchAll() {
             <option value="OVERRIDE">✏️ 只看補卡</option>
           </select>
         </div>
-        <button onClick={exportCSV} style={{ marginTop: 8, width: '100%', padding: 8, background: 'rgba(196,163,90,.1)', border: '1px solid var(--border-gold)', borderRadius: 6, color: 'var(--gold)', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+        <button onClick={exportCSV} style={{ marginTop: 8, width: '100%', padding: 8, background: 'rgba(196,163,90,.1)', border: '1px solid var(--border-gold)', borderRadius: 6, color: '#c9a84c', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
           <Download size={12} /> 下載 CSV
         </button>
       </div>
@@ -224,14 +224,14 @@ export default function PunchAll() {
         grouped.length === 0 ? <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>本月無打卡紀錄</div> :
         grouped.map(([date, list]) => (
           <div key={date} style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--gold)', marginBottom: 6, fontFamily: 'var(--font-mono)' }}>{date}（{new Date(date).toLocaleDateString('zh-TW', { weekday: 'short' })}）</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#c9a84c', marginBottom: 6, fontFamily: 'var(--font-mono)' }}>{date}（{new Date(date).toLocaleDateString('zh-TW', { weekday: 'short' })}）</div>
             {list.map(r => (
               <div key={r.id} className="card" style={{ padding: '10px 12px', marginBottom: 6, borderLeft: r.isLate ? '3px solid var(--red)' : r.isEarly ? '3px solid #f59e0b' : !r.valid ? '3px solid #9ca3af' : '3px solid transparent' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                       <span style={{ fontSize: 14, fontWeight: 600 }}>{r.empName}</span>
-                      {r.isPT && <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 8, background: 'rgba(196,163,90,.15)', color: 'var(--gold)' }}>PT</span>}
+                      {r.isPT && <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 8, background: 'rgba(196,163,90,.15)', color: '#c9a84c' }}>PT</span>}
                       <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: r.punch_type === '上班' ? 'rgba(100,170,100,.15)' : 'rgba(77,140,196,.15)', color: r.punch_type === '上班' ? 'rgba(100,170,100,.9)' : 'rgba(77,140,196,.9)' }}>{r.punch_type}</span>
                       <span style={{ fontSize: 13, fontFamily: 'var(--font-mono)', color: r.isLate ? 'var(--red)' : r.isEarly ? '#f59e0b' : 'var(--text)', fontWeight: r.isLate || r.isEarly ? 700 : 400 }}>{r.time ? toTaipei(r.time, true) : '—'}</span>
                       {r.isLate && <span style={{ fontSize: 11, color: 'var(--red)', fontWeight: 700 }}>🔴遲到 {r.lateMin}分</span>}
@@ -242,7 +242,7 @@ export default function PunchAll() {
                     {r.override_reason && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>📝 {r.override_reason} · {r.override_by}</div>}
                   </div>
                   <div style={{ display: 'flex', gap: 4 }}>
-                    <button onClick={() => startEdit(r)} style={iconBtn('var(--gold)')} title="修正時間"><Edit3 size={14} /></button>
+                    <button onClick={() => startEdit(r)} style={iconBtn('#c9a84c')} title="修正時間"><Edit3 size={14} /></button>
                     <button onClick={() => deletePunch(r)} style={iconBtn('var(--red)')} title="刪除"><Trash2 size={14} /></button>
                   </div>
                 </div>
@@ -256,7 +256,7 @@ export default function PunchAll() {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setEditing(null)}>
           <div style={{ background: 'var(--black-card)', border: '1px solid var(--border-gold)', borderRadius: 16, padding: 20, width: '100%', maxWidth: 420 }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--gold)' }}>修正打卡時間</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#c9a84c' }}>修正打卡時間</div>
               <button onClick={() => setEditing(null)} style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer' }}><X size={18} /></button>
             </div>
             <div style={{ background: 'rgba(196,163,90,.05)', padding: 10, borderRadius: 8, marginBottom: 12, fontSize: 13 }}>
@@ -276,7 +276,7 @@ export default function PunchAll() {
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setEditing(null)} style={{ flex: 1, padding: 10, background: 'var(--black)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer' }}>取消</button>
-              <button onClick={saveEdit} disabled={saving} style={{ flex: 1, padding: 10, background: 'var(--gold)', color: '#000', border: 'none', borderRadius: 8, fontWeight: 700, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <button onClick={saveEdit} disabled={saving} style={{ flex: 1, padding: 10, background: '#c9a84c', color: '#000', border: 'none', borderRadius: 8, fontWeight: 700, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                 <Save size={14} /> {saving ? '儲存中…' : '儲存修正'}
               </button>
             </div>
@@ -293,7 +293,7 @@ const inp = { width: '100%', padding: '8px 10px', background: 'var(--black)', bo
 const lbl = { display: 'block', fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }
 const iconBtn = (color) => ({ background: 'transparent', border: `1px solid ${color}33`, color, padding: 6, borderRadius: 6, cursor: 'pointer', display: 'flex', alignItems: 'center' })
 
-function StatChip({ label, value, color = 'var(--gold)' }) {
+function StatChip({ label, value, color = '#c9a84c' }) {
   return (
     <div style={{ background: 'var(--black-card)', border: '1px solid var(--border)', borderRadius: 6, padding: '6px 4px', textAlign: 'center' }}>
       <div style={{ fontSize: 16, fontWeight: 700, color, fontFamily: 'var(--font-mono)' }}>{value}</div>
