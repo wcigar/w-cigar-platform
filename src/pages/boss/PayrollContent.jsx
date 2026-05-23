@@ -171,7 +171,7 @@ function calcSalaryToDate(emp, cfg, bonusDefs, att, isCurrentMonth, targetDate) 
       attendanceBonus: { def: null, amount: 0, status: 'na', effective: 0 },
       otPay: 0, otDetails: [],
       sickDeduct: 0, personalDeduct: 0, absentDeduct: 0,
-      li: 0, hi: 0, lp: 0, liER: 0, hiER: 0, lb: null,
+      li: 0, hi: 0, lp: 0, liER: 0, hiER: 0, lb: 0,
       totalBonuses: otherBonusTotal, totalDeductions: 0,
       currentPayable: proratedBase + otherBonusTotal,
       erCost: proratedBase + otherBonusTotal,
@@ -475,11 +475,13 @@ export default function Payroll() {
           <div style={{background:'var(--black-card)',border:'1px solid var(--border-gold)',borderRadius:20,padding:24,width:'100%',maxWidth:440,maxHeight:'90vh',overflowY:'auto'}} onClick={e => e.stopPropagation()}>
             <div style={{fontSize:18,fontWeight:700,color:'var(--gold)',marginBottom:4}}>薪資條 — {payslip.emp.name}</div>
             <div style={{fontSize:12,color:'var(--text-muted)',marginBottom:12}}>{month}{isCurrentMonth?` (截至${todayDay}日)`:''}</div>
-            <R label={`出勤${payslip.p.actualWorkedDays}天 底薪`} value={payslip.p.proratedBase}/>
+            {payslip.p.isPT
+              ? <R label={`PT ${payslip.p.att.totalPunchHours||0} hr × $${(payslip.p.hourlyBase||0).toLocaleString()}/hr`} value={payslip.p.proratedBase}/>
+              : <R label={`出勤${payslip.p.actualWorkedDays}天 底薪`} value={payslip.p.proratedBase}/>}
             {payslip.p.attendanceBonus.amount>0&&<R label={`全勤獎金（${payslip.p.attendanceBonus.status==='lost'?'已失效':'暫符合'}）`} value={payslip.p.attendanceBonus.effective} positive={payslip.p.attendanceBonus.status!=='lost'}/>}
             {payslip.p.otherBonuses.map(b=><R key={b.id} label={`+ ${b.bonus_name}`} value={b.amount} positive/>)}
             {payslip.p.otPay>0&&<R label="+ 加班費" value={payslip.p.otPay} positive/>}
-            <R label="- 勞保" value={-payslip.p.li} negative/><R label="- 健保" value={-payslip.p.hi} negative/>
+            {!payslip.p.isPT && <><R label="- 勞保" value={-payslip.p.li} negative/><R label="- 健保" value={-payslip.p.hi} negative/></>}
             {payslip.p.sickDeduct>0&&<R label="- 病假" value={-payslip.p.sickDeduct} negative/>}
             <div style={{height:2,background:'var(--gold)',margin:'10px 0'}}/>
             <R label="截至今日可領" value={payslip.p.currentPayable} highlight/>
@@ -547,19 +549,35 @@ export default function Payroll() {
               {p.otDetails.length>0&&<div style={{marginBottom:8}}><div style={{fontSize:11,color:'var(--green)',fontWeight:600,marginBottom:4}}>⏰ 加班（時薪${p.hourlyBase}）</div>{p.otDetails.map((d,i)=><div key={i} style={{fontSize:11,color:'var(--text-dim)',display:'flex',justifyContent:'space-between',padding:'2px 0'}}><span>{d.date} {d.hours}hr</span><span style={{color:'var(--green)'}}>+${d.pay.toLocaleString()}</span></div>)}</div>}
               <CigarRewardPayrollStatus employeeId={emp.id} month={month} />
               <SH>薪資明細</SH>
-              <R label="月底薪" value={p.monthlyBase} dim/><R label={`當月天數`} value={`${p.daysInMonth} 天`} dim/><R label="每日底薪" value={p.dailyBase} dim/>
-              <R label="實際出勤天數" value={`${p.actualWorkedDays} 天`} dim/>
-              <div style={{height:1,background:'var(--border)',margin:'4px 0'}}/>
-              <R label={`出勤${p.actualWorkedDays}天 × $${p.dailyBase.toLocaleString()}`} value={p.proratedBase}/>
-              {p.attendanceBonus.amount>0&&<div style={{display:'flex',justifyContent:'space-between',padding:'3px 0',fontSize:13}}><span style={{color:'var(--text-dim)',display:'flex',alignItems:'center',gap:4}}>+ 全勤獎金 <span style={{fontSize:10,padding:'1px 6px',borderRadius:6,background:abStatus==='lost'?'rgba(196,77,77,.15)':'rgba(77,168,108,.15)',color:abStatus==='lost'?'var(--red)':'var(--green)',fontWeight:700}}>{abStatus==='lost'?'已失效':abStatus==='pending'?'暫符合':'已確認'}</span></span><span style={{fontFamily:'var(--font-mono)',color:abStatus==='lost'?'var(--red)':'var(--green)',textDecoration:abStatus==='lost'?'line-through':'none'}}>{abStatus==='lost'?`$${p.attendanceBonus.amount.toLocaleString()}`:`+$${p.attendanceBonus.effective.toLocaleString()}`}</span></div>}
-              {p.otherBonuses.map(b=><R key={b.id} label={`+ ${b.bonus_name}`} value={b.amount} positive/>)}
-              {p.otPay>0&&<R label="+ 加班費" value={p.otPay} positive/>}
-              <div style={{height:1,background:'var(--border)',margin:'6px 0'}}/>
-              <R label={`投保 $${p.lb.toLocaleString()}`} value={p.lb} dim/>
-              <R label="- 勞保(20%)" value={-p.li} negative/><R label="- 健保(30%)" value={-p.hi} negative/>
-              {p.sickDeduct>0&&<R label={`- 病假${p.att.sick}天`} value={-p.sickDeduct} negative/>}
-              {p.personalDeduct>0&&<R label={`- 事假${p.att.personal}天`} value={-p.personalDeduct} negative/>}
-              {p.absentDeduct>0&&<R label={`- 曠職${p.att.absent}天`} value={-p.absentDeduct} negative/>}
+              {p.isPT ? (<>
+                <div style={{fontSize:11,color:'var(--gold)',marginBottom:6,fontWeight:600}}>PT 彈性工時（依打卡時數計薪）</div>
+                <R label="時薪" value={`$${(p.hourlyBase||0).toLocaleString()}`} dim/>
+                <R label="本月累計時數" value={`${p.att.totalPunchHours || 0} hr`} dim/>
+                <R label="出勤天數" value={`${p.actualWorkedDays} 天`} dim/>
+                {p.att.dailyHours?.length>0 && (
+                  <div style={{marginTop:6,marginBottom:6,fontSize:11,color:'var(--text-dim)'}}>
+                    <div style={{fontWeight:600,marginBottom:4,color:'var(--gold)'}}>每日打卡時數</div>
+                    {p.att.dailyHours.map((d,i)=>(<div key={i} style={{display:'flex',justifyContent:'space-between',padding:'2px 0'}}><span>{d.date}</span><span style={{fontFamily:'var(--font-mono)'}}>{d.hours} hr</span></div>))}
+                  </div>
+                )}
+                <div style={{height:1,background:'var(--border)',margin:'4px 0'}}/>
+                <R label={`${p.att.totalPunchHours || 0} hr × $${(p.hourlyBase||0).toLocaleString()}/hr`} value={p.proratedBase}/>
+                {p.otherBonuses.map(b=><R key={b.id} label={`+ ${b.bonus_name}`} value={b.amount} positive/>)}
+              </>) : (<>
+                <R label="月底薪" value={p.monthlyBase} dim/><R label={`當月天數`} value={`${p.daysInMonth} 天`} dim/><R label="每日底薪" value={p.dailyBase} dim/>
+                <R label="實際出勤天數" value={`${p.actualWorkedDays} 天`} dim/>
+                <div style={{height:1,background:'var(--border)',margin:'4px 0'}}/>
+                <R label={`出勤${p.actualWorkedDays}天 × $${p.dailyBase.toLocaleString()}`} value={p.proratedBase}/>
+                {p.attendanceBonus.amount>0&&<div style={{display:'flex',justifyContent:'space-between',padding:'3px 0',fontSize:13}}><span style={{color:'var(--text-dim)',display:'flex',alignItems:'center',gap:4}}>+ 全勤獎金 <span style={{fontSize:10,padding:'1px 6px',borderRadius:6,background:abStatus==='lost'?'rgba(196,77,77,.15)':'rgba(77,168,108,.15)',color:abStatus==='lost'?'var(--red)':'var(--green)',fontWeight:700}}>{abStatus==='lost'?'已失效':abStatus==='pending'?'暫符合':'已確認'}</span></span><span style={{fontFamily:'var(--font-mono)',color:abStatus==='lost'?'var(--red)':'var(--green)',textDecoration:abStatus==='lost'?'line-through':'none'}}>{abStatus==='lost'?`$${p.attendanceBonus.amount.toLocaleString()}`:`+$${p.attendanceBonus.effective.toLocaleString()}`}</span></div>}
+                {p.otherBonuses.map(b=><R key={b.id} label={`+ ${b.bonus_name}`} value={b.amount} positive/>)}
+                {p.otPay>0&&<R label="+ 加班費" value={p.otPay} positive/>}
+                <div style={{height:1,background:'var(--border)',margin:'6px 0'}}/>
+                <R label={`投保 $${p.lb.toLocaleString()}`} value={p.lb} dim/>
+                <R label="- 勞保(20%)" value={-p.li} negative/><R label="- 健保(30%)" value={-p.hi} negative/>
+                {p.sickDeduct>0&&<R label={`- 病假${p.att.sick}天`} value={-p.sickDeduct} negative/>}
+                {p.personalDeduct>0&&<R label={`- 事假${p.att.personal}天`} value={-p.personalDeduct} negative/>}
+                {p.absentDeduct>0&&<R label={`- 曠職${p.att.absent}天`} value={-p.absentDeduct} negative/>}
+              </>)}
               <div style={{height:2,background:'var(--gold)',margin:'8px 0'}}/>
               <R label="＝ 系統計算" value={p.currentPayable} highlight/>
               {/* 手動覆寫摘要 */}
