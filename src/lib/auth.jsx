@@ -15,6 +15,29 @@ export function AuthProvider({ children }) {
       const ts = parsed._ts || 0
       if (Date.now() - ts < EXPIRY_DAYS*24*60*60*1000) {
         setUser(parsed)
+        // 背景刷新：從 DB 抓最新 employee 資料更新 user object（emp_type / title / enabled 等可能異動）
+        if (parsed.employee_id) {
+          supabase.from('employees')
+            .select('id, name, title, enabled, emp_type, is_admin')
+            .eq('id', parsed.employee_id).maybeSingle()
+            .then(({ data }) => {
+              if (!data) return
+              const refreshed = {
+                ...parsed,
+                name: data.name, position: data.title, is_active: data.enabled,
+                employee_type: data.emp_type, is_admin: data.is_admin,
+                role: data.is_admin ? 'boss' : 'staff',
+                _ts: Date.now()
+              }
+              const changed = parsed.employee_type !== data.emp_type ||
+                              parsed.is_active !== data.enabled ||
+                              parsed.position !== data.title
+              if (changed) {
+                setUser(refreshed)
+                localStorage.setItem('w_cigar_user', JSON.stringify(refreshed))
+              }
+            })
+        }
       } else {
         localStorage.removeItem('w_cigar_user')
       }
