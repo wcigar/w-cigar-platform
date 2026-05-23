@@ -53,26 +53,36 @@ function EmployeeManager() {
   }
 
   async function toggleEmp(emp) {
-    await supabase.from('employees').update({ enabled: !emp.enabled }).eq('id', emp.id); load()
+    const adminId = JSON.parse(localStorage.getItem('w_cigar_user') || '{}')?.employee_id || 'ADMIN'
+    const { data, error } = await supabase.rpc('admin_update_employee', {
+      p_admin_employee_id: adminId,
+      p_target_employee_id: emp.id,
+      p_enabled: !emp.enabled,
+    })
+    if (error) { alert('切換狀態失敗: ' + error.message); return }
+    load()
   }
 
   async function deleteEmp(emp) {
     if (emp.enabled) { alert('在職員工不可刪除，請先設為離職'); return }
-    // 先檢查有沒有歷史資料
     const [sR, pR] = await Promise.all([
       supabase.from('schedules').select('id', { count: 'exact', head: true }).eq('employee_id', emp.id),
       supabase.from('punch_records').select('id', { count: 'exact', head: true }).eq('employee_id', emp.id),
     ])
     const hasData = (sR.count || 0) > 0 || (pR.count || 0) > 0
     if (hasData) {
-      const msg = `${emp.name} 有歷史資料（排班 ${sR.count||0} 筆 / 打卡 ${pR.count||0} 筆），\n刪除會破壞薪資/出勤歷史紀錄。\n\n強烈建議保留為「離職」狀態，不要永久刪除。\n\n仍要強制刪除？（需要再次確認）`
+      const msg = `${emp.name} 有歷史資料（排班 ${sR.count||0} 筆 / 打卡 ${pR.count||0} 筆），\n刪除會破壞薪資/出勤歷史紀錄。\n\n強烈建議保留為「離職」狀態。\n\n仍要強制刪除？`
       if (!confirm(msg)) return
-      if (!confirm(`最後確認：永久刪除 ${emp.name} 及其所有歷史紀錄？此動作不可復原。`)) return
+      if (!confirm(`最後確認：永久刪除 ${emp.name}？此動作不可復原。`)) return
     } else {
       if (!confirm(`${emp.name} 沒有歷史資料，可以安全刪除。\n確定刪除？`)) return
     }
-    const { error } = await supabase.from('employees').delete().eq('id', emp.id)
-    if (error) { alert('刪除失敗（可能還有其他資料表 FK 引用）：' + error.message); return }
+    const adminId = JSON.parse(localStorage.getItem('w_cigar_user') || '{}')?.employee_id || 'ADMIN'
+    const { data, error } = await supabase.rpc('admin_delete_employee', {
+      p_admin_employee_id: adminId,
+      p_target_employee_id: emp.id,
+    })
+    if (error) { alert('刪除失敗: ' + error.message); return }
     load()
   }
 
