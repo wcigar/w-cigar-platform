@@ -1,7 +1,8 @@
 export const SHIFTS = {
   '早班': { start: '12:00', end: '21:00', hours: 9, startH: 12, startM: 0, endH: 21, endM: 0 },
   '晚班': { start: '15:00', end: '00:00', hours: 9, startH: 15, startM: 0, endH: 24, endM: 0 },
-  '彈性班': { start: null, end: null, hours: 9, flexible: true },  // 不固定時段、做滿 9 小時、不判遲到/早退
+  '單人班': { start: '14:00', end: '23:00', hours: 9, startH: 14, startM: 0, endH: 23, endM: 0 },  // 1 人值班日：14:00-23:00 固定，照常判遲到/早退
+  '彈性班': { start: null, end: null, hours: 9, flexible: true },  // 不固定時段、不判遲到/早退（少用，PT 已有自己的彈性路徑）
   '休假': { start: null, end: null, hours: 0 },
 }
 

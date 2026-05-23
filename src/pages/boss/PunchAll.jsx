@@ -58,7 +58,7 @@ export default function PunchAll() {
     const v = s?.shift
     // 彈性班：不判遲到/早退
     if (v === '彈性班') return { isLate: false, isEarly: false, lateMin: 0, earlyMin: 0, valid: r.is_valid !== false, override: !!r.manual_override, flexible: true }
-    const shift = (v === '早班' || v === '晚班') ? SHIFTS[v] : null
+    const shift = (v === '早班' || v === '晚班' || v === '單人班') ? SHIFTS[v] : null
     let isLate = false, lateMin = 0, isEarly = false, earlyMin = 0
     if (shift && r.time) {
       const [h, m] = taipeiHM(r.time)

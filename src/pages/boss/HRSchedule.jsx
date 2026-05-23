@@ -10,8 +10,8 @@ import { format, startOfMonth, endOfMonth, addMonths, subMonths, eachDayOfInterv
 import SmartScheduleBtn from '../../components/SmartSchedule'
 
 const WEEKDAYS = ['日','一','二','三','四','五','六']
-const ALL_SHIFTS = ['早班','晚班','彈性班',...LEAVE_TYPES,'']
-const WORK_SHIFTS = ['早班','晚班','彈性班']
+const ALL_SHIFTS = ['早班','晚班','單人班','彈性班',...LEAVE_TYPES,'']
+const WORK_SHIFTS = ['早班','晚班','單人班','彈性班']
 
 export default function HRSchedule() {
   const [month, setMonth] = useState(new Date())
@@ -74,7 +74,7 @@ export default function HRSchedule() {
   async function loadLogs() { const { data } = await supabase.from('audit_logs').select('*').order('time', { ascending: false }).limit(50); setLogs(data || []) }
   useEffect(() => { if (tab === 'audit') loadLogs() }, [tab])
 
-  const shiftColors = { '早班': '#3dd68c', '晚班': '#4d8ac4', '彈性班': '#c9a84c', '休假': '#ff9a9a', '臨時請假': '#ff9a9a', '病假': '#ffb347', '事假': '#ffd700', '特休': '#64c8ff' }
+  const shiftColors = { '早班': '#3dd68c', '晚班': '#4d8ac4', '單人班': '#e67e22', '彈性班': '#c9a84c', '休假': '#ff9a9a', '臨時請假': '#ff9a9a', '病假': '#ffb347', '事假': '#ffd700', '特休': '#64c8ff' }
   const tabs = [{ id: 'schedule', l: '排班表' }, { id: 'holidays', l: `國定假日 (${monthHolidays.length})` }, { id: 'punch', l: '打卡紀錄' }, { id: 'leave', l: '假單審核' }, { id: 'weekly', l: '📊 週會報表' }, { id: 'audit', l: '稽核日誌' }]
 
   const holWorkCount = scheds.filter(s => (WORK_SHIFTS.includes(s.shift)) && isHoliday(s.date)).length

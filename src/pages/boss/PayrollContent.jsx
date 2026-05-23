@@ -100,7 +100,7 @@ function getAttendanceData(eid, schedules, punches, emp) {
 
   es.forEach(s => {
     const v = s.shift || ''
-    if (v === '早班' || v === '晚班' || v === '彈性班') {
+    if (v === '早班' || v === '晚班' || v === '彈性班' || v === '單人班') {
       const shift = SHIFTS[v]
       if (!shift) { work++; return }
       const isFlexible = shift.flexible === true
