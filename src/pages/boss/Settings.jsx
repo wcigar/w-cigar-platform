@@ -56,6 +56,26 @@ function EmployeeManager() {
     await supabase.from('employees').update({ enabled: !emp.enabled }).eq('id', emp.id); load()
   }
 
+  async function deleteEmp(emp) {
+    if (emp.enabled) { alert('在職員工不可刪除，請先設為離職'); return }
+    // 先檢查有沒有歷史資料
+    const [sR, pR] = await Promise.all([
+      supabase.from('schedules').select('id', { count: 'exact', head: true }).eq('employee_id', emp.id),
+      supabase.from('punch_records').select('id', { count: 'exact', head: true }).eq('employee_id', emp.id),
+    ])
+    const hasData = (sR.count || 0) > 0 || (pR.count || 0) > 0
+    if (hasData) {
+      const msg = `${emp.name} 有歷史資料（排班 ${sR.count||0} 筆 / 打卡 ${pR.count||0} 筆），\n刪除會破壞薪資/出勤歷史紀錄。\n\n強烈建議保留為「離職」狀態，不要永久刪除。\n\n仍要強制刪除？（需要再次確認）`
+      if (!confirm(msg)) return
+      if (!confirm(`最後確認：永久刪除 ${emp.name} 及其所有歷史紀錄？此動作不可復原。`)) return
+    } else {
+      if (!confirm(`${emp.name} 沒有歷史資料，可以安全刪除。\n確定刪除？`)) return
+    }
+    const { error } = await supabase.from('employees').delete().eq('id', emp.id)
+    if (error) { alert('刪除失敗（可能還有其他資料表 FK 引用）：' + error.message); return }
+    load()
+  }
+
   async function saveEdit() {
     if (!editing) return
     const adminId = JSON.parse(localStorage.getItem('user') || '{}')?.employee_id || 'ADMIN'
@@ -133,9 +153,12 @@ function EmployeeManager() {
                   </div>
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 4 }}>
-                <button style={iconBtn} onClick={() => setEditing({ ...emp })}><Edit3 size={14} color="var(--gold)" /></button>
+              <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                <button style={iconBtn} onClick={() => setEditing({ ...emp })}><Edit3 size={14} color="#c9a84c" /></button>
                 <span className={`badge ${emp.enabled ? 'badge-green' : 'badge-red'}`} style={{ cursor: 'pointer' }} onClick={() => toggleEmp(emp)}>{emp.enabled ? '在職' : '離職'}</span>
+                {!emp.enabled && (
+                  <button style={{ ...iconBtn, marginLeft: 4 }} onClick={() => deleteEmp(emp)} title="永久刪除"><Trash2 size={14} color="#c44d4d" /></button>
+                )}
               </div>
             </div>
           )}
