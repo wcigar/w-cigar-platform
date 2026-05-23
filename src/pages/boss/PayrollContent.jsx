@@ -46,32 +46,49 @@ function getAttendanceData(eid, schedules, punches, emp) {
   if (isPT) {
     let totalMinutes = 0, workDays = 0
     let missingPunch = []
+    let overrideCount = 0
     const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' })
     const dates = [...new Set(ep.map(p => p.date))].sort()
     const dailyHours = []
+    const dailyPunches = []
     dates.forEach(d => {
       const day = ep.filter(p => p.date === d).sort((a, b) => (a.time || '').localeCompare(b.time || ''))
       const ins = day.filter(p => p.punch_type === '上班')
       const outs = day.filter(p => p.punch_type === '下班')
       if (ins.length === 0 && outs.length === 0) return
-      if (ins.length === 0 || outs.length === 0) {
-        if (d < today) missingPunch.push({ date: d, missing: ins.length ? '下班' : '上班' })
-        return
+      const sch = schedules.find(s => s.employee_id === eid && s.date === d)
+      const shiftName = sch?.shift || 'PT'
+      const inP = ins[0], outP = outs[outs.length - 1]
+      const inHM = inP ? (() => { const [h, m] = taipeiHM(inP.time); return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}` })() : null
+      const outHM = outP ? (() => { const [h, m] = taipeiHM(outP.time); return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}` })() : null
+      const override = !!(inP?.manual_override || outP?.manual_override)
+      if (override) overrideCount++
+      let hours = null
+      if (inP && outP) {
+        const inT = new Date(inP.time).getTime()
+        const outT = new Date(outP.time).getTime()
+        const mins = Math.max(0, Math.round((outT - inT) / 60000))
+        if (mins > 0) {
+          totalMinutes += mins; workDays++
+          hours = +(mins / 60).toFixed(2)
+          dailyHours.push({ date: d, hours, minutes: mins })
+        }
+      } else if (d < today) {
+        missingPunch.push({ date: d, missing: ins.length ? '下班' : '上班' })
       }
-      const inT = new Date(ins[0].time).getTime()
-      const outT = new Date(outs[outs.length - 1].time).getTime()
-      const mins = Math.max(0, Math.round((outT - inT) / 60000))
-      if (mins > 0) {
-        totalMinutes += mins; workDays++
-        dailyHours.push({ date: d, hours: +(mins / 60).toFixed(2), minutes: mins })
-      }
+      dailyPunches.push({
+        date: d, shift: shiftName, clockIn: inHM, clockOut: outHM, hours,
+        isLate: false, lateMin: 0, isEarly: false, earlyMin: 0,
+        override, missingIn: !inP, missingOut: !outP,
+      })
     })
+    dailyPunches.sort((a, b) => a.date.localeCompare(b.date))
     return {
       isPT: true, work: workDays, sick: 0, personal: 0, off: 0, special: 0, absent: 0, total: es.length,
       lateCount: 0, lateMinutes: 0, lateDetails: [], earlyCount: 0, earlyMinutes: 0, earlyDetails: [],
-      otTotalMin: 0, otDetails: [], overrideCount: 0, missingPunch,
+      otTotalMin: 0, otDetails: [], overrideCount, missingPunch,
       totalPunchMinutes: totalMinutes, totalPunchHours: +(totalMinutes / 60).toFixed(2),
-      dailyHours,
+      dailyHours, dailyPunches,
     }
   }
 
@@ -573,8 +590,8 @@ export default function Payroll() {
               {p.att.earlyDetails.length>0&&<div style={{marginBottom:8}}><div style={{fontSize:11,color:'#f59e0b',fontWeight:600,marginBottom:4}}>⚠️ 早退明細</div>{p.att.earlyDetails.map((d,i)=><div key={i} style={{fontSize:11,color:'var(--text-dim)',display:'flex',justifyContent:'space-between',padding:'2px 0'}}><span>{d.date} 下班{d.time}{d.overridden?' ⚙️':''}</span><span style={{color:'#f59e0b'}}>早{d.minutes}分</span></div>)}</div>}
               {p.otDetails.length>0&&<div style={{marginBottom:8}}><div style={{fontSize:11,color:'var(--green)',fontWeight:600,marginBottom:4}}>⏰ 加班（時薪${p.hourlyBase}）</div>{p.otDetails.map((d,i)=><div key={i} style={{fontSize:11,color:'var(--text-dim)',display:'flex',justifyContent:'space-between',padding:'2px 0'}}><span>{d.date} {d.hours}hr</span><span style={{color:'var(--green)'}}>+${d.pay.toLocaleString()}</span></div>)}</div>}
 
-              {/* 每日打卡明細（非 PT 員工） */}
-              {!p.isPT && p.att.dailyPunches?.length>0 && (
+              {/* 每日打卡明細（PT 與正職都顯示） */}
+              {p.att.dailyPunches?.length>0 && (
                 <div style={{marginBottom:10,padding:8,background:'rgba(0,0,0,.25)',borderRadius:6,border:'1px solid var(--border)'}}>
                   <div style={{fontSize:11,fontWeight:700,color:'var(--gold)',marginBottom:6,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                     <span>📅 每日打卡明細</span>
