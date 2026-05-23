@@ -102,6 +102,7 @@ export default function BossHome() {
     { icon: DollarSign, label: '薪資財務', sub: '薪資 · 支出 · 勞健保', path: '/payroll', color: '#4d8ac4' },
     { icon: Package, label: '庫存盤點', sub: '進貨 · 庫存 · 盤點', path: '/boss-inventory', color: '#7a8c4d' },
     { icon: Edit3, label: '補打卡', sub: '老闆/會計代員工補登', path: '/admin-punch', color: '#a47a4a' },
+    { icon: Clock, label: '全員打卡', sub: '檢視+修正每位員工打卡', path: '/punch-all', color: '#6b8e7a' },
   ]
 
   // === 進階 menu（折疊起來）===

@@ -79,6 +79,7 @@ function getAttendanceData(eid, schedules, punches, emp) {
   let lateCount = 0, lateMinutes = 0, earlyCount = 0, earlyMinutes = 0
   let otTotalMin = 0, otDetails = [], lateDetails = [], earlyDetails = []
   let overrideCount = 0, missingPunch = []
+  const dailyPunches = []  // 每日打卡明細：{ date, shift, clockIn, clockOut, hours, isLate, lateMin, isEarly, earlyMin, override, missing }
 
   es.forEach(s => {
     const v = s.shift || ''
@@ -94,17 +95,22 @@ function getAttendanceData(eid, schedules, punches, emp) {
       const countsAsWorked = resolved ? (resolved.countsAsWorked !== false) : true
       if (countsAsWorked) work++
 
+      let dayIsLate = false, dayLateMin = 0, dayIsEarly = false, dayEarlyMin = 0
+      let inHM = null, outHM = null
+
       // 遲到檢查（用 taipeiHM 轉換時區）
       const clockInTime = resolved?.clockIn || clockInPunch?.time
       if (clockInTime) {
         const [h, m] = typeof clockInTime === 'string' && clockInTime.includes('T') ? taipeiHM(clockInTime) : (clockInTime || '').slice(0, 5).split(':').map(Number)
         if (!isNaN(h) && !isNaN(m)) {
+          inHM = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`
           const pm = h * 60 + m, sm = shift.startH * 60 + shift.startM + LATE_GRACE_MIN
           if (resolved?.overridden && resolved.isLate === false) { /* 已取消遲到 */ }
           else if (pm > sm) {
             const mins = pm - sm
             lateCount++; lateMinutes += mins
-            lateDetails.push({ date: s.date, minutes: mins, time: `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`, overridden: resolved?.overridden })
+            dayIsLate = true; dayLateMin = mins
+            lateDetails.push({ date: s.date, minutes: mins, time: inHM, overridden: resolved?.overridden })
           }
         }
       }
@@ -114,6 +120,7 @@ function getAttendanceData(eid, schedules, punches, emp) {
       if (clockOutTime) {
         const [h, m] = typeof clockOutTime === 'string' && clockOutTime.includes('T') ? taipeiHM(clockOutTime) : (clockOutTime || '').slice(0, 5).split(':').map(Number)
         if (!isNaN(h) && !isNaN(m)) {
+          outHM = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`
           let pm = h * 60 + m
           if (v === '晚班' && h < 12) pm += 1440
           const endMin = shift.endH * 60 + shift.endM
@@ -121,7 +128,8 @@ function getAttendanceData(eid, schedules, punches, emp) {
           else if (pm < endMin) {
             const mins = endMin - pm
             earlyCount++; earlyMinutes += mins
-            earlyDetails.push({ date: s.date, minutes: mins, time: `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`, overridden: resolvedOut?.overridden })
+            dayIsEarly = true; dayEarlyMin = mins
+            earlyDetails.push({ date: s.date, minutes: mins, time: outHM, overridden: resolvedOut?.overridden })
           }
           const graceMin = endMin + OT_GRACE_MIN
           if (pm > graceMin) {
@@ -131,6 +139,21 @@ function getAttendanceData(eid, schedules, punches, emp) {
           }
         }
       }
+
+      // 計算當日工時（純打卡，跨日已補正）
+      let hours = null
+      if (clockInTime && clockOutTime) {
+        const inT = new Date(clockInTime).getTime()
+        const outT = new Date(clockOutTime).getTime()
+        if (outT > inT) hours = +((outT - inT) / 3600000).toFixed(2)
+      }
+
+      dailyPunches.push({
+        date: s.date, shift: v, clockIn: inHM, clockOut: outHM, hours,
+        isLate: dayIsLate, lateMin: dayLateMin, isEarly: dayIsEarly, earlyMin: dayEarlyMin,
+        override: !!(resolved?.overridden || resolvedOut?.overridden),
+        missingIn: !clockInPunch, missingOut: !clockOutPunch,
+      })
 
       // 缺打卡檢查（有上班卡沒下班卡、或反之，且非今天）
       const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' })
@@ -145,7 +168,9 @@ function getAttendanceData(eid, schedules, punches, emp) {
     else if (v === '曠職') absent++
     else off++
   })
-  return { work, sick, personal, off, special, absent, total: es.length, lateCount, lateMinutes, lateDetails, earlyCount, earlyMinutes, earlyDetails, otTotalMin, otDetails, overrideCount, missingPunch }
+  // 日期由舊到新
+  dailyPunches.sort((a, b) => a.date.localeCompare(b.date))
+  return { work, sick, personal, off, special, absent, total: es.length, lateCount, lateMinutes, lateDetails, earlyCount, earlyMinutes, earlyDetails, otTotalMin, otDetails, overrideCount, missingPunch, dailyPunches }
 }
 
 /* ================================================================
@@ -547,6 +572,37 @@ export default function Payroll() {
               {p.att.lateDetails.length>0&&<div style={{marginBottom:8}}><div style={{fontSize:11,color:'var(--red)',fontWeight:600,marginBottom:4}}>⚠️ 遲到明細</div>{p.att.lateDetails.map((d,i)=><div key={i} style={{fontSize:11,color:'var(--text-dim)',display:'flex',justifyContent:'space-between',padding:'2px 0'}}><span>{d.date} 打卡{d.time}{d.overridden?' ⚙️':''}</span><span style={{color:'var(--red)'}}>遲{d.minutes}分</span></div>)}</div>}
               {p.att.earlyDetails.length>0&&<div style={{marginBottom:8}}><div style={{fontSize:11,color:'#f59e0b',fontWeight:600,marginBottom:4}}>⚠️ 早退明細</div>{p.att.earlyDetails.map((d,i)=><div key={i} style={{fontSize:11,color:'var(--text-dim)',display:'flex',justifyContent:'space-between',padding:'2px 0'}}><span>{d.date} 下班{d.time}{d.overridden?' ⚙️':''}</span><span style={{color:'#f59e0b'}}>早{d.minutes}分</span></div>)}</div>}
               {p.otDetails.length>0&&<div style={{marginBottom:8}}><div style={{fontSize:11,color:'var(--green)',fontWeight:600,marginBottom:4}}>⏰ 加班（時薪${p.hourlyBase}）</div>{p.otDetails.map((d,i)=><div key={i} style={{fontSize:11,color:'var(--text-dim)',display:'flex',justifyContent:'space-between',padding:'2px 0'}}><span>{d.date} {d.hours}hr</span><span style={{color:'var(--green)'}}>+${d.pay.toLocaleString()}</span></div>)}</div>}
+
+              {/* 每日打卡明細（非 PT 員工） */}
+              {!p.isPT && p.att.dailyPunches?.length>0 && (
+                <div style={{marginBottom:10,padding:8,background:'rgba(0,0,0,.25)',borderRadius:6,border:'1px solid var(--border)'}}>
+                  <div style={{fontSize:11,fontWeight:700,color:'var(--gold)',marginBottom:6,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                    <span>📅 每日打卡明細</span>
+                    <a href="/punch-all" style={{fontSize:10,color:'var(--blue)',textDecoration:'none'}}>修正 →</a>
+                  </div>
+                  <div style={{display:'grid',gridTemplateColumns:'80px 50px 60px 60px 1fr',gap:4,fontSize:10,color:'var(--text-muted)',padding:'2px 0',borderBottom:'1px solid var(--border)',marginBottom:4}}>
+                    <span>日期</span><span>班別</span><span>上班</span><span>下班</span><span style={{textAlign:'right'}}>工時/異常</span>
+                  </div>
+                  {p.att.dailyPunches.map((d,i)=>(
+                    <div key={i} style={{display:'grid',gridTemplateColumns:'80px 50px 60px 60px 1fr',gap:4,fontSize:11,padding:'3px 0',borderBottom:'1px solid rgba(255,255,255,.03)',background:d.isLate?'rgba(196,77,77,.08)':'transparent'}}>
+                      <span style={{fontFamily:'var(--font-mono)',color:'var(--text-dim)'}}>{d.date.slice(5)}</span>
+                      <span style={{fontSize:10,color:d.shift==='晚班'?'#a78bfa':'#fbbf24'}}>{d.shift}</span>
+                      <span style={{fontFamily:'var(--font-mono)',color:d.isLate?'var(--red)':d.missingIn?'#9ca3af':'var(--text)',fontWeight:d.isLate?700:400}}>{d.clockIn || '—'}</span>
+                      <span style={{fontFamily:'var(--font-mono)',color:d.isEarly?'#f59e0b':d.missingOut?'#9ca3af':'var(--text)',fontWeight:d.isEarly?700:400}}>{d.clockOut || '—'}</span>
+                      <span style={{textAlign:'right',fontFamily:'var(--font-mono)',fontSize:10}}>
+                        {d.hours !== null && <span style={{color:'var(--text-dim)'}}>{d.hours}hr </span>}
+                        {d.isLate && <span style={{color:'var(--red)',fontWeight:700}}>遲{d.lateMin}分 </span>}
+                        {d.isEarly && <span style={{color:'#f59e0b',fontWeight:700}}>早{d.earlyMin}分 </span>}
+                        {d.missingIn && !d.missingOut && <span style={{color:'#9ca3af'}}>缺上班 </span>}
+                        {d.missingOut && !d.missingIn && <span style={{color:'#9ca3af'}}>缺下班 </span>}
+                        {d.missingIn && d.missingOut && <span style={{color:'#9ca3af'}}>未打卡 </span>}
+                        {d.override && <span style={{color:'var(--blue)'}}>✏️</span>}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <CigarRewardPayrollStatus employeeId={emp.id} month={month} />
               <SH>薪資明細</SH>
               {p.isPT ? (<>

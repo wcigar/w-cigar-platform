@@ -69,6 +69,7 @@ import AdminCustoms from './pages/admin/Customs'
 import FactorySubmit from './pages/customs/FactorySubmit'
 import SalesInput from './pages/admin/SalesInput'
 import BossAdminPunch from './pages/boss/AdminPunch'
+import BossPunchAll from './pages/boss/PunchAll'
 import InvestmentDashboard from './pages/investment/InvestmentDashboard'
 
 function AppInner() {
@@ -98,6 +99,7 @@ function AppInner() {
             <Route path="/commission" element={<Commission />} />
             <Route path="/customers" element={<Customers />} />
 <Route path="/admin-punch" element={<BossAdminPunch />} />
+            <Route path="/punch-all" element={<BossPunchAll />} />
             <Route path="/dealer-orders" element={<DealerOrders />} />
             <Route path="/pos" element={<StaffPOS />} />
             <Route path="/revenue" element={<StaffRevenue />} />
