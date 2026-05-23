@@ -100,9 +100,10 @@ function getAttendanceData(eid, schedules, punches, emp) {
 
   es.forEach(s => {
     const v = s.shift || ''
-    if (v === '早班' || v === '晚班') {
+    if (v === '早班' || v === '晚班' || v === '彈性班') {
       const shift = SHIFTS[v]
       if (!shift) { work++; return }
+      const isFlexible = shift.flexible === true
       const dayPunches = ep.filter(p => p.date === s.date)
       const clockInPunch = dayPunches.find(p => p.punch_type === '上班')
       const clockOutPunch = dayPunches.find(p => p.punch_type === '下班')
@@ -111,6 +112,32 @@ function getAttendanceData(eid, schedules, punches, emp) {
       if (resolved?.overridden || resolvedOut?.overridden) overrideCount++
       const countsAsWorked = resolved ? (resolved.countsAsWorked !== false) : true
       if (countsAsWorked) work++
+
+      // 彈性班：不判遲到/早退，只記錄打卡時間
+      if (isFlexible) {
+        let inHM = null, outHM = null, hours = null
+        const inTime = resolved?.clockIn || clockInPunch?.time
+        const outTime = resolvedOut?.clockOut || clockOutPunch?.time
+        if (inTime) { const [h, m] = taipeiHM(inTime); inHM = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}` }
+        if (outTime) { const [h, m] = taipeiHM(outTime); outHM = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}` }
+        if (inTime && outTime) {
+          const inT = new Date(inTime).getTime(), outT = new Date(outTime).getTime()
+          if (outT > inT) hours = +((outT - inT) / 3600000).toFixed(2)
+        }
+        dailyPunches.push({
+          date: s.date, shift: v, clockIn: inHM, clockOut: outHM, hours,
+          isLate: false, lateMin: 0, isEarly: false, earlyMin: 0,
+          override: !!(resolved?.overridden || resolvedOut?.overridden),
+          missingIn: !clockInPunch, missingOut: !clockOutPunch, flexible: true,
+        })
+        const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' })
+        if (s.date < today) {
+          if (clockInPunch && !clockOutPunch) missingPunch.push({ date: s.date, missing: '下班' })
+          else if (!clockInPunch && clockOutPunch) missingPunch.push({ date: s.date, missing: '上班' })
+          else if (!clockInPunch && !clockOutPunch) missingPunch.push({ date: s.date, missing: '全缺' })
+        }
+        return
+      }
 
       let dayIsLate = false, dayLateMin = 0, dayIsEarly = false, dayEarlyMin = 0
       let inHM = null, outHM = null

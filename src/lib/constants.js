@@ -1,6 +1,7 @@
 export const SHIFTS = {
   '早班': { start: '12:00', end: '21:00', hours: 9, startH: 12, startM: 0, endH: 21, endM: 0 },
   '晚班': { start: '15:00', end: '00:00', hours: 9, startH: 15, startM: 0, endH: 24, endM: 0 },
+  '彈性班': { start: null, end: null, hours: 9, flexible: true },  // 不固定時段、做滿 9 小時、不判遲到/早退
   '休假': { start: null, end: null, hours: 0 },
 }
 

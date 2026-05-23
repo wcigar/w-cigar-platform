@@ -53,9 +53,11 @@ export default function PunchAll() {
   function diagnose(r) {
     const emp = empMap[r.employee_id]
     const isPT = emp?.emp_type === 'PT'
-    if (isPT) return { isLate: false, isEarly: false, lateMin: 0, earlyMin: 0, valid: r.is_valid !== false, override: !!r.manual_override }
+    if (isPT) return { isLate: false, isEarly: false, lateMin: 0, earlyMin: 0, valid: r.is_valid !== false, override: !!r.manual_override, flexible: false }
     const s = schMap[`${r.employee_id}|${r.date}`]
     const v = s?.shift
+    // 彈性班：不判遲到/早退
+    if (v === '彈性班') return { isLate: false, isEarly: false, lateMin: 0, earlyMin: 0, valid: r.is_valid !== false, override: !!r.manual_override, flexible: true }
     const shift = (v === '早班' || v === '晚班') ? SHIFTS[v] : null
     let isLate = false, lateMin = 0, isEarly = false, earlyMin = 0
     if (shift && r.time) {
@@ -70,7 +72,7 @@ export default function PunchAll() {
         if (pm < em) { isEarly = true; earlyMin = em - pm }
       }
     }
-    return { isLate, lateMin, isEarly, earlyMin, valid: r.is_valid !== false, override: !!r.manual_override }
+    return { isLate, lateMin, isEarly, earlyMin, valid: r.is_valid !== false, override: !!r.manual_override, flexible: false }
   }
 
   const enriched = useMemo(() => {
@@ -232,6 +234,7 @@ export default function PunchAll() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                       <span style={{ fontSize: 14, fontWeight: 600 }}>{r.empName}</span>
                       {r.isPT && <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 8, background: 'rgba(196,163,90,.15)', color: '#c9a84c' }}>PT</span>}
+                      {r.flexible && <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 8, background: 'rgba(196,163,90,.15)', color: '#c9a84c' }}>彈性班</span>}
                       <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: r.punch_type === '上班' ? 'rgba(100,170,100,.15)' : 'rgba(77,140,196,.15)', color: r.punch_type === '上班' ? 'rgba(100,170,100,.9)' : 'rgba(77,140,196,.9)' }}>{r.punch_type}</span>
                       <span style={{ fontSize: 13, fontFamily: 'var(--font-mono)', color: r.isLate ? 'var(--red)' : r.isEarly ? '#f59e0b' : 'var(--text)', fontWeight: r.isLate || r.isEarly ? 700 : 400 }}>{r.time ? toTaipei(r.time, true) : '—'}</span>
                       {r.isLate && <span style={{ fontSize: 11, color: 'var(--red)', fontWeight: 700 }}>🔴遲到 {r.lateMin}分</span>}

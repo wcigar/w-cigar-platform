@@ -10,7 +10,8 @@ import { format, startOfMonth, endOfMonth, addMonths, subMonths, eachDayOfInterv
 import SmartScheduleBtn from '../../components/SmartSchedule'
 
 const WEEKDAYS = ['日','一','二','三','四','五','六']
-const ALL_SHIFTS = ['早班','晚班',...LEAVE_TYPES,'']
+const ALL_SHIFTS = ['早班','晚班','彈性班',...LEAVE_TYPES,'']
+const WORK_SHIFTS = ['早班','晚班','彈性班']
 
 export default function HRSchedule() {
   const [month, setMonth] = useState(new Date())
@@ -73,10 +74,10 @@ export default function HRSchedule() {
   async function loadLogs() { const { data } = await supabase.from('audit_logs').select('*').order('time', { ascending: false }).limit(50); setLogs(data || []) }
   useEffect(() => { if (tab === 'audit') loadLogs() }, [tab])
 
-  const shiftColors = { '早班': '#3dd68c', '晚班': '#4d8ac4', '休假': '#ff9a9a', '臨時請假': '#ff9a9a', '病假': '#ffb347', '事假': '#ffd700', '特休': '#64c8ff' }
+  const shiftColors = { '早班': '#3dd68c', '晚班': '#4d8ac4', '彈性班': '#c9a84c', '休假': '#ff9a9a', '臨時請假': '#ff9a9a', '病假': '#ffb347', '事假': '#ffd700', '特休': '#64c8ff' }
   const tabs = [{ id: 'schedule', l: '排班表' }, { id: 'holidays', l: `國定假日 (${monthHolidays.length})` }, { id: 'punch', l: '打卡紀錄' }, { id: 'leave', l: '假單審核' }, { id: 'weekly', l: '📊 週會報表' }, { id: 'audit', l: '稽核日誌' }]
 
-  const holWorkCount = scheds.filter(s => (s.shift === '早班' || s.shift === '晚班') && isHoliday(s.date)).length
+  const holWorkCount = scheds.filter(s => (WORK_SHIFTS.includes(s.shift)) && isHoliday(s.date)).length
   const holRestCount = scheds.filter(s => s.shift === '休假' && isHoliday(s.date)).length
 
   if (loading && tab === 'schedule') return <div className="page-container"><div className="loading-shimmer" style={{ height: 400 }} /></div>
@@ -119,9 +120,9 @@ export default function HRSchedule() {
           </div>
           {emps.map(emp => {
             const es = scheds.filter(s => s.employee_id === emp.id)
-            const work = es.filter(s => s.shift === '早班' || s.shift === '晚班').length
+            const work = es.filter(s => WORK_SHIFTS.includes(s.shift)).length
             const off = es.filter(s => LEAVE_TYPES.includes(s.shift) || s.shift === '休假').length
-            const holWork = es.filter(s => (s.shift === '早班' || s.shift === '晚班') && isHoliday(s.date)).length
+            const holWork = es.filter(s => (WORK_SHIFTS.includes(s.shift)) && isHoliday(s.date)).length
             return <div key={emp.id} style={{ padding: '6px 10px', background: 'var(--black-card)', border: '1px solid var(--border)', borderRadius: 10, fontSize: 10, whiteSpace: 'nowrap', textAlign: 'center' }}>
               <div style={{ fontWeight: 700, color: 'var(--gold)' }}>{emp.name}</div>
               <div style={{ color: 'var(--text-dim)', marginTop: 2 }}>上{work} 休{off}/{restQuota}{holWork > 0 && <span style={{ color: 'var(--red)' }}> 國假{holWork}</span>}</div>
@@ -152,7 +153,7 @@ export default function HRSchedule() {
                 const isToday = isSameDay(day, new Date())
                 const hol = isHoliday(ds)
                 const holName = getHolidayName(ds)
-                const working = emps.filter(e => { const s = getShift(e.id, ds); return s?.shift === '早班' || s?.shift === '晚班' }).length
+                const working = emps.filter(e => { const s = getShift(e.id, ds); return WORK_SHIFTS.includes(s?.shift) }).length
                 return (
                   <tr key={ds} style={{ background: isToday ? 'rgba(201,168,76,.1)' : hol ? 'rgba(196,77,77,.06)' : isFri ? 'rgba(201,168,76,.03)' : undefined, border: isToday ? '2px solid rgba(201,168,76,.5)' : undefined }}>
                     <td style={{ position: 'sticky', left: 0, background: isToday ? 'rgba(201,168,76,.15)' : hol ? 'rgba(196,77,77,.08)' : 'var(--black-card)', zIndex: 1, fontWeight: isToday ? 800 : 600, fontSize: isToday ? 13 : 11, whiteSpace: 'nowrap' }}>
@@ -201,7 +202,7 @@ export default function HRSchedule() {
               <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--red)', marginBottom: 6 }}>本月國假 ({monthHolidays.length}天)</div>
               {monthHolidays.map(h => {
                 const d = new Date(h.date), dow = WEEKDAYS[d.getDay()]
-                const workers = scheds.filter(s => s.date === h.date && (s.shift === '早班' || s.shift === '晚班'))
+                const workers = scheds.filter(s => s.date === h.date && (WORK_SHIFTS.includes(s.shift)))
                 const resters = scheds.filter(s => s.date === h.date && s.shift === '休假')
                 return <div key={h.date} className="card" style={{ padding: 12, marginBottom: 6, borderColor: 'rgba(196,77,77,.2)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ fontWeight: 600, color: 'var(--red)' }}>🔴 {h.name}</span><span style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{h.date.slice(5)} ({dow})</span></div>
