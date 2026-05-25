@@ -167,3 +167,24 @@ nav button, nav a { font-size: 13px !important; padding: 8px 4px !important; }
     bottom: 64px !important;
   }
 }
+
+/* ===== 全站字體放大（Wilson 5/25 要求「明顯一點」） =====
+   行內小字 px 寫死、media query 無法覆蓋 → 用 attribute selector
+   逐級放大、不破壞 layout，每個 step +2px、bolder font-weight */
+[style*="font-size:9px"],  [style*="font-size: 9px"]  { font-size: 11px !important; }
+[style*="font-size:10px"], [style*="font-size: 10px"] { font-size: 12px !important; }
+[style*="font-size:11px"], [style*="font-size: 11px"] { font-size: 13px !important; }
+[style*="font-size:12px"], [style*="font-size: 12px"] { font-size: 14px !important; font-weight: 500; }
+[style*="font-size:13px"], [style*="font-size: 13px"] { font-size: 15px !important; }
+[style*="font-size:14px"], [style*="font-size: 14px"] { font-size: 16px !important; }
+
+/* 全站 dim/muted 顏色拉亮 → 明顯一點不刺眼 */
+[style*="color: var(--text-dim)"],  [style*="color:var(--text-dim)"]  { color: #c4baa8 !important; }
+[style*="color: var(--text-muted)"], [style*="color:var(--text-muted)"] { color: #9a907e !important; }
+
+/* section-title 加重 */
+.section-title { font-weight: 700 !important; letter-spacing: 0.5px; }
+
+/* 表格、card 整體 line-height 拉開 → 透氣感 */
+.card { line-height: 1.55; }
+table { line-height: 1.5; }
