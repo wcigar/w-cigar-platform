@@ -131,8 +131,10 @@ export default function StaffExpense() {
       const { error } = await supabase.storage.from('photos').upload(path, photos[i])
       if (!error) { const { data } = supabase.storage.from('photos').getPublicUrl(path); photoUrls.push(data.publicUrl) }
     }
-    await supabase.from('expenses').insert({ date: today, category: form.category, vendor: form.vendor, item: form.item || form.category, amount: +form.amount, payment: form.payment, handler: user.name, submitted_by: user.employee_id, photo_url: photoUrls.length > 1 ? JSON.stringify(photoUrls) : (photoUrls[0] || ''), note: (noReceipt ? '[無收據:' + noReceiptReason + '] ' : '') + form.note })
-    setSubmitting(false); alert('支出已提交！')
+    const { data: insertData, error: insertErr } = await supabase.from('expenses').insert({ date: today, category: form.category, vendor: form.vendor, item: form.item || form.category, amount: +form.amount, payment: form.payment, handler: user.name, submitted_by: user.employee_id, photo_url: photoUrls.length > 1 ? JSON.stringify(photoUrls) : (photoUrls[0] || ''), note: (noReceipt ? '[無收據:' + noReceiptReason + '] ' : '') + form.note }).select().single()
+    setSubmitting(false)
+    if (insertErr) { alert('❌ 提交失敗: ' + insertErr.message + '\n\n請截圖傳給老闆'); console.error('expenses insert error:', insertErr); return }
+    alert('✅ 支出已提交（ID: ' + insertData?.id + '）')
     setForm({ category: '', vendor: '', item: '', amount: '', payment: '現金', note: '' }); setPhotos([]); setPreviews([]); setNoReceipt(false); setNoReceiptReason(''); load()
   }
 
