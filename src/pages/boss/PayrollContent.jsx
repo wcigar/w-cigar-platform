@@ -220,12 +220,13 @@ function getAttendanceData(eid, schedules, punches, emp) {
 /* ================================================================
    薪資計算（統一實際出勤天數）
    ================================================================ */
-function calcSalaryToDate(emp, cfg, bonusDefs, att, isCurrentMonth, targetDate) {
+function calcSalaryToDate(emp, cfg, bonusDefs, att, isCurrentMonth, targetDate, empPenalties = []) {
   const year = targetDate.getFullYear(), monthNum = targetDate.getMonth() + 1
   const daysInMonth = new Date(year, monthNum, 0).getDate()
   const dayOfMonth = targetDate.getDate()
+  const sopPenaltyTotal = (empPenalties || []).reduce((s, p) => s + (+p.amount || 0), 0)
 
-  // PT：純時薪制 — 打卡時數 × 時薪，無遲到/早退/勞健保扣款
+  // PT：純時薪制 — 打卡時數 × 時薪，無遲到/早退/勞健保扣款；SOP 罰款仍扣
   if (att?.isPT || emp?.emp_type === 'PT') {
     const hourlyBase = +(cfg.hourly_rate || cfg.monthly_salary || 0)
     const totalHours = +att.totalPunchHours || 0
@@ -241,8 +242,9 @@ function calcSalaryToDate(emp, cfg, bonusDefs, att, isCurrentMonth, targetDate) 
       otPay: 0, otDetails: [],
       sickDeduct: 0, personalDeduct: 0, absentDeduct: 0,
       li: 0, hi: 0, lp: 0, liER: 0, hiER: 0, lb: 0,
-      totalBonuses: otherBonusTotal, totalDeductions: 0,
-      currentPayable: proratedBase + otherBonusTotal,
+      sopPenalties: empPenalties || [], sopPenaltyTotal,
+      totalBonuses: otherBonusTotal, totalDeductions: sopPenaltyTotal,
+      currentPayable: proratedBase + otherBonusTotal - sopPenaltyTotal,
       erCost: proratedBase + otherBonusTotal,
       att, isPT: true,
     }
@@ -276,7 +278,7 @@ function calcSalaryToDate(emp, cfg, bonusDefs, att, isCurrentMonth, targetDate) 
   const li = calcLaborIns(monthlyBase), hi = calcHealthIns(monthlyBase)
   const lp = calcLaborPension(monthlyBase), liER = calcLaborInsER(monthlyBase), hiER = calcHealthInsER(monthlyBase)
   const lb = findBracket(monthlyBase, LABOR_INS_BRACKETS)
-  const totalDeductions = li + hi + sickDeduct + personalDeduct + absentDeduct
+  const totalDeductions = li + hi + sickDeduct + personalDeduct + absentDeduct + sopPenaltyTotal
   const currentPayable = proratedBase + totalBonuses - totalDeductions
   const erCost = proratedBase + totalBonuses + liER + hiER + lp
 
@@ -285,6 +287,7 @@ function calcSalaryToDate(emp, cfg, bonusDefs, att, isCurrentMonth, targetDate) 
     actualWorkedDays: att.work, proratedBase, empBonuses, otherBonuses,
     attendanceBonus: { def: attendanceBonusDef, amount: attendanceBonusAmount, status: attendanceBonusStatus, effective: effectiveAttendanceBonus },
     otPay, otDetails: att.otDetails, sickDeduct, personalDeduct, absentDeduct,
+    sopPenalties: empPenalties || [], sopPenaltyTotal,
     li, hi, lp, liER, hiER, lb, totalBonuses, totalDeductions, currentPayable, erCost, att,
   }
 }
@@ -302,6 +305,7 @@ export default function Payroll() {
   const [expenses, setExpenses] = useState([])
   const [schedules, setSchedules] = useState([])
   const [punches, setPunches] = useState([])
+  const [sopPenalties, setSopPenalties] = useState([])
   const [expanded, setExpanded] = useState(null)
   const [editingSal, setEditingSal] = useState(null)
   const [newBonus, setNewBonus] = useState({ employee_id: '', bonus_name: '', amount: '' })
@@ -340,17 +344,19 @@ export default function Payroll() {
     setLoading(true)
     const s = month + '-01'
     const e = isCurrentMonth ? todayStr : format(endOfMonth(new Date(month + '-01')), 'yyyy-MM-dd')
-    const [eR, sR, bR, xR, scR, pR] = await Promise.all([
+    const [eR, sR, bR, xR, scR, pR, penR] = await Promise.all([
       supabase.from('employees').select('*').eq('enabled', true).order('name'),
       supabase.rpc('get_salary_configs', { p_admin_id: user?.employee_id }),
       supabase.rpc('get_bonus_definitions', { p_admin_id: user?.employee_id }),
       supabase.from('expenses').select('*').gte('date', s).lte('date', e).order('date', { ascending: false }),
       supabase.from('schedules').select('*').gte('date', s).lte('date', e),
       supabase.from('punch_records').select('*').gte('date', s).lte('date', e),
+      supabase.from('sop_penalties').select('*').gte('date', s).lte('date', e),
     ])
     setEmps((eR.data || []).filter(x => !x.is_admin))
     setSalConfigs(sR.data || []); setBonuses(bR.data || [])
     setExpenses(xR.data || []); setSchedules(scR.data || []); setPunches(pR.data || [])
+    setSopPenalties(penR?.data || [])
     // 載入薪資手動調整
     try {
       const { data: adjData } = await supabase.rpc('get_payroll_adjustments', { p_admin_id: user?.employee_id, p_month: month })
@@ -366,7 +372,8 @@ export default function Payroll() {
     const cfg = getCfg(emp.id)
     const att = getAttendanceData(emp.id, schedules, punches, emp)
     const targetDate = isCurrentMonth ? today : new Date(yr, mo - 1, daysInMonth)
-    return calcSalaryToDate(emp, cfg, bonuses, att, isCurrentMonth, targetDate)
+    const empPenalties = sopPenalties.filter(p => p.employee_id === emp.id)
+    return calcSalaryToDate(emp, cfg, bonuses, att, isCurrentMonth, targetDate, empPenalties)
   }
 
   async function saveSalConfig(eid) {
@@ -678,6 +685,21 @@ export default function Payroll() {
                 {p.personalDeduct>0&&<R label={`- 事假${p.att.personal}天`} value={-p.personalDeduct} negative/>}
                 {p.absentDeduct>0&&<R label={`- 曠職${p.att.absent}天`} value={-p.absentDeduct} negative/>}
               </>)}
+              {p.sopPenaltyTotal > 0 && (
+                <div style={{marginTop:8,padding:8,background:'rgba(196,77,77,.08)',borderRadius:6,border:'1px solid rgba(196,77,77,.25)'}}>
+                  <div style={{fontSize:11,fontWeight:700,color:'var(--red)',marginBottom:4}}>📛 SOP 罰款（環境整潔拍照未完成）</div>
+                  {(p.sopPenalties || []).map((sp, i) => (
+                    <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'2px 0',fontSize:11,color:'var(--text-dim)'}}>
+                      <span>{sp.date} · {sp.task_title}</span>
+                      <span style={{fontFamily:'var(--font-mono)',color:'var(--red)',fontWeight:700}}>-${(+sp.amount).toLocaleString()}</span>
+                    </div>
+                  ))}
+                  <div style={{display:'flex',justifyContent:'space-between',padding:'4px 0 0',marginTop:4,borderTop:'1px solid rgba(196,77,77,.2)',fontSize:12,fontWeight:700}}>
+                    <span style={{color:'var(--red)'}}>合計</span>
+                    <span style={{fontFamily:'var(--font-mono)',color:'var(--red)'}}>-${p.sopPenaltyTotal.toLocaleString()}</span>
+                  </div>
+                </div>
+              )}
               <div style={{height:2,background:'var(--gold)',margin:'8px 0'}}/>
               <R label="＝ 系統計算" value={p.currentPayable} highlight/>
               {/* 手動覆寫摘要 */}
