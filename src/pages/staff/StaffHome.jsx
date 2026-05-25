@@ -141,6 +141,10 @@ export default function StaffHome() {
       // 跨夜安全：punch_records.date 必須用 RPC 回傳的 active_date，避免晚班跨午夜後寫成隔天日期
       const punchDate = punchStatus?.active_date || ((type === '下班' && crossDayPunchDate) ? crossDayPunchDate : today)
       await supabase.from('punch_records').insert({ date: punchDate, employee_id: user.employee_id, name: user.name, punch_type: type, photo_url: photoUrl || null, lat, lng, distance_m: Math.round(dist), is_valid: valid })
+      // 打卡成功 → 立即觸發 staff-reminders 推播確認音到員工 LINE 群（fire-and-forget）
+      if (valid) {
+        supabase.functions.invoke('staff-reminders', { body: {} }).catch(() => {})
+      }
       if (valid) {
         const msgs = ['今天也是充滿雪茄香氣的一天！🚬','每一支雪茄背後都有你的專業服務 💎','好的開始是成功的一半，準備好迎接貴客了！✨','專業、熱情、細心 — 這就是你 🌟','讓每位客人都感受到 VIP 尊榮 👑','今天的努力是明天的業績 💰','雪茄不只是商品，是一種生活態度 🎩','服務從微笑開始，業績從細節累積 📈','你的專業讓每支雪茄都更有價值 🏆','準備好了嗎？今天又是滿分服務日！⭐','細心呵護每一位會員的窖藏 🗄️','用心推薦，讓客人找到命定的那支 💫','每一次開櫃都是信任的延續 🔑','你不只是店員，你是雪茄管家 🎯','今天的一杯好茶配一支好茄 = 完美 ☕']
         setMotivation({ text: msgs[Math.floor(Math.random() * msgs.length)], type })
