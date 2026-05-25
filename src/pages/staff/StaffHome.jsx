@@ -272,14 +272,14 @@ export default function StaffHome() {
 
         {/* SOP 進度 */}
         <div className="wcb-card">
-          <div style={{display:'flex',justifyContent:'space-between',marginBottom:10}}><span style={{fontFamily:'var(--serif)',fontSize:12,color:'var(--ash)'}}>SOP 進度</span><span style={{fontFamily:'var(--mono)',fontSize:13,color:'rgba(196,163,90,.7)'}}>{done} / {tasks.length}</span></div>
+          <div style={{display:'flex',justifyContent:'space-between',marginBottom:10}}><span style={{fontFamily:'var(--serif)',fontSize:14,color:'var(--bone)',fontWeight:600}}>SOP 進度</span><span style={{fontFamily:'var(--mono)',fontSize:15,color:'rgba(196,163,90,1)',fontWeight:700}}>{done} / {tasks.length}</span></div>
           <div className="wcb-progress-track"><div className="wcb-progress-fill" style={{width:`${sopPct}%`}}/></div>
           <div className="wcb-sep"/>
           {tasks.slice(0,5).map(t => (
-            <div key={t.id} style={{display:'flex',alignItems:'center',gap:14,padding:'11px 0',borderBottom:'1px solid rgba(196,163,90,.03)'}}>
-              <div style={{width:18,height:18,borderRadius:5,flexShrink:0,border:`1px solid rgba(196,163,90,${t.completed?.15:.08})`,display:'flex',alignItems:'center',justifyContent:'center',...(t.completed?{background:'rgba(196,163,90,.1)'}:{})}}>{t.completed&&<span style={{fontSize:9,color:'rgba(196,163,90,.7)'}}>✓</span>}</div>
-              <span style={{fontFamily:'var(--serif)',fontSize:13,color:t.completed?'rgba(232,220,200,.3)':'rgba(232,220,200,.85)',flex:1,...(t.completed?{textDecoration:'line-through',textDecorationColor:'rgba(196,163,90,.1)'}:{})}}>{t.title}</span>
-              {t.due_time&&<span style={{fontFamily:'var(--mono)',fontSize:9,color:'rgba(196,163,90,.25)',letterSpacing:1}}>{t.due_time}</span>}
+            <div key={t.id} style={{display:'flex',alignItems:'center',gap:14,padding:'11px 0',borderBottom:'1px solid rgba(196,163,90,.08)'}}>
+              <div style={{width:22,height:22,borderRadius:6,flexShrink:0,border:`1.5px solid ${t.completed?'rgba(77,168,108,.7)':'rgba(196,163,90,.4)'}`,display:'flex',alignItems:'center',justifyContent:'center',...(t.completed?{background:'rgba(77,168,108,.2)'}:{})}}>{t.completed&&<span style={{fontSize:14,color:'#4da86c',fontWeight:900,lineHeight:1}}>✓</span>}</div>
+              <span style={{fontFamily:'var(--serif)',fontSize:14,color:t.completed?'rgba(232,220,200,.55)':'rgba(232,220,200,1)',fontWeight:t.completed?400:500,flex:1,...(t.completed?{textDecoration:'line-through',textDecorationColor:'rgba(196,163,90,.3)'}:{})}}>{t.title}</span>
+              {t.due_time&&<span style={{fontFamily:'var(--mono)',fontSize:11,color:'rgba(196,163,90,.7)',letterSpacing:1,fontWeight:600}}>{t.due_time}</span>}
             </div>
           ))}
         </div>

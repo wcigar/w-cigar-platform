@@ -97,7 +97,7 @@ export default function BossHome() {
 
   // === 主要 menu（5 個常用）===
   const mainCards = [
-    { icon: Briefcase, label: '營運管理', sub: 'SOP ' + stats.sop + '% · 異常 ' + stats.abnPending, path: '/operations', color: 'var(--gold)' },
+    { icon: Briefcase, label: '營運管理', sub: 'SOP ' + stats.sop + '% · 異常 ' + stats.abnPending, path: '/operations', color: '#c9a84c' },
     { icon: Users, label: '人事排班', sub: '今日 ' + stats.working + ' 人 · 假單 ' + stats.leavePending, path: '/hr', color: '#4da86c' },
     { icon: DollarSign, label: '薪資財務', sub: '薪資 · 支出 · 勞健保', path: '/payroll', color: '#4d8ac4' },
     { icon: Package, label: '庫存盤點', sub: '進貨 · 庫存 · 盤點', path: '/boss-inventory', color: '#7a8c4d' },
