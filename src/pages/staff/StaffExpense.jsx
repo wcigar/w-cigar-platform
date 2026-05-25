@@ -70,6 +70,7 @@ export default function StaffExpense() {
   const [showCashForm, setShowCashForm] = useState(false)
   const [newCatName, setNewCatName] = useState('')
   const [newVendorName, setNewVendorName] = useState('')
+  const [showAddVendor, setShowAddVendor] = useState(false)
   const [cashForm, setCashForm] = useState({ amount: '', method: '現金', given_by: 'Wilson', note: '' })
   const [showSign, setShowSign] = useState(false)
   const [editing, setEditing] = useState(null)
@@ -300,21 +301,30 @@ export default function StaffExpense() {
             ))}
           </div>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 6 }}>廠商（選填）</div>
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 14, maxHeight: 80, overflowY: 'auto' }}>
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8, maxHeight: 80, overflowY: 'auto' }}>
             {vendors.filter(v => !form.category || v.category === form.category || !v.category).map(v => (
               <button key={v.id} onClick={() => { setForm(p => ({ ...p, vendor: v.name })); if (v.category && !form.category) setForm(p => ({ ...p, category: v.category })) }} style={{ padding: '5px 10px', borderRadius: 12, fontSize: 11, cursor: 'pointer', background: form.vendor === v.name ? 'rgba(77,168,108,.1)' : 'transparent', color: form.vendor === v.name ? 'var(--green)' : 'var(--text-muted)', border: form.vendor === v.name ? '1px solid rgba(77,168,108,.3)' : '1px solid var(--border)' }}>{v.name}</button>
             ))}
             <input placeholder="或手動輸入" value={vendors.some(v => v.name === form.vendor) ? '' : form.vendor} onChange={e => setForm(p => ({ ...p, vendor: e.target.value }))} style={{ flex: 1, minWidth: 80, fontSize: 11, padding: '5px 10px' }} />
-            {newVendorName === '' ? (
-              <button onClick={() => setNewVendorName(' ')} style={{ padding: '5px 10px', borderRadius: 12, fontSize: 11, cursor: 'pointer', background: 'transparent', color: 'var(--green)', border: '1px dashed rgba(77,168,108,.4)', whiteSpace: 'nowrap' }}>+ 廠商</button>
-            ) : (
-              <div style={{ display: 'flex', gap: 4, alignItems: 'center', width: '100%', marginTop: 6 }}>
-                <input placeholder="廠商名稱" value={newVendorName.trim()} onChange={e => setNewVendorName(e.target.value)} style={{ flex: 1, fontSize: 12, padding: '6px 8px', minHeight: 32 }} />
-                <button onClick={async () => { if (!newVendorName.trim()) return; await supabase.from('expense_vendors').insert({ name: newVendorName.trim(), category: form.category || '', enabled: true }); setNewVendorName(''); load() }} style={{ padding: '6px 10px', borderRadius: 10, fontSize: 11, fontWeight: 700, cursor: 'pointer', background: 'rgba(77,168,108,.12)', color: 'var(--green)', border: '1px solid rgba(77,168,108,.3)' }}>✓</button>
-                <button onClick={() => setNewVendorName('')} style={{ padding: '6px 8px', borderRadius: 10, fontSize: 11, cursor: 'pointer', background: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>✕</button>
-              </div>
-            )}
           </div>
+          {!showAddVendor ? (
+            <button onClick={() => setShowAddVendor(true)} style={{ marginBottom: 14, padding: '6px 12px', borderRadius: 12, fontSize: 12, cursor: 'pointer', background: 'transparent', color: 'var(--green)', border: '1px dashed rgba(77,168,108,.4)', whiteSpace: 'nowrap' }}>+ 新增廠商到清單</button>
+          ) : (
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 14 }}>
+              <input autoFocus placeholder="廠商名稱（永久存清單）" value={newVendorName} onChange={e => setNewVendorName(e.target.value)} style={{ flex: 1, fontSize: 13, padding: '8px 10px', minHeight: 36 }} />
+              <button onClick={async () => {
+                const name = newVendorName.trim()
+                if (!name) return alert('請輸入廠商名稱')
+                const { error } = await supabase.from('expense_vendors').insert({ name, category: form.category || '', enabled: true })
+                if (error) { alert('❌ 新增失敗: ' + error.message + '\n\n請截圖傳給老闆'); console.error('expense_vendors insert error:', error); return }
+                setForm(p => ({ ...p, vendor: name }))
+                setNewVendorName('')
+                setShowAddVendor(false)
+                load()
+              }} style={{ padding: '8px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer', background: 'rgba(77,168,108,.12)', color: 'var(--green)', border: '1px solid rgba(77,168,108,.3)', whiteSpace: 'nowrap' }}>✓ 加入</button>
+              <button onClick={() => { setNewVendorName(''); setShowAddVendor(false) }} style={{ padding: '8px 10px', borderRadius: 10, fontSize: 12, cursor: 'pointer', background: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>✕</button>
+            </div>
+          )}
           <input placeholder="品項說明（選填）" value={form.item} onChange={e => setForm(p => ({ ...p, item: e.target.value }))} style={{ marginBottom: 8, fontSize: 14, padding: 12 }} />
           <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
             <div style={{ flex: 1, position: 'relative' }}>
