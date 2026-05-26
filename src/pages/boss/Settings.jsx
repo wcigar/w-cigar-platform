@@ -99,7 +99,11 @@ function EmployeeManager() {
       p_salary_type: editing.salary_type,
       p_salary_amount: Number(editing.salary_amount || 0),
       p_phone: editing.phone || '',
-      p_hire_date: editing.hire_date || null
+      p_hire_date: editing.hire_date || null,
+      p_labor_ins_date: editing.labor_ins_date || null,
+      p_labor_ins_end_date: editing.labor_ins_end_date || null,
+      p_health_ins_date: editing.health_ins_date || null,
+      p_health_ins_end_date: editing.health_ins_end_date || null
     })
     if (error) { alert('儲存失敗：' + error.message); return }
     setEditing(null); load()
@@ -138,6 +142,22 @@ function EmployeeManager() {
               <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                 <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>入職</label>
                 <input type="date" value={editing.hire_date || ''} onChange={e => setEditing(p => ({ ...p, hire_date: e.target.value }))} style={{ width: 140, fontSize: 13, padding: 8 }} />
+              </div>
+              <div style={{ marginBottom: 4, padding: 8, background: 'rgba(77,138,196,.04)', borderRadius: 6, border: '1px solid rgba(77,138,196,.15)' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--blue)', marginBottom: 6 }}>🏛️ 勞健保（合規台灣勞保條例 §6/§12、健保法 §13/§15）</div>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <label style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 60 }}>勞保加保</label>
+                  <input type="date" value={editing.labor_ins_date || ''} onChange={e => setEditing(p => ({ ...p, labor_ins_date: e.target.value }))} style={{ width: 140, fontSize: 13, padding: 8 }} />
+                  <label style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 60 }}>勞保退保</label>
+                  <input type="date" value={editing.labor_ins_end_date || ''} onChange={e => setEditing(p => ({ ...p, labor_ins_end_date: e.target.value }))} style={{ width: 140, fontSize: 13, padding: 8 }} />
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <label style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 60 }}>健保加保</label>
+                  <input type="date" value={editing.health_ins_date || ''} onChange={e => setEditing(p => ({ ...p, health_ins_date: e.target.value }))} style={{ width: 140, fontSize: 13, padding: 8 }} />
+                  <label style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 60 }}>健保退保</label>
+                  <input type="date" value={editing.health_ins_end_date || ''} onChange={e => setEditing(p => ({ ...p, health_ins_end_date: e.target.value }))} style={{ width: 140, fontSize: 13, padding: 8 }} />
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 6 }}>留空 = 不限期間（一直在保）。月中加退保系統自動按日比例計算保費。</div>
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <input value={editing.login_code} onChange={e => setEditing(p => ({ ...p, login_code: e.target.value }))} placeholder="登入碼" type="password" style={{ flex: 1, fontSize: 13, padding: 8 }} />

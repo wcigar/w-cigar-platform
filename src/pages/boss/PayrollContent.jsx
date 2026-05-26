@@ -218,6 +218,25 @@ function getAttendanceData(eid, schedules, punches, emp) {
 }
 
 /* ================================================================
+   勞健保按日比例（台灣勞保條例 §12、健保法 §13 — 部分月按日計、分母 30）
+   - 全月在保 → 全額保費
+   - 部分月在保 → full × overlapDays / 30
+   - 完全沒在保 → 0
+   - 加退保日皆 inclusive
+   ================================================================ */
+function prorateInsurance(fullAmount, insStart, insEnd, monthStart, monthEnd) {
+  if (!insStart && !insEnd) return fullAmount
+  const s = insStart ? new Date(insStart) : new Date('1900-01-01')
+  const e = insEnd ? new Date(insEnd) : new Date('9999-12-31')
+  if (e < monthStart || s > monthEnd) return 0
+  if (s <= monthStart && e >= monthEnd) return fullAmount
+  const effStart = s > monthStart ? s : monthStart
+  const effEnd = e < monthEnd ? e : monthEnd
+  const days = Math.floor((effEnd - effStart) / 86400000) + 1
+  return Math.round(fullAmount * days / 30)
+}
+
+/* ================================================================
    薪資計算（統一實際出勤天數）
    ================================================================ */
 function calcSalaryToDate(emp, cfg, bonusDefs, att, isCurrentMonth, targetDate, empPenalties = []) {
@@ -225,6 +244,9 @@ function calcSalaryToDate(emp, cfg, bonusDefs, att, isCurrentMonth, targetDate, 
   const daysInMonth = new Date(year, monthNum, 0).getDate()
   const dayOfMonth = targetDate.getDate()
   const sopPenaltyTotal = (empPenalties || []).reduce((s, p) => s + (+p.amount || 0), 0)
+  // 勞健保按日比例計算（月初到月底範圍）
+  const monthStartDt = new Date(year, monthNum - 1, 1)
+  const monthEndDt = new Date(year, monthNum - 1, daysInMonth)
 
   // PT：純時薪制 — 打卡時數 × 時薪，無遲到/早退/勞健保扣款；SOP 罰款仍扣
   if (att?.isPT || emp?.emp_type === 'PT') {
@@ -275,8 +297,14 @@ function calcSalaryToDate(emp, cfg, bonusDefs, att, isCurrentMonth, targetDate, 
   const sickDeduct = Math.round(att.sick * dailyBase * 0.5)
   const personalDeduct = att.personal * dailyBase
   const absentDeduct = att.absent * dailyBase
-  const li = calcLaborIns(monthlyBase), hi = calcHealthIns(monthlyBase)
-  const lp = calcLaborPension(monthlyBase), liER = calcLaborInsER(monthlyBase), hiER = calcHealthInsER(monthlyBase)
+  // 勞健保按日比例計算（台灣法規）
+  const li_full = calcLaborIns(monthlyBase), hi_full = calcHealthIns(monthlyBase)
+  const lp_full = calcLaborPension(monthlyBase), liER_full = calcLaborInsER(monthlyBase), hiER_full = calcHealthInsER(monthlyBase)
+  const li   = prorateInsurance(li_full,   emp?.labor_ins_date,  emp?.labor_ins_end_date,  monthStartDt, monthEndDt)
+  const liER = prorateInsurance(liER_full, emp?.labor_ins_date,  emp?.labor_ins_end_date,  monthStartDt, monthEndDt)
+  const lp   = prorateInsurance(lp_full,   emp?.labor_ins_date,  emp?.labor_ins_end_date,  monthStartDt, monthEndDt)
+  const hi   = prorateInsurance(hi_full,   emp?.health_ins_date, emp?.health_ins_end_date, monthStartDt, monthEndDt)
+  const hiER = prorateInsurance(hiER_full, emp?.health_ins_date, emp?.health_ins_end_date, monthStartDt, monthEndDt)
   const lb = findBracket(monthlyBase, LABOR_INS_BRACKETS)
   const totalDeductions = li + hi + sickDeduct + personalDeduct + absentDeduct + sopPenaltyTotal
   const currentPayable = proratedBase + totalBonuses - totalDeductions
