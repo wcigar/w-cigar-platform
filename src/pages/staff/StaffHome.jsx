@@ -34,6 +34,12 @@ export default function StaffHome() {
   const [crossDayPunchDate, setCrossDayPunchDate] = useState(null)
   const [punchStatus, setPunchStatus] = useState(null) // 跨夜安全的打卡狀態 (RPC)
   const [showPerformance, setShowPerformance] = useState(false)
+  // 雙身份：paired employee (e.g. Daniel 正職 + Daniel_PT)
+  const [pairedEmp, setPairedEmp] = useState(null)
+  const [pairedPunchIn, setPairedPunchIn] = useState(null)
+  const [pairedPunchOut, setPairedPunchOut] = useState(null)
+  const [pairedSchedule, setPairedSchedule] = useState(null)
+  const [punchAsEmp, setPunchAsEmp] = useState(null) // null = 自己、{id,name} = paired
   const today = format(new Date(), 'yyyy-MM-dd')
   const punchCamRef = useRef(null)
   const punchCanvasRef = useRef(null)
@@ -71,6 +77,25 @@ export default function StaffHome() {
     const pIn = punchRecords.find(r => r.punch_type === '上班')
     const pOut = [...punchRecords].reverse().find(r => r.punch_type === '下班')
     setPunchIn(pIn || null); setPunchOut(pOut || null)
+
+    // 雙身份：找同 line_user_id 的另一個員工 record（e.g. Daniel 看到 Daniel_PT）
+    const { data: meRow } = await supabase.from('employees').select('line_user_id').eq('id', user.employee_id).maybeSingle()
+    if (meRow?.line_user_id) {
+      const { data: paired } = await supabase.from('employees').select('id,name,emp_type,salary_amount,salary_type').eq('line_user_id', meRow.line_user_id).neq('id', user.employee_id).eq('enabled', true).maybeSingle()
+      if (paired) {
+        setPairedEmp(paired)
+        const [pPunch, pSched] = await Promise.all([
+          supabase.from('punch_records').select('*').eq('employee_id', paired.id).eq('date', today).order('time'),
+          supabase.from('schedules').select('shift').eq('employee_id', paired.id).eq('date', today).maybeSingle(),
+        ])
+        const pps = pPunch.data || []
+        setPairedPunchIn(pps.find(r => r.punch_type === '上班') || null)
+        setPairedPunchOut([...pps].reverse().find(r => r.punch_type === '下班') || null)
+        setPairedSchedule(pSched.data || null)
+      } else {
+        setPairedEmp(null); setPairedPunchIn(null); setPairedPunchOut(null); setPairedSchedule(null)
+      }
+    }
     const counts = {}
     ;(lbRes.data || []).forEach(r => { if (r.completed_by) counts[r.completed_by] = (counts[r.completed_by] || 0) + 1 })
     setLeaderboard(Object.entries(counts).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count))
@@ -95,8 +120,8 @@ export default function StaffHome() {
     setLoading(false)
   }
 
-  function openPunchCam(type) {
-    setPunchType(type); setShowPunchCam(true)
+  function openPunchCam(type, asEmp = null) {
+    setPunchType(type); setPunchAsEmp(asEmp); setShowPunchCam(true)
     navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
       .then(stream => { setPunchStream(stream); setTimeout(() => { if (punchCamRef.current) punchCamRef.current.srcObject = stream }, 100) })
       .catch(() => alert('無法開啟相機'))
@@ -140,7 +165,9 @@ export default function StaffHome() {
       const valid = dist <= 100
       // 跨夜安全：punch_records.date 必須用 RPC 回傳的 active_date，避免晚班跨午夜後寫成隔天日期
       const punchDate = punchStatus?.active_date || ((type === '下班' && crossDayPunchDate) ? crossDayPunchDate : today)
-      await supabase.from('punch_records').insert({ date: punchDate, employee_id: user.employee_id, name: user.name, punch_type: type, photo_url: photoUrl || null, lat, lng, distance_m: Math.round(dist), is_valid: valid })
+      // 雙身份：punchAsEmp 不為 null 則打卡到該 paired identity（e.g. Daniel 主帳號打 Daniel_PT 卡）
+      const targetEmp = punchAsEmp || { id: user.employee_id, name: user.name }
+      await supabase.from('punch_records').insert({ date: punchDate, employee_id: targetEmp.id, name: targetEmp.name, punch_type: type, photo_url: photoUrl || null, lat, lng, distance_m: Math.round(dist), is_valid: valid })
       // 打卡成功 → 立即觸發 staff-reminders 推播確認音到員工 LINE 群（fire-and-forget）
       if (valid) {
         supabase.functions.invoke('staff-reminders', { body: {} }).catch(() => {})
@@ -150,6 +177,7 @@ export default function StaffHome() {
         setMotivation({ text: msgs[Math.floor(Math.random() * msgs.length)], type })
         setTimeout(() => setMotivation(null), 5000)
       } else { alert(`距離店面 ${Math.round(dist)}m，超出範圍`) }
+      setPunchAsEmp(null) // 重置雙身份打卡狀態
       load()
     }, () => alert('請開啟GPS'))
   }
@@ -252,6 +280,42 @@ export default function StaffHome() {
             <Clock size={12}/> 我的打卡紀錄
           </button>
         </div>
+
+        {/* 雙身份：PT 打卡卡片（Daniel 雙身份專用） */}
+        {pairedEmp && (() => {
+          const pShift = pairedSchedule?.shift
+          const pShiftInfo = pShift ? SHIFTS[pShift] : null
+          const isLeave = pShift && ['休假','臨時請假','病假','事假','特休','調班'].includes(pShift)
+          const canPtIn = !!pShift && !isLeave && !pairedPunchIn
+          const canPtOut = !!pShift && !isLeave && !!pairedPunchIn && !pairedPunchOut
+          return (
+            <div className="wcb-card" style={{background:'linear-gradient(160deg,rgba(20,30,42,.96),rgba(10,14,20,.99))',borderColor:'rgba(77,138,196,.3)',padding:'24px 22px',textAlign:'center',marginTop:12}}>
+              <div style={{fontFamily:'Cormorant Garamond,serif',fontSize:11,fontStyle:'italic',color:'rgba(77,138,196,.5)',letterSpacing:4}}>{pairedEmp.emp_type} Identity · {pairedEmp.name}</div>
+              <div style={{fontFamily:'var(--serif)',fontSize:13,color:'#88b8e0',marginTop:6,letterSpacing:1}}>{pairedEmp.salary_type} ${pairedEmp.salary_amount}{pairedEmp.salary_type==='時薪'?'/hr':''}{pShift && !isLeave ? ` · ${pShift}` : ''}{isLeave ? ` · ${pShift}` : ''}{!pShift ? ' · 今日未排班' : ''}</div>
+              {pShiftInfo?.start && (
+                <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8,margin:'10px 0',lineHeight:1}}>
+                  <span style={{fontFamily:'JetBrains Mono,monospace',fontSize:22,fontWeight:300,letterSpacing:3,color:'rgba(136,184,224,.85)'}}>{pShiftInfo.start}</span>
+                  <span style={{fontSize:14,color:'rgba(77,138,196,.3)'}}>—</span>
+                  <span style={{fontFamily:'JetBrains Mono,monospace',fontSize:22,fontWeight:300,letterSpacing:3,color:'rgba(136,184,224,.85)'}}>{pShiftInfo.end}</span>
+                </div>
+              )}
+              {pShift && !isLeave && (
+                <>
+                  <div style={{display:'flex',gap:16,justifyContent:'center',alignItems:'center',margin:'10px 0'}}>
+                    <div style={{display:'flex',alignItems:'center',gap:6}}><span style={{fontFamily:'var(--mono)',fontSize:9,color:'rgba(77,138,196,.4)',letterSpacing:1}}>IN</span><span style={{fontFamily:'var(--mono)',fontSize:14,color:pairedPunchIn?'rgba(100,170,100,.85)':'rgba(77,138,196,.25)'}}>{pairedPunchIn?toTaipei(pairedPunchIn.time,true):'—:—'}</span></div>
+                    <div style={{width:1,height:14,background:'rgba(77,138,196,.15)'}}/>
+                    <div style={{display:'flex',alignItems:'center',gap:6}}><span style={{fontFamily:'var(--mono)',fontSize:9,color:'rgba(77,138,196,.4)',letterSpacing:1}}>OUT</span><span style={{fontFamily:'var(--mono)',fontSize:14,color:pairedPunchOut?'rgba(136,184,224,.85)':'rgba(77,138,196,.25)'}}>{pairedPunchOut?toTaipei(pairedPunchOut.time,true):'—:—'}</span></div>
+                  </div>
+                  <div style={{display:'flex',gap:10}}>
+                    {canPtIn && <button onClick={() => openPunchCam('上班', { id: pairedEmp.id, name: pairedEmp.name })} style={{flex:1,padding:14,fontSize:14,fontFamily:'var(--serif)',letterSpacing:2,fontWeight:600,background:'linear-gradient(135deg,#4d8ac4,#3a6f9e)',color:'#fff',border:'none',borderRadius:8,cursor:'pointer'}}>{pairedEmp.emp_type} 上班打卡</button>}
+                    {canPtOut && <button onClick={() => openPunchCam('下班', { id: pairedEmp.id, name: pairedEmp.name })} style={{flex:1,padding:14,fontSize:14,fontFamily:'var(--serif)',letterSpacing:2,fontWeight:500,background:'rgba(77,138,196,.1)',color:'#88b8e0',border:'1.5px solid rgba(77,138,196,.5)',borderRadius:8,cursor:'pointer'}}>{pairedEmp.emp_type} 下班打卡</button>}
+                    {!canPtIn && !canPtOut && <div style={{flex:1,padding:'12px 16px',textAlign:'center',fontFamily:'var(--serif)',fontSize:12,color:'rgba(77,138,196,.45)',border:'1px dashed rgba(77,138,196,.2)',borderRadius:8}}>{pairedEmp.emp_type} 班已完成打卡</div>}
+                  </div>
+                </>
+              )}
+            </div>
+          )
+        })()}
 
         {/* 盤點提醒 */}
         {invReminder.length > 0 && (
