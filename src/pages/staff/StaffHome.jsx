@@ -502,12 +502,14 @@ export default function StaffHome() {
 
       {/* 打卡相機 */}
       {showPunchCam && (
-        <div className="wcb-modal-overlay" style={{alignItems:'center'}} onClick={closePunchCam}>
-          <div style={{maxWidth:420,width:'100%',textAlign:'center'}} onClick={e=>e.stopPropagation()}>
-            <div style={{fontFamily:'var(--serif)',fontSize:16,color:'var(--cream)',marginBottom:12}}>{punchType}打卡 — 請拍照</div>
-            <video ref={punchCamRef} autoPlay playsInline muted style={{width:'100%',borderRadius:14,border:'2px solid rgba(196,163,90,.3)'}}/>
+        <div className="wcb-modal-overlay" style={{alignItems:'center',padding:'20px 16px'}} onClick={closePunchCam}>
+          <div style={{maxWidth:420,width:'100%',maxHeight:'95vh',display:'flex',flexDirection:'column',textAlign:'center'}} onClick={e=>e.stopPropagation()}>
+            <div style={{fontFamily:'var(--serif)',fontSize:15,color:'var(--cream)',marginBottom:10,flexShrink:0}}>{punchType}打卡 — 請拍照</div>
+            <div style={{flexShrink:1,minHeight:0,marginBottom:12,display:'flex',alignItems:'center',justifyContent:'center'}}>
+              <video ref={punchCamRef} autoPlay playsInline muted style={{maxWidth:'100%',maxHeight:'55vh',width:'auto',height:'auto',borderRadius:14,border:'2px solid rgba(196,163,90,.3)',objectFit:'cover'}}/>
+            </div>
             <canvas ref={punchCanvasRef} style={{display:'none'}}/>
-            <div style={{display:'flex',gap:12,marginTop:16,justifyContent:'center'}}>
+            <div style={{display:'flex',gap:12,justifyContent:'center',flexShrink:0,paddingBottom:'env(safe-area-inset-bottom,8px)'}}>
               <button className="wcb-btn-gold" style={{flex:1,maxWidth:200}} onClick={capturePunchPhoto}>📸 拍照打卡</button>
               <button className="wcb-btn-outline" style={{padding:'14px 24px'}} onClick={closePunchCam}>取消</button>
             </div>
