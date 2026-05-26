@@ -272,7 +272,19 @@ function EmployeeManager() {
                   <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                     {emp.id} · {emp.title} · <span style={{ color: emp.emp_type === '正職' ? 'var(--green)' : 'var(--blue)' }}>{emp.emp_type}</span>
                     {emp.salary_amount > 0 && <span style={{ color: 'var(--gold)', marginLeft: 6 }}>· {emp.salary_type}{(+emp.salary_amount).toLocaleString()}</span>}
+                    {emp.primary_shift && <span style={{ color: 'var(--text-dim)', marginLeft: 6 }}>· {emp.primary_shift}</span>}
+                    {(emp.custom_shift_start && emp.custom_shift_end) && <span style={{ color: '#e08585', marginLeft: 6, fontFamily: 'var(--font-mono)' }}>{emp.custom_shift_start.slice(0,5)}-{emp.custom_shift_end.slice(0,5)}</span>}
                   </div>
+                  {(() => {
+                    const partner = getPartner(emp)
+                    if (partner && partner.enabled) {
+                      const ptTime = (partner.custom_shift_start && partner.custom_shift_end)
+                        ? `${partner.custom_shift_start.slice(0,5)}-${partner.custom_shift_end.slice(0,5)}`
+                        : (partner.primary_shift || '')
+                      return <div style={{ fontSize: 11, color: '#e08585', marginTop: 2 }}>🎭 PT 副身份 · {ptTime} · ${(+partner.salary_amount || 0).toLocaleString()}/hr</div>
+                    }
+                    return null
+                  })()}
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
