@@ -233,6 +233,20 @@ export default function StaffHome() {
     alert(choice === '補休' ? `✅ ${holiday_date} 已轉補休 8 hr` : `✅ ${holiday_date} 選擇加班費（請知會老闆）`)
   }
 
+  async function showLeaveBalance() {
+    const { data, error } = await supabase.rpc('leave_balance_get', { p_employee_id: user.employee_id })
+    if (error) { alert('查詢失敗: ' + error.message); return }
+    if (!data || data.length === 0) { alert('🌴 你目前沒有任何補休 / 年假餘額'); return }
+    const lines = data.map(lb => {
+      const total = (+lb.total_hours || 0).toFixed(1)
+      const expSoon = (+lb.expiring_soon || 0)
+      const exp = lb.nearest_expiry ? `\n   最近到期：${lb.nearest_expiry}` : ''
+      const warn = expSoon > 0 ? `\n   ⚠️ 含 ${expSoon.toFixed(1)} hr 60 天內到期、過期不轉加班費` : ''
+      return `${lb.leave_type}：${total} hr${exp}${warn}`
+    }).join('\n\n')
+    alert('🌴 我的休假餘額\n━━━━━━━━━\n\n' + lines)
+  }
+
   return (
     <div style={{padding:'0 20px 100px',maxWidth:460,margin:'0 auto'}}>
       <AbnormalReport show={showAbnormal} onClose={() => setShowAbnormal(false)} />
@@ -242,9 +256,10 @@ export default function StaffHome() {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
           <div style={{ background: 'var(--black-card)', border: '2px solid var(--border-gold)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 420 }}>
             <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--gold)', marginBottom: 8 }}>📋 國定假日確認</div>
-            <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 16, lineHeight: 1.6 }}>
+            <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 12, lineHeight: 1.6 }}>
               依勞基法、國定假日上班需您本人同意轉補休、或選擇加班費。請逐一確認：
             </div>
+            <button onClick={showLeaveBalance} style={{ width: '100%', marginBottom: 14, padding: 10, fontSize: 12, fontWeight: 600, background: 'rgba(77,168,108,.08)', color: 'var(--green)', border: '1px solid rgba(77,168,108,.3)', borderRadius: 8, cursor: 'pointer' }}>🌴 先查看目前補休 / 年假餘額</button>
             {pendingHolidays.map(h => (
               <div key={h.holiday_date} style={{ marginBottom: 14, padding: 12, background: 'rgba(196,77,77,.06)', borderRadius: 8, border: '1px solid rgba(196,77,77,.2)' }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>{h.holiday_date} · {h.holiday_name}</div>

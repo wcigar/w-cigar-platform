@@ -37,7 +37,7 @@ function resolvePunch(punch) {
 /* ================================================================
    出勤統計
    ================================================================ */
-function getAttendanceData(eid, schedules, punches, emp) {
+export function getAttendanceData(eid, schedules, punches, emp) {
   const es = schedules.filter(s => s.employee_id === eid)
   const ep = punches.filter(p => p.employee_id === eid && p.is_valid)
   const isPT = emp?.emp_type === 'PT'
@@ -224,7 +224,7 @@ function getAttendanceData(eid, schedules, punches, emp) {
    - 完全沒在保 → 0
    - 加退保日皆 inclusive
    ================================================================ */
-function prorateInsurance(fullAmount, insStart, insEnd, monthStart, monthEnd) {
+export function prorateInsurance(fullAmount, insStart, insEnd, monthStart, monthEnd) {
   if (!insStart && !insEnd) return fullAmount
   const s = insStart ? new Date(insStart) : new Date('1900-01-01')
   const e = insEnd ? new Date(insEnd) : new Date('9999-12-31')
@@ -239,7 +239,7 @@ function prorateInsurance(fullAmount, insStart, insEnd, monthStart, monthEnd) {
 /* ================================================================
    薪資計算（統一實際出勤天數）
    ================================================================ */
-function calcSalaryToDate(emp, cfg, bonusDefs, att, isCurrentMonth, targetDate, empPenalties = []) {
+export function calcSalaryToDate(emp, cfg, bonusDefs, att, isCurrentMonth, targetDate, empPenalties = []) {
   const year = targetDate.getFullYear(), monthNum = targetDate.getMonth() + 1
   const daysInMonth = new Date(year, monthNum, 0).getDate()
   const dayOfMonth = targetDate.getDate()
