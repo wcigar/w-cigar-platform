@@ -469,6 +469,31 @@ export default function Payroll() {
   }
   async function deleteExpense(id) { if (!confirm('刪除？')) return; await supabase.from('expenses').delete().eq('id', id); load() }
 
+  // 薪資結轉：mark 薪資已結算 + 推 LINE 通知員工
+  async function finalizeOne(emp, p) {
+    if (!confirm(`確認結轉 ${emp.name} ${month} 月薪資 $${(p.currentPayable || 0).toLocaleString()}？\n\n結轉後會：\n1. 寫入 payroll_records 表（狀態=已結轉）\n2. 推 LINE 群通知該員工\n3. 顯示在「薪資總表」`)) return
+    const adminId = user?.employee_id || 'ADMIN'
+    const records = [{
+      employee_id: emp.id,
+      base_amount: p.proratedBase || 0,
+      bonus_amount: p.totalBonuses || 0,
+      deduction_amount: p.totalDeductions || 0,
+      net_amount: p.currentPayable || 0,
+      details: { li: p.li, hi: p.hi, lp: p.lp, liER: p.liER, hiER: p.hiER, lb: p.lb, sopPenaltyTotal: p.sopPenaltyTotal || 0, otPay: p.otPay || 0 }
+    }]
+    const { data, error } = await supabase.rpc('payroll_finalize', { p_admin_id: adminId, p_month: month, p_records: records })
+    if (error) { alert('結轉失敗: ' + error.message); return }
+
+    // LINE 通知
+    const msg = `💰 薪資結轉通知（${month}）\n━━━━━━━━━━\n\n${emp.name} 您好：\n本月薪資已結算\n\n📊 實發金額：$${(p.currentPayable || 0).toLocaleString()}\n📅 月份：${month}\n\n明細請見薪資頁面、有疑問請即時反映。`
+    try {
+      const { data: pubKey } = await supabase.functions.invoke('staff-reminders', { body: { adhoc_message: msg } })
+    } catch (e) { console.error('LINE push error:', e) }
+
+    alert(`✅ ${emp.name} 薪資已結轉 $${(p.currentPayable || 0).toLocaleString()}、LINE 群通知已推`)
+    load()
+  }
+
   /* === 出勤修正操作 === */
   async function overridePunch(punchId, updates) {
     setOverrideSaving(punchId)
@@ -589,6 +614,21 @@ export default function Payroll() {
             {payslip.p.sickDeduct>0&&<R label="- 病假" value={-payslip.p.sickDeduct} negative/>}
             <div style={{height:2,background:'var(--gold)',margin:'10px 0'}}/>
             <R label="截至今日可領" value={payslip.p.currentPayable} highlight/>
+            {payslip.leaveBalance && payslip.leaveBalance.length > 0 && (
+              <div style={{ marginTop: 12, padding: 10, background: 'rgba(77,168,108,.05)', borderRadius: 6, border: '1px solid rgba(77,168,108,.2)' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--green)', marginBottom: 4 }}>🌴 休假時數</div>
+                {payslip.leaveBalance.map(lb => (
+                  <div key={lb.leave_type} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', fontSize: 12 }}>
+                    <span style={{ color: 'var(--text-dim)' }}>{lb.leave_type} 餘額{lb.expiring_soon > 0 ? ' ⚠️' : ''}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text)', fontWeight: 600 }}>
+                      {(+lb.total_hours || 0).toFixed(1)} hr
+                      {lb.expiring_soon > 0 && <span style={{ color: '#f59e0b', marginLeft: 6, fontSize: 10 }}>含 {(+lb.expiring_soon).toFixed(1)} hr 60 天內到期</span>}
+                    </span>
+                  </div>
+                ))}
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>過期補休不轉加班費、請務必休完。</div>
+              </div>
+            )}
             <div style={{display:'flex',gap:8,marginTop:16}}>
               <button className="btn-gold" style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:6}} onClick={printPayslip}><Printer size={14}/> 列印</button>
               <button className="btn-outline" style={{flex:1}} onClick={() => setPayslip(null)}>關閉</button>
@@ -765,7 +805,8 @@ export default function Payroll() {
               <SH>雇主負擔</SH>
               <R label="勞保70%" value={p.liER} dim/><R label="健保60%" value={p.hiER} dim/><R label="勞退6%" value={p.lp} dim/>
               <R label="雇主總成本" value={p.erCost} highlight/>
-              <button className="btn-outline" style={{width:'100%',marginTop:10,display:'flex',alignItems:'center',justifyContent:'center',gap:6,fontSize:13}} onClick={()=>setPayslip({emp,p})}><FileText size={14}/> 生成薪資條</button>
+              <button className="btn-outline" style={{width:'100%',marginTop:10,display:'flex',alignItems:'center',justifyContent:'center',gap:6,fontSize:13}} onClick={async()=>{const{data:lb}=await supabase.rpc('leave_balance_get',{p_employee_id:emp.id});setPayslip({emp,p,leaveBalance:lb||[]})}}><FileText size={14}/> 生成薪資條</button>
+              <button className="btn-gold" style={{width:'100%',marginTop:6,display:'flex',alignItems:'center',justifyContent:'center',gap:6,fontSize:13,background:'linear-gradient(135deg,#4d8ac4,#3a6f9e)'}} onClick={()=>finalizeOne(emp,p)}>💸 結轉本月薪資 + LINE 通知</button>
             </div>}
           </div>
         })}

@@ -34,6 +34,8 @@ export default function StaffHome() {
   const [crossDayPunchDate, setCrossDayPunchDate] = useState(null)
   const [punchStatus, setPunchStatus] = useState(null) // 跨夜安全的打卡狀態 (RPC)
   const [showPerformance, setShowPerformance] = useState(false)
+  // 國定假日轉補休同意彈窗
+  const [pendingHolidays, setPendingHolidays] = useState([])
   // 雙身份：paired employee (e.g. Daniel 正職 + Daniel_PT)
   const [pairedEmp, setPairedEmp] = useState(null)
   const [pairedPunchIn, setPairedPunchIn] = useState(null)
@@ -77,6 +79,10 @@ export default function StaffHome() {
     const pIn = punchRecords.find(r => r.punch_type === '上班')
     const pOut = [...punchRecords].reverse().find(r => r.punch_type === '下班')
     setPunchIn(pIn || null); setPunchOut(pOut || null)
+
+    // 國定假日待同意（有上班但還沒選 補休/加班費）
+    const { data: pendingH } = await supabase.rpc('holiday_pending_consents', { p_employee_id: user.employee_id })
+    setPendingHolidays(pendingH || [])
 
     // 雙身份：找同 line_user_id 的另一個員工 record（e.g. Daniel 看到 Daniel_PT）
     const { data: meRow } = await supabase.from('employees').select('line_user_id').eq('id', user.employee_id).maybeSingle()
@@ -220,9 +226,41 @@ export default function StaffHome() {
 
   if (loading) return <div style={{padding:24}}><div className="loading-shimmer" style={{height:120,marginBottom:12,borderRadius:14}}/><div className="loading-shimmer" style={{height:80,borderRadius:14}}/></div>
 
+  async function submitHolidayConsent(holiday_date, choice) {
+    const { error } = await supabase.rpc('holiday_consent_submit', { p_employee_id: user.employee_id, p_holiday_date: holiday_date, p_choice: choice, p_hours: 8 })
+    if (error) { alert('提交失敗: ' + error.message); return }
+    setPendingHolidays(prev => prev.filter(h => h.holiday_date !== holiday_date))
+    alert(choice === '補休' ? `✅ ${holiday_date} 已轉補休 8 hr` : `✅ ${holiday_date} 選擇加班費（請知會老闆）`)
+  }
+
   return (
     <div style={{padding:'0 20px 100px',maxWidth:460,margin:'0 auto'}}>
       <AbnormalReport show={showAbnormal} onClose={() => setShowAbnormal(false)} />
+
+      {/* 國定假日轉補休同意彈窗 */}
+      {pendingHolidays.length > 0 && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ background: 'var(--black-card)', border: '2px solid var(--border-gold)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 420 }}>
+            <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--gold)', marginBottom: 8 }}>📋 國定假日確認</div>
+            <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 16, lineHeight: 1.6 }}>
+              依勞基法、國定假日上班需您本人同意轉補休、或選擇加班費。請逐一確認：
+            </div>
+            {pendingHolidays.map(h => (
+              <div key={h.holiday_date} style={{ marginBottom: 14, padding: 12, background: 'rgba(196,77,77,.06)', borderRadius: 8, border: '1px solid rgba(196,77,77,.2)' }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>{h.holiday_date} · {h.holiday_name}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 10 }}>當日有排班、請選擇處理方式（一律 8 hr）</div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => submitHolidayConsent(h.holiday_date, '補休')} style={{ flex: 1, padding: 12, fontSize: 13, fontWeight: 700, background: 'linear-gradient(135deg,#4da86c,#2d8a4e)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer' }}>✅ 同意轉補休</button>
+                  <button onClick={() => submitHolidayConsent(h.holiday_date, '加班費')} style={{ flex: 1, padding: 12, fontSize: 13, fontWeight: 600, background: 'rgba(245,158,11,.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,.4)', borderRadius: 8, cursor: 'pointer' }}>💰 改領加班費</button>
+                </div>
+              </div>
+            ))}
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 8, textAlign: 'center' }}>
+              💡 補休 12 個月內須使用、過期不轉加班費。
+            </div>
+          </div>
+        </div>
+      )}
       {motivation && <div onClick={() => setMotivation(null)} style={{position:'fixed',inset:0,background:'rgba(5,4,3,.9)',zIndex:9998,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',cursor:'pointer',padding:20}}>
         <div style={{fontSize:48,marginBottom:16}}>✅</div>
         <div style={{fontFamily:'var(--serif)',fontSize:22,fontWeight:600,color:'var(--cream)',marginBottom:8}}>{motivation.type}打卡成功！</div>
