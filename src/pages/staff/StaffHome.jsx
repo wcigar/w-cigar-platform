@@ -81,7 +81,7 @@ export default function StaffHome() {
     // 雙身份：找同 line_user_id 的另一個員工 record（e.g. Daniel 看到 Daniel_PT）
     const { data: meRow } = await supabase.from('employees').select('line_user_id').eq('id', user.employee_id).maybeSingle()
     if (meRow?.line_user_id) {
-      const { data: paired } = await supabase.from('employees').select('id,name,emp_type,salary_amount,salary_type').eq('line_user_id', meRow.line_user_id).neq('id', user.employee_id).eq('enabled', true).maybeSingle()
+      const { data: paired } = await supabase.from('employees').select('id,name,emp_type,salary_amount,salary_type,primary_shift,custom_shift_start,custom_shift_end').eq('line_user_id', meRow.line_user_id).neq('id', user.employee_id).eq('enabled', true).maybeSingle()
       if (paired) {
         setPairedEmp(paired)
         const [pPunch, pSched] = await Promise.all([
@@ -284,7 +284,10 @@ export default function StaffHome() {
         {/* 雙身份：PT 打卡卡片（Daniel 雙身份專用） */}
         {pairedEmp && (() => {
           const pShift = pairedSchedule?.shift
-          const pShiftInfo = pShift ? SHIFTS[pShift] : null
+          // 自訂時段 > SHIFTS preset
+          const customStart = pairedEmp.custom_shift_start?.slice(0,5)
+          const customEnd = pairedEmp.custom_shift_end?.slice(0,5)
+          const pShiftInfo = (customStart && customEnd) ? { start: customStart, end: customEnd } : (pShift ? SHIFTS[pShift] : null)
           const isLeave = pShift && ['休假','臨時請假','病假','事假','特休','調班'].includes(pShift)
           const canPtIn = !!pShift && !isLeave && !pairedPunchIn
           const canPtOut = !!pShift && !isLeave && !!pairedPunchIn && !pairedPunchOut

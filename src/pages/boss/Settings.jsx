@@ -65,13 +65,20 @@ function EmployeeManager() {
     ) || null
   }
 
+  // PT preset → 預設時段
+  const PT_PRESETS = { 'PT早班': ['12:00','15:00'], 'PT午班': ['14:00','18:00'], 'PT晚班': ['18:00','22:00'] }
+
   function startEditEmp(emp) {
     const partner = getPartner(emp)
+    const partnerStart = partner?.custom_shift_start?.slice(0,5) || (partner?.primary_shift && PT_PRESETS[partner.primary_shift]?.[0]) || '12:00'
+    const partnerEnd = partner?.custom_shift_end?.slice(0,5) || (partner?.primary_shift && PT_PRESETS[partner.primary_shift]?.[1]) || '15:00'
     setEditing({
       ...emp,
       _dual_enabled: !!(partner && partner.enabled),
       _pt_shift: partner?.primary_shift || 'PT早班',
       _pt_hourly: partner?.salary_amount || 200,
+      _pt_start: partnerStart,
+      _pt_end: partnerEnd,
       _partner_id: partner?.id || null
     })
   }
@@ -140,7 +147,9 @@ function EmployeeManager() {
         p_primary_id: editing.id,
         p_enabled: !!editing._dual_enabled,
         p_pt_shift: editing._pt_shift || 'PT早班',
-        p_pt_hourly_rate: Number(editing._pt_hourly || 200)
+        p_pt_hourly_rate: Number(editing._pt_hourly || 200),
+        p_pt_start: editing._pt_start || null,
+        p_pt_end: editing._pt_end || null
       })
       if (dualErr) { alert('雙身份設定失敗：' + dualErr.message); return }
     }
@@ -194,15 +203,28 @@ function EmployeeManager() {
                     🎭 雙身份（正職 + PT 副身份）
                   </label>
                   {editing._dual_enabled && (
-                    <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', paddingLeft: 26 }}>
-                      <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>PT 班別</label>
-                      <select value={editing._pt_shift || 'PT早班'} onChange={e => setEditing(p => ({ ...p, _pt_shift: e.target.value }))} style={{ width: 130, fontSize: 13, padding: 8 }}>
-                        {ALL_SHIFTS_PT.map(s => <option key={s} value={s}>{s}</option>)}
-                      </select>
-                      <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>PT 時薪</label>
-                      <input type="number" inputMode="numeric" value={editing._pt_hourly || 200} onChange={e => setEditing(p => ({ ...p, _pt_hourly: e.target.value }))} style={{ width: 90, fontSize: 13, padding: 8 }} placeholder="200" />
-                      <div style={{ fontSize: 10, color: 'var(--text-muted)', width: '100%', marginTop: 4 }}>
-                        {editing._partner_id ? `✓ 已連結副身份 ${editing._partner_id}` : '⚠️ 儲存後自動建立副身份 record'}
+                    <div style={{ marginTop: 8, paddingLeft: 26 }}>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
+                        <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>PT 班別</label>
+                        <select value={editing._pt_shift || 'PT早班'} onChange={e => {
+                          const preset = PT_PRESETS[e.target.value]
+                          setEditing(p => ({ ...p, _pt_shift: e.target.value, ...(preset ? { _pt_start: preset[0], _pt_end: preset[1] } : {}) }))
+                        }} style={{ width: 130, fontSize: 13, padding: 8 }}>
+                          {ALL_SHIFTS_PT.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                        <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>PT 時薪</label>
+                        <input type="number" inputMode="numeric" value={editing._pt_hourly || 200} onChange={e => setEditing(p => ({ ...p, _pt_hourly: e.target.value }))} style={{ width: 90, fontSize: 13, padding: 8 }} placeholder="200" />
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 4 }}>
+                        <label style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 50 }}>PT 起</label>
+                        <input type="time" value={editing._pt_start || '12:00'} onChange={e => setEditing(p => ({ ...p, _pt_start: e.target.value }))} style={{ width: 110, fontSize: 14, padding: 8, fontFamily: 'var(--font-mono)', color: '#e08585' }} />
+                        <span style={{ color: 'var(--text-muted)' }}>—</span>
+                        <label style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 50 }}>PT 迄</label>
+                        <input type="time" value={editing._pt_end || '15:00'} onChange={e => setEditing(p => ({ ...p, _pt_end: e.target.value }))} style={{ width: 110, fontSize: 14, padding: 8, fontFamily: 'var(--font-mono)', color: '#e08585' }} />
+                      </div>
+                      <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 6 }}>
+                        改 PT 班別 → 自動帶入預設時段、可手動覆寫。
+                        {editing._partner_id ? ` · ✓ 已連結副身份 ${editing._partner_id}` : ' · ⚠️ 儲存後自動建立副身份'}
                       </div>
                     </div>
                   )}
