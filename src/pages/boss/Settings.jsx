@@ -36,6 +36,9 @@ export default function Settings() {
 }
 
 /* ========== 員工管理 ========== */
+const ALL_SHIFTS_REGULAR = ['早班','晚班','單人班','彈性班']
+const ALL_SHIFTS_PT = ['PT早班','PT午班','PT晚班']
+
 function EmployeeManager() {
   const [emps, setEmps] = useState([])
   const [editing, setEditing] = useState(null)
@@ -50,6 +53,27 @@ function EmployeeManager() {
     const { data } = await supabase.from('employees').select('*').order('name')
     setEmps((data || []).filter(e => !e.is_admin))
     setLoading(false)
+  }
+
+  // 偵測員工是否有 PT 副身份（按 id 字尾或 line_user_id 配對）
+  function getPartner(emp) {
+    if (!emp || emp.emp_type !== '正職') return null
+    return emps.find(e =>
+      e.id !== emp.id &&
+      (e.id === emp.id + '_PT' ||
+       (e.line_user_id && emp.line_user_id && e.line_user_id === emp.line_user_id && e.emp_type === 'PT'))
+    ) || null
+  }
+
+  function startEditEmp(emp) {
+    const partner = getPartner(emp)
+    setEditing({
+      ...emp,
+      _dual_enabled: !!(partner && partner.enabled),
+      _pt_shift: partner?.primary_shift || 'PT早班',
+      _pt_hourly: partner?.salary_amount || 200,
+      _partner_id: partner?.id || null
+    })
   }
 
   async function toggleEmp(emp) {
@@ -103,9 +127,24 @@ function EmployeeManager() {
       p_labor_ins_date: editing.labor_ins_date || null,
       p_labor_ins_end_date: editing.labor_ins_end_date || null,
       p_health_ins_date: editing.health_ins_date || null,
-      p_health_ins_end_date: editing.health_ins_end_date || null
+      p_health_ins_end_date: editing.health_ins_end_date || null,
+      p_primary_shift: editing.primary_shift || null
     })
     if (error) { alert('儲存失敗：' + error.message); return }
+
+    // 雙身份 setup（只對正職員工生效）
+    if (editing.emp_type === '正職') {
+      const adminId2 = JSON.parse(localStorage.getItem('w_cigar_user') || '{}')?.employee_id || 'ADMIN'
+      const { error: dualErr } = await supabase.rpc('admin_setup_dual_identity', {
+        p_admin_id: adminId2,
+        p_primary_id: editing.id,
+        p_enabled: !!editing._dual_enabled,
+        p_pt_shift: editing._pt_shift || 'PT早班',
+        p_pt_hourly_rate: Number(editing._pt_hourly || 200)
+      })
+      if (dualErr) { alert('雙身份設定失敗：' + dualErr.message); return }
+    }
+
     setEditing(null); load()
   }
 
@@ -142,7 +181,38 @@ function EmployeeManager() {
               <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                 <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>入職</label>
                 <input type="date" value={editing.hire_date || ''} onChange={e => setEditing(p => ({ ...p, hire_date: e.target.value }))} style={{ width: 140, fontSize: 13, padding: 8 }} />
+                <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>預設班別</label>
+                <select value={editing.primary_shift || ''} onChange={e => setEditing(p => ({ ...p, primary_shift: e.target.value }))} style={{ width: 120, fontSize: 13, padding: 8 }}>
+                  <option value="">未設定</option>
+                  {(editing.emp_type === 'PT' ? ALL_SHIFTS_PT : ALL_SHIFTS_REGULAR).map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
               </div>
+              {editing.emp_type === '正職' && (
+                <div style={{ marginBottom: 8, padding: 10, background: 'rgba(196,77,77,.04)', borderRadius: 6, border: '1px solid rgba(196,77,77,.18)' }}>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: '#e08585', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={!!editing._dual_enabled} onChange={e => setEditing(p => ({ ...p, _dual_enabled: e.target.checked }))} style={{ width: 18, height: 18 }} />
+                    🎭 雙身份（正職 + PT 副身份）
+                  </label>
+                  {editing._dual_enabled && (
+                    <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', paddingLeft: 26 }}>
+                      <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>PT 班別</label>
+                      <select value={editing._pt_shift || 'PT早班'} onChange={e => setEditing(p => ({ ...p, _pt_shift: e.target.value }))} style={{ width: 130, fontSize: 13, padding: 8 }}>
+                        {ALL_SHIFTS_PT.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                      <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>PT 時薪</label>
+                      <input type="number" inputMode="numeric" value={editing._pt_hourly || 200} onChange={e => setEditing(p => ({ ...p, _pt_hourly: e.target.value }))} style={{ width: 90, fontSize: 13, padding: 8 }} placeholder="200" />
+                      <div style={{ fontSize: 10, color: 'var(--text-muted)', width: '100%', marginTop: 4 }}>
+                        {editing._partner_id ? `✓ 已連結副身份 ${editing._partner_id}` : '⚠️ 儲存後自動建立副身份 record'}
+                      </div>
+                    </div>
+                  )}
+                  {!editing._dual_enabled && editing._partner_id && (
+                    <div style={{ marginTop: 6, fontSize: 11, color: '#f59e0b', paddingLeft: 26 }}>
+                      ⚠️ 儲存後 PT 副身份 {editing._partner_id} 會被停用（保留歷史紀錄）
+                    </div>
+                  )}
+                </div>
+              )}
               <div style={{ marginBottom: 4, padding: 8, background: 'rgba(77,138,196,.04)', borderRadius: 6, border: '1px solid rgba(77,138,196,.15)' }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--blue)', marginBottom: 6 }}>🏛️ 勞健保（合規台灣勞保條例 §6/§12、健保法 §13/§15）</div>
                 <div style={{ display: 'flex', gap: 8, marginBottom: 6, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -184,7 +254,7 @@ function EmployeeManager() {
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                <button style={iconBtn} onClick={() => setEditing({ ...emp })}><Edit3 size={14} color="#c9a84c" /></button>
+                <button style={iconBtn} onClick={() => startEditEmp(emp)}><Edit3 size={14} color="#c9a84c" /></button>
                 <span className={`badge ${emp.enabled ? 'badge-green' : 'badge-red'}`} style={{ cursor: 'pointer' }} onClick={() => toggleEmp(emp)}>{emp.enabled ? '在職' : '離職'}</span>
                 {!emp.enabled && (
                   <button style={{ ...iconBtn, marginLeft: 4 }} onClick={() => deleteEmp(emp)} title="永久刪除"><Trash2 size={14} color="#c44d4d" /></button>
