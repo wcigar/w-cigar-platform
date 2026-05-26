@@ -268,6 +268,7 @@ export default function StaffHome() {
                   <button onClick={() => submitHolidayConsent(h.holiday_date, '補休')} style={{ flex: 1, padding: 12, fontSize: 13, fontWeight: 700, background: 'linear-gradient(135deg,#4da86c,#2d8a4e)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer' }}>✅ 同意轉補休</button>
                   <button onClick={() => submitHolidayConsent(h.holiday_date, '加班費')} style={{ flex: 1, padding: 12, fontSize: 13, fontWeight: 600, background: 'rgba(245,158,11,.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,.4)', borderRadius: 8, cursor: 'pointer' }}>💰 改領加班費</button>
                 </div>
+                <button onClick={() => setPendingHolidays(prev => prev.filter(x => x.holiday_date !== h.holiday_date))} style={{ width: '100%', marginTop: 6, padding: 8, fontSize: 11, fontWeight: 500, background: 'transparent', color: 'var(--text-muted)', border: '1px dashed var(--border)', borderRadius: 6, cursor: 'pointer' }}>🤔 再想想（稍後決定、下次登入會再問）</button>
               </div>
             ))}
             <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 8, textAlign: 'center' }}>
