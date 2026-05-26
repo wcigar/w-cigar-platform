@@ -484,13 +484,28 @@ export default function Payroll() {
     const { data, error } = await supabase.rpc('payroll_finalize', { p_admin_id: adminId, p_month: month, p_records: records })
     if (error) { alert('結轉失敗: ' + error.message); return }
 
-    // LINE 通知
-    const msg = `💰 薪資結轉通知（${month}）\n━━━━━━━━━━\n\n${emp.name} 您好：\n本月薪資已結算\n\n📊 實發金額：$${(p.currentPayable || 0).toLocaleString()}\n📅 月份：${month}\n\n明細請見薪資頁面、有疑問請即時反映。`
+    // LINE 個人私推（鐵律：薪資資料絕不進員工群）
+    // 抓員工的 line_user_id、直接推他個人 → 只有他自己看得到
+    const { data: empRow } = await supabase.from('employees').select('line_user_id').eq('id', emp.id).maybeSingle()
+    if (!empRow?.line_user_id) {
+      alert(`⚠️ ${emp.name} 還沒綁定 LINE（請他在群裡發「我是 ${emp.name}」綁定後再結轉）\n薪資已寫入系統、未推 LINE 通知`)
+      load()
+      return
+    }
+    const privateMsg = `💰 薪資已結算（${month}）\n━━━━━━━━━━\n\n${emp.name} 您好：\n本月薪資已由老闆確認\n\n實發金額：$${(p.currentPayable || 0).toLocaleString()}\n月份：${month}\n\n明細請查員工系統薪資頁面。\n有疑問請當面或私訊老闆、勿在群組討論。\n\n（此訊息私下發送、僅你可見）`
     try {
-      const { data: pubKey } = await supabase.functions.invoke('staff-reminders', { body: { adhoc_message: msg } })
-    } catch (e) { console.error('LINE push error:', e) }
+      const { error: lineErr } = await supabase.functions.invoke('staff-reminders', {
+        body: { target_user_id: empRow.line_user_id, message: privateMsg }
+      })
+      if (lineErr) throw lineErr
+    } catch (e) {
+      console.error('LINE private push error:', e)
+      alert(`⚠️ ${emp.name} 薪資已結轉、但 LINE 通知失敗：` + (e.message || ''))
+      load()
+      return
+    }
 
-    alert(`✅ ${emp.name} 薪資已結轉 $${(p.currentPayable || 0).toLocaleString()}、LINE 群通知已推`)
+    alert(`✅ ${emp.name} 薪資已結轉、LINE 私人通知已推（僅員工本人收到、不進群組）`)
     load()
   }
 
