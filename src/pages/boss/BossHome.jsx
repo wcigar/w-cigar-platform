@@ -198,7 +198,7 @@ export default function BossHome() {
           <SB label="待交班" value={pendingHandover} color={pendingHandover > 0 ? '#f59e0b' : 'var(--text-muted)'} />
           <SB label="經銷待出貨" value={dealerPending} color={dealerPending > 0 ? 'var(--red)' : 'var(--text-muted)'} tap={() => navigate('/dealer-orders')} />
           <SB label="VIP 欠款" value={vipUnpaid ? '$' + (vipUnpaid/1000).toFixed(0) + 'K' : '$0'} color={vipUnpaid > 0 ? 'var(--red)' : 'var(--text-muted)'} tap={() => navigate('/vip-cellar/admin')} />
-          <SB label={`經銷未結${dealerUnsettledCount > 0 ? ` (${dealerUnsettledCount})` : ''}`} value={dealerUnsettled ? '$' + (dealerUnsettled >= 10000 ? (dealerUnsettled/1000).toFixed(0) + 'K' : dealerUnsettled.toLocaleString()) : '$0'} color={dealerUnsettled > 0 ? '#f59e0b' : 'var(--text-muted)'} />
+          <SB label={`經銷未結${dealerUnsettledCount > 0 ? ` (${dealerUnsettledCount})` : ''}`} value={dealerUnsettled ? '$' + (dealerUnsettled >= 10000 ? (dealerUnsettled/1000).toFixed(0) + 'K' : dealerUnsettled.toLocaleString()) : '$0'} color={dealerUnsettled > 0 ? '#f59e0b' : 'var(--text-muted)'} tap={() => window.open('https://dealer.wcigarbar.com/admin', '_blank')} />
         </div>
       )}
 
