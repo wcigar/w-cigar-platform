@@ -82,6 +82,7 @@ export default function StaffExpense() {
   // 零用金編輯
   const [editingCash, setEditingCash] = useState(null)
   const [cashEditForm, setCashEditForm] = useState({ amount: '', method: '', given_by: '', received_by: '', note: '' })
+  const [filterHandler, setFilterHandler] = useState('all')
   const isBoss = user.role === 'boss' || user.employee_id === 'ADMIN' || user.is_admin
 
   useEffect(() => { load() }, [])
@@ -411,10 +412,46 @@ export default function StaffExpense() {
         </div>
       )}
 
-      {tab === 'history' && (
+      {tab === 'history' && (() => {
+        // 員工小計 group by handler
+        const byHandler = {}
+        expenses.forEach(r => {
+          const h = r.handler || '未知'
+          if (!byHandler[h]) byHandler[h] = { count: 0, total: 0, withPhoto: 0 }
+          byHandler[h].count++
+          byHandler[h].total += +r.amount || 0
+          if (r.photo_url) byHandler[h].withPhoto++
+        })
+        const handlerList = Object.entries(byHandler).sort((a, b) => b[1].total - a[1].total)
+        const filtered = filterHandler === 'all' ? expenses : expenses.filter(r => (r.handler || '未知') === filterHandler)
+        return (
         <div>
-          {expenses.length === 0 ? <div className="card" style={{ textAlign: 'center', padding: 30, color: 'var(--text-dim)' }}>本月無支出</div> :
-            expenses.map(r => (
+          {/* 員工支出小計區塊 */}
+          {handlerList.length > 0 && (
+            <div className="card" style={{ padding: 12, marginBottom: 10, borderColor: 'var(--border-gold)' }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--gold)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>📊 本月員工支出小計</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 6 }}>
+                {handlerList.map(([name, st]) => (
+                  <div key={name} onClick={() => setFilterHandler(filterHandler === name ? 'all' : name)} style={{ cursor: 'pointer', padding: '8px 10px', background: filterHandler === name ? 'var(--gold-glow)' : 'rgba(0,0,0,.25)', border: '1px solid ' + (filterHandler === name ? 'var(--border-gold)' : 'var(--border)'), borderRadius: 8 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: filterHandler === name ? 'var(--gold)' : 'var(--text)' }}>{name}</div>
+                    <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--red)', marginTop: 2 }}>${st.total.toLocaleString()}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>{st.count} 筆 · 收據 {st.withPhoto}/{st.count}{st.withPhoto < st.count ? ' ⚠️' : ''}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {/* 篩選按鈕列 */}
+          {handlerList.length > 1 && (
+            <div style={{ display: 'flex', gap: 4, marginBottom: 8, overflowX: 'auto', paddingBottom: 4 }}>
+              <button onClick={() => setFilterHandler('all')} style={{ padding: '5px 12px', borderRadius: 14, fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', background: filterHandler === 'all' ? 'var(--gold-glow)' : 'transparent', color: filterHandler === 'all' ? 'var(--gold)' : 'var(--text-dim)', border: filterHandler === 'all' ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>全部 ({expenses.length})</button>
+              {handlerList.map(([name, st]) => (
+                <button key={name} onClick={() => setFilterHandler(name)} style={{ padding: '5px 12px', borderRadius: 14, fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', background: filterHandler === name ? 'var(--gold-glow)' : 'transparent', color: filterHandler === name ? 'var(--gold)' : 'var(--text-dim)', border: filterHandler === name ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>{name} ({st.count})</button>
+              ))}
+            </div>
+          )}
+          {filtered.length === 0 ? <div className="card" style={{ textAlign: 'center', padding: 30, color: 'var(--text-dim)' }}>{filterHandler === 'all' ? '本月無支出' : `${filterHandler} 本月無支出`}</div> :
+            filtered.map(r => (
               <div key={r.id} className="card" style={{ padding: 12, marginBottom: 6 }}>
                 {editing === r.id ? (
                   <div>
@@ -468,7 +505,8 @@ export default function StaffExpense() {
               </div>
             ))}
         </div>
-      )}
+        )
+      })()}
 
       {tab === 'cash' && (
         <div>
