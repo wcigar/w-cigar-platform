@@ -19,6 +19,8 @@ export default function BossHome() {
   const [monthRevenue, setMonthRevenue] = useState(0)
   const [pendingHandover, setPendingHandover] = useState(0)
   const [dealerPending, setDealerPending] = useState(0)
+  const [dealerUnsettled, setDealerUnsettled] = useState(0)
+  const [dealerUnsettledCount, setDealerUnsettledCount] = useState(0)
   const [openActions, setOpenActions] = useState([])
   const [allEmps, setAllEmps] = useState([])
   const [reassigning, setReassigning] = useState(null)
@@ -61,6 +63,21 @@ export default function BossHome() {
     setPendingHandover((hoR.data || []).length)
     try { const { data: dpData } = await supabase.rpc('get_dealer_pending_orders'); if (dpData?.count !== undefined) setDealerPending(dpData.count) } catch {}
     try { const { data: vd } = await supabase.rpc('get_vip_dashboard'); if (vd?.total_unpaid !== undefined) setVipUnpaid(vd.total_unpaid) } catch {}
+    // 跨 project fetch dealer Supabase 月結未結算總額
+    try {
+      const DEALER_URL = 'https://oecagouzanoddmwfrvka.supabase.co'
+      const DEALER_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9lY2Fnb3V6YW5vZGRtd2ZydmthIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2NjQxMDIsImV4cCI6MjA5MTI0MDEwMn0.QTfo2sCcZLbOwHLm_ybzvOWPzO_sJYwCQyOHgNTU7Y8'
+      const r = await fetch(DEALER_URL + '/rest/v1/rpc/dealer_unsettled_total', {
+        method: 'POST',
+        headers: { 'apikey': DEALER_ANON, 'Authorization': 'Bearer ' + DEALER_ANON, 'Content-Type': 'application/json' },
+        body: '{}'
+      })
+      const d = await r.json()
+      if (d?.total_amount !== undefined) {
+        setDealerUnsettled(+d.total_amount || 0)
+        setDealerUnsettledCount(+d.order_count || 0)
+      }
+    } catch (e) { console.error('dealer unsettled fetch:', e) }
 
     const dangerList = []
     abns.forEach(a => {
@@ -181,6 +198,7 @@ export default function BossHome() {
           <SB label="待交班" value={pendingHandover} color={pendingHandover > 0 ? '#f59e0b' : 'var(--text-muted)'} />
           <SB label="經銷待出貨" value={dealerPending} color={dealerPending > 0 ? 'var(--red)' : 'var(--text-muted)'} tap={() => navigate('/dealer-orders')} />
           <SB label="VIP 欠款" value={vipUnpaid ? '$' + (vipUnpaid/1000).toFixed(0) + 'K' : '$0'} color={vipUnpaid > 0 ? 'var(--red)' : 'var(--text-muted)'} tap={() => navigate('/vip-cellar/admin')} />
+          <SB label={`經銷未結${dealerUnsettledCount > 0 ? ` (${dealerUnsettledCount})` : ''}`} value={dealerUnsettled ? '$' + (dealerUnsettled >= 10000 ? (dealerUnsettled/1000).toFixed(0) + 'K' : dealerUnsettled.toLocaleString()) : '$0'} color={dealerUnsettled > 0 ? '#f59e0b' : 'var(--text-muted)'} />
         </div>
       )}
 
