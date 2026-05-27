@@ -173,6 +173,10 @@ export default function StaffHome() {
       const punchDate = punchStatus?.active_date || ((type === '下班' && crossDayPunchDate) ? crossDayPunchDate : today)
       // 雙身份：punchAsEmp 不為 null 則打卡到該 paired identity（e.g. Daniel 主帳號打 Daniel_PT 卡）
       const targetEmp = punchAsEmp || { id: user.employee_id, name: user.name }
+      // PT walkin：沒排班 PT 自助打卡 → 寫卡前自動補一筆「彈性班」schedule
+      if (punchStatus?.virtual_pt_walkin && type === '上班' && !punchAsEmp) {
+        await supabase.from('schedules').upsert({ employee_id: user.employee_id, date: punchDate, shift: '彈性班' }, { onConflict: 'employee_id,date' })
+      }
       await supabase.from('punch_records').insert({ date: punchDate, employee_id: targetEmp.id, name: targetEmp.name, punch_type: type, photo_url: photoUrl || null, lat, lng, distance_m: Math.round(dist), is_valid: valid })
       // 打卡成功 → 立即觸發 staff-reminders 推播確認音到員工 LINE 群（fire-and-forget）
       if (valid) {
