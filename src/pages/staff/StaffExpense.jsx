@@ -229,6 +229,32 @@ export default function StaffExpense() {
     else { if (confirm('確認收到 $' + (+cashForm.amount).toLocaleString() + ' 匯款？')) submitCashRequest(null) }
   }
 
+  function exportExcel() {
+    const esc = v => { const s = String(v ?? ''); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s }
+    const photoCount = url => { if (!url) return 0; try { const p = JSON.parse(url); return Array.isArray(p) ? p.length : 1 } catch { return 1 } }
+    const lines = []
+    lines.push(`W Cigar Bar - 支出 / 零用金報表 - ${month}`)
+    lines.push('匯出時間,' + new Date().toLocaleString('zh-TW'))
+    lines.push('')
+    lines.push('【支出明細】共 ' + expenses.length + ' 筆 · 合計 NT$' + totalSpent.toLocaleString())
+    lines.push(['日期','分類','廠商','品項','金額','付款方式','經手人','照片張數','備註'].join(','))
+    expenses.forEach(r => lines.push([r.date, r.category || '', r.vendor || '', r.item || '', r.amount || 0, r.payment || '', r.handler || '', photoCount(r.photo_url), r.note || ''].map(esc).join(',')))
+    lines.push('')
+    lines.push('【零用金明細】共 ' + cashRecords.length + ' 筆 · 收入合計 NT$' + totalCashIn.toLocaleString())
+    lines.push(['日期','撥付人','撥付方式','金額','經手人','備註','簽名'].join(','))
+    cashRecords.forEach(r => lines.push([r.date, r.given_by || '', r.method || '', r.amount || 0, r.received_by || r.employee_name || '', r.note || '', r.signature_url ? '有' : '無'].map(esc).join(',')))
+    lines.push('')
+    lines.push('【月度小計】')
+    lines.push('零用金收入,NT$' + totalCashIn.toLocaleString())
+    lines.push('全員支出,NT$' + totalSpent.toLocaleString())
+    lines.push('餘額,NT$' + balance.toLocaleString())
+    const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `支出報表_${month}.csv`; a.click()
+    URL.revokeObjectURL(url)
+  }
+
   if (loading) return <div className="page-container">{[1,2,3].map(i => <div key={i} className="loading-shimmer" style={{ height: 60, marginBottom: 8 }} />)}</div>
 
   return (
@@ -286,10 +312,11 @@ export default function StaffExpense() {
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 4, marginBottom: 14, overflowX: 'auto' }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 14, overflowX: 'auto', alignItems: 'center' }}>
         {[['new','登記支出'],['history','支出紀錄'],['cash','零用金明細']].map(([v,l]) => (
           <button key={v} onClick={() => setTab(v)} style={{ padding: '7px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: tab === v ? 'var(--gold-glow)' : 'transparent', color: tab === v ? 'var(--gold)' : 'var(--text-dim)', border: tab === v ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>{l}</button>
         ))}
+        <button onClick={exportExcel} style={{ marginLeft: 'auto', padding: '7px 14px', borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: 'pointer', background: 'rgba(77,168,108,.12)', color: 'var(--green)', border: '1px solid rgba(77,168,108,.3)', whiteSpace: 'nowrap' }}>📊 匯出 Excel</button>
       </div>
 
       {tab === 'new' && (
