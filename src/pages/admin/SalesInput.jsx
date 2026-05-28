@@ -1,7 +1,7 @@
 // src/pages/admin/SalesInput.jsx
 // 酒店銷售輸入頁（/admin/sales-input）
-// 操作員: ADMIN(8541) / STAFF (RICKY 2580 / DANIEL 2581 / JESSICA 2582 / SHANSHAN 8888 / AMANDA 1111)
 // 寫入流程: RPC submit_venue_sale → venue_sales_daily / inventory_balances / monthly_collections 三件事原子完成
+// 操作員身份請查 employees 表（login_code 不在程式碼註釋裡）
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../lib/auth'

@@ -4,12 +4,12 @@ import { useAuth } from '../../lib/auth'
 import { Package, Send } from 'lucide-react'
 
 const REASON_CODES = [
-  { id: 'normal', label: '正常消耗', color: 'var(--green)' },
-  { id: 'damage', label: '損耗報廢', color: 'var(--red)' },
-  { id: 'restock', label: '進貨入庫', color: 'var(--blue)' },
+  { id: 'normal', label: '正常消耗', color: '#4da86c' },
+  { id: 'damage', label: '損耗報廢', color: '#c44d4d' },
+  { id: 'restock', label: '進貨入庫', color: '#4d8ac4' },
   { id: 'error', label: '盤點誤差', color: '#f59e0b' },
-  { id: 'gift', label: '贈送客戶', color: 'var(--gold)' },
-  { id: 'other', label: '其他', color: 'var(--text-muted)' },
+  { id: 'gift', label: '贈送客戶', color: '#c9a84c' },
+  { id: 'other', label: '其他', color: '#8a8278' },
 ]
 
 export default function StaffInventory() {

@@ -20,3 +20,13 @@ export function taipeiHM(utcStr) {
   const taipei = new Date(d.toLocaleString('en-US', { timeZone: 'Asia/Taipei' }))
   return [taipei.getHours(), taipei.getMinutes()]
 }
+
+// Get today's date in Taipei (yyyy-MM-dd). Correct even at 0-8AM Taipei when UTC date is yesterday.
+export function todayTw() {
+  return new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10)
+}
+
+// Current Taipei month (yyyy-MM).
+export function monthTw() {
+  return new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 7)
+}

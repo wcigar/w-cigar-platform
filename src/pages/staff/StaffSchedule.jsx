@@ -12,8 +12,8 @@ import { zhTW } from 'date-fns/locale'
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
 
 const LEAVE_MENU = [
-  { key: '休假', label: '休假', color: 'var(--red)' },
-  { key: '臨時請假', label: '臨時請假', color: 'var(--red)' },
+  { key: '休假', label: '休假', color: '#c44d4d' },
+  { key: '臨時請假', label: '臨時請假', color: '#c44d4d' },
   { key: '病假', label: '病假', color: '#ffb347' },
   { key: '事假', label: '事假', color: '#ffd700' },
   { key: '特休', label: '特休', color: '#64c8ff' },

@@ -1,19 +1,24 @@
 import { useState } from 'react'
+import { supabase } from '../../lib/supabase'
 import PayrollContent from './PayrollContent'
 import PayrollExport from './PayrollExport'
 import PayrollSummary from './PayrollSummary'
 import PettyCash from './PettyCash'
-
-const PAYROLL_PIN = '1986'
 
 export default function Payroll() {
   const [locked, setLocked] = useState(true)
   const [pin, setPin] = useState('')
   const [error, setError] = useState(false)
   const [view, setView] = useState('main')
+  const [verifying, setVerifying] = useState(false)
 
-  function handleUnlock() {
-    if (pin === PAYROLL_PIN) { setLocked(false); setError(false) }
+  async function handleUnlock() {
+    if (verifying) return
+    setVerifying(true)
+    const { data, error: rpcErr } = await supabase.rpc('verify_gate_pin', { p_gate: 'payroll', p_pin: pin })
+    setVerifying(false)
+    if (rpcErr) { setError(true); setPin(''); return }
+    if (data === true) { setLocked(false); setError(false) }
     else { setError(true); setPin('') }
   }
 

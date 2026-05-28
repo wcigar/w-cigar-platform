@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { logAudit } from '../../lib/audit'
+import { todayTw } from '../../lib/timezone'
 import { Search, ShoppingCart, X, Plus, Minus, Trash2, CreditCard, DollarSign, ChevronLeft, ChevronUp, ChevronDown, CheckCircle2, LogIn, LogOut as LogOutIcon, Clock, User, Edit2 } from 'lucide-react'
 
 const PAY_METHODS = [
@@ -138,7 +139,7 @@ export default function StaffPOS() {
     try {
       const [prodR, sumR, shiftR, tiersR] = await Promise.all([
         supabase.rpc('pos_get_products'), supabase.rpc('pos_today_summary'),
-        supabase.from('pos_shifts').select('*').eq('work_date', new Date().toISOString().slice(0, 10)).eq('status', 'open').order('opened_at', { ascending: false }).limit(1),
+        supabase.from('pos_shifts').select('*').eq('work_date', todayTw()).eq('status', 'open').order('opened_at', { ascending: false }).limit(1),
         supabase.from('membership_tiers').select('*').order('sort_order'),
       ])
       let cigars = []
@@ -202,8 +203,8 @@ export default function StaffPOS() {
 
   // ── Today Orders ──
   async function loadTodayOrders() {
-    const td = new Date().toISOString().slice(0, 10)
-    const { data } = await supabase.from('unified_orders').select('*').in('channel', ['store', 'pos-v2']).gte('created_at', td + 'T00:00:00').lte('created_at', td + 'T23:59:59').order('created_at', { ascending: false })
+    const td = todayTw()
+    const { data } = await supabase.from('unified_orders').select('*').in('channel', ['store', 'pos-v2']).gte('created_at', td + 'T00:00:00+08:00').lte('created_at', td + 'T23:59:59+08:00').order('created_at', { ascending: false })
     setTodayOrders(data || [])
   }
 

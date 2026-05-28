@@ -33,21 +33,26 @@ const CATEGORY_LABELS = {
   reference: { label: '參考', color: '#6b7280' },
 };
 
-// 前端 PIN 門 — 擋路人，不擋懂技術的人。真正的防線是 Supabase RLS。
-const ACCESS_PIN = '85411458';
-
+// PIN 驗證走 server-side RPC（verify_gate_pin）— bcrypt hash 不暴露在 client bundle
 function PasswordGate({ children }) {
   const [unlocked, setUnlocked] = useState(() => {
     try { return sessionStorage.getItem('iw_unlocked') === '1'; } catch { return false; }
   });
   const [pin, setPin] = useState('');
   const [err, setErr] = useState(false);
+  const [verifying, setVerifying] = useState(false);
 
-  function submit(e) {
+  async function submit(e) {
     e.preventDefault();
-    if (pin === ACCESS_PIN) {
+    if (verifying) return;
+    setVerifying(true);
+    const { data, error } = await supabase.rpc('verify_gate_pin', { p_gate: 'investment', p_pin: pin });
+    setVerifying(false);
+    if (error) { setErr(true); setPin(''); return; }
+    if (data === true) {
       try { sessionStorage.setItem('iw_unlocked', '1'); } catch {}
       setUnlocked(true);
+      setErr(false);
     } else {
       setErr(true);
       setPin('');
