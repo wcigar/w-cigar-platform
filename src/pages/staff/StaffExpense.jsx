@@ -150,15 +150,17 @@ export default function StaffExpense() {
       const { error } = await supabase.storage.from('photos').upload(path, blob)
       if (!error) { const { data } = supabase.storage.from('photos').getPublicUrl(path); sigUrl = data.publicUrl }
     }
-    await supabase.from('petty_cash').insert({ date: today, employee_id: 'SHARED', employee_name: '共用零用金', received_by: user.name, amount: +cashForm.amount, method: cashForm.method, given_by: cashForm.given_by, signature_url: sigUrl, note: cashForm.note })
+    const { error: cashErr } = await supabase.from('petty_cash').insert({ date: today, employee_id: 'SHARED', employee_name: '共用零用金', received_by: user.name, amount: +cashForm.amount, method: cashForm.method, given_by: cashForm.given_by, signature_url: sigUrl, note: cashForm.note })
     setShowSign(false); setShowCashForm(false); setSubmitting(false)
+    if (cashErr) { alert('❌ 零用金提交失敗：' + cashErr.message); return }
     alert('零用金 $' + (+cashForm.amount).toLocaleString() + ' 已收到！')
     setCashForm({ amount: '', method: '現金', given_by: 'Wilson', note: '' }); load()
   }
 
   async function deleteExpense(id) {
     if (!confirm('確定刪除此筆支出？')) return
-    await supabase.from('expenses').delete().eq('id', id)
+    const { error } = await supabase.from('expenses').delete().eq('id', id)
+    if (error) { alert('❌ 刪除失敗：' + error.message); return }
     load()
   }
 
@@ -201,7 +203,8 @@ export default function StaffExpense() {
       if (!error) { const { data } = supabase.storage.from('photos').getPublicUrl(path); newUrls.push(data.publicUrl) }
     }
     const allUrls = [...existingUrls, ...newUrls]
-    await supabase.from('expenses').update({ item: editForm.item, amount: +editForm.amount, note: editForm.note, photo_url: allUrls.length > 1 ? JSON.stringify(allUrls) : (allUrls[0] || '') }).eq('id', id)
+    const { error } = await supabase.from('expenses').update({ item: editForm.item, amount: +editForm.amount, note: editForm.note, photo_url: allUrls.length > 1 ? JSON.stringify(allUrls) : (allUrls[0] || '') }).eq('id', id)
+    if (error) { alert('❌ 編輯失敗：' + error.message); return }
     setEditing(null); setEditPhotos([]); setEditPreviews([])
     load()
   }
@@ -213,13 +216,15 @@ export default function StaffExpense() {
 
   async function saveCashEdit(id) {
     if (!cashEditForm.amount || +cashEditForm.amount <= 0) return alert('金額不可為空')
-    await supabase.from('petty_cash').update({ amount: +cashEditForm.amount, method: cashEditForm.method, given_by: cashEditForm.given_by, received_by: cashEditForm.received_by, note: cashEditForm.note }).eq('id', id)
+    const { error } = await supabase.from('petty_cash').update({ amount: +cashEditForm.amount, method: cashEditForm.method, given_by: cashEditForm.given_by, received_by: cashEditForm.received_by, note: cashEditForm.note }).eq('id', id)
+    if (error) { alert('❌ 編輯失敗：' + error.message); return }
     setEditingCash(null); load()
   }
 
   async function deleteCash(r) {
     if (!confirm(`確定要刪除這筆零用金紀錄？金額：$${r.amount.toLocaleString()}`)) return
-    await supabase.from('petty_cash').delete().eq('id', r.id)
+    const { error } = await supabase.from('petty_cash').delete().eq('id', r.id)
+    if (error) { alert('❌ 刪除失敗：' + error.message); return }
     load()
   }
 

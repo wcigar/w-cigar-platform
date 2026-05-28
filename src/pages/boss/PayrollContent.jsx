@@ -512,20 +512,21 @@ export default function Payroll() {
   /* === 出勤修正操作 === */
   async function overridePunch(punchId, updates) {
     setOverrideSaving(punchId)
-    await supabase.from('punch_records').update({
+    const { error } = await supabase.from('punch_records').update({
       manual_override: true,
       ...updates,
       override_by: 'ADMIN',
       override_at: new Date().toISOString(),
     }).eq('id', punchId)
-    await logAudit('AttendanceOverride', `修正打卡 #${punchId}: ${JSON.stringify(updates)}`, 'ADMIN')
     setOverrideSaving(null)
+    if (error) { alert('❌ 修正失敗：' + error.message); return }
+    await logAudit('AttendanceOverride', `修正打卡 #${punchId}: ${JSON.stringify(updates)}`, 'ADMIN')
     load()
   }
 
   async function cancelOverride(punchId) {
     setOverrideSaving(punchId)
-    await supabase.from('punch_records').update({
+    const { error } = await supabase.from('punch_records').update({
       manual_override: false,
       corrected_clock_in: null, corrected_clock_out: null,
       corrected_is_late: null, corrected_is_early: null,
@@ -533,6 +534,7 @@ export default function Payroll() {
       override_reason: null, override_by: null, override_at: null,
     }).eq('id', punchId)
     setOverrideSaving(null)
+    if (error) { alert('❌ 還原失敗：' + error.message); return }
     load()
   }
 

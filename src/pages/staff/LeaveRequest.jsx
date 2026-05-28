@@ -42,11 +42,12 @@ export default function LeaveRequest() {
     if (exists) return alert('該日已有請假紀錄')
     if (!confirm('確定提交 ' + form.date + ' 的' + form.leave_type + '申請？')) return
     setSubmitting(true)
-    await supabase.from('leave_requests').insert({
+    const { error } = await supabase.from('leave_requests').insert({
       employee_id: user.employee_id, employee_name: user.name,
       date: form.date, leave_type: form.leave_type, reason: form.reason, status: '待審核'
     })
     setSubmitting(false)
+    if (error) { alert('❌ 申請失敗：' + error.message); return }
     alert('請假申請已送出，請等待老闆審核')
     setForm({ date: format(addDays(new Date(), 1), 'yyyy-MM-dd'), leave_type: '事假', reason: '' })
     setTab('history')
@@ -55,7 +56,8 @@ export default function LeaveRequest() {
 
   async function cancelRequest(id) {
     if (!confirm('確定取消此假單？')) return
-    await supabase.from('leave_requests').delete().eq('id', id)
+    const { error } = await supabase.from('leave_requests').delete().eq('id', id)
+    if (error) { alert('❌ 取消失敗：' + error.message); return }
     load()
   }
 

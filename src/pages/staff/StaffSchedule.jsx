@@ -86,9 +86,11 @@ function ScheduleContent() {
       const existing = schedules.find(s => s.date === dateStr)
       if (existing) {
         if (existing.shift === leaveType) return
-        await supabase.from('schedules').update({ shift: leaveType }).eq('id', existing.id)
+        const { error } = await supabase.from('schedules').update({ shift: leaveType }).eq('id', existing.id)
+        if (error) { alert('❌ 排班更新失敗：' + error.message); return }
       } else {
-        await supabase.from('schedules').insert({ date: dateStr, employee_id: user.employee_id, shift: leaveType })
+        const { error } = await supabase.from('schedules').insert({ date: dateStr, employee_id: user.employee_id, shift: leaveType })
+        if (error) { alert('❌ 排班失敗：' + error.message); return }
       }
     }
     load()

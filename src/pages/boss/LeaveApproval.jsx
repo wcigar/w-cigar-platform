@@ -32,16 +32,19 @@ export default function LeaveApproval() {
   async function approve(id) {
     if (!confirm('核准此假單？')) return
     const req = requests.find(r => r.id === id)
-    await supabase.from('leave_requests').update({ status: '已核准', reviewed_by: 'Wilson', reviewed_at: new Date().toISOString() }).eq('id', id)
+    const { error: e1 } = await supabase.from('leave_requests').update({ status: '已核准', reviewed_by: 'Wilson', reviewed_at: new Date().toISOString() }).eq('id', id)
+    if (e1) { alert('❌ 核准失敗：' + e1.message); return }
     if (req) {
-      await supabase.from('schedules').upsert({ employee_id: req.employee_id, date: req.date, shift: req.leave_type }, { onConflict: 'employee_id,date' })
+      const { error: e2 } = await supabase.from('schedules').upsert({ employee_id: req.employee_id, date: req.date, shift: req.leave_type }, { onConflict: 'employee_id,date' })
+      if (e2) { alert('⚠️ 假單已核准但排班同步失敗：' + e2.message + '\n請手動到 HR 排班頁改 ' + req.employee_id + ' ' + req.date); load(); return }
     }
     load()
   }
 
   async function reject(id) {
     if (!rejectReason.trim()) return alert('請填寫駁回原因')
-    await supabase.from('leave_requests').update({ status: '已駁回', reviewed_by: 'Wilson', reviewed_at: new Date().toISOString(), reject_reason: rejectReason }).eq('id', id)
+    const { error } = await supabase.from('leave_requests').update({ status: '已駁回', reviewed_by: 'Wilson', reviewed_at: new Date().toISOString(), reject_reason: rejectReason }).eq('id', id)
+    if (error) { alert('❌ 駁回失敗：' + error.message); return }
     setRejectId(null); setRejectReason('')
     load()
   }

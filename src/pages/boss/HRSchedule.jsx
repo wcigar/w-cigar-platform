@@ -60,8 +60,13 @@ export default function HRSchedule() {
   const PREF_LABELS = { '早班': { t: '希早', c: '#3dd68c' }, '晚班': { t: '希晚', c: '#4d8ac4' }, '都可': { t: '希都可', c: 'var(--gold)' }, '休假': { t: '希休', c: '#ff9a9a' }, '不可': { t: '✗', c: 'var(--red)' } }
   async function setShiftVal(eid, ds, val) {
     const ex = getShift(eid, ds)
-    if (ex) await supabase.from('schedules').update({ shift: val }).eq('id', ex.id)
-    else if (val) await supabase.from('schedules').insert({ employee_id: eid, date: ds, shift: val })
+    if (ex) {
+      const { error } = await supabase.from('schedules').update({ shift: val }).eq('id', ex.id)
+      if (error) { alert('❌ 排班更新失敗：' + error.message); return }
+    } else if (val) {
+      const { error } = await supabase.from('schedules').insert({ employee_id: eid, date: ds, shift: val })
+      if (error) { alert('❌ 排班新增失敗：' + error.message); return }
+    }
     load()
   }
 
