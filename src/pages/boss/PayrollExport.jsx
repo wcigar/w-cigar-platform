@@ -108,7 +108,7 @@ export default function PayrollExport() {
     w.document.write('<table><thead><tr><th>姓名</th><th>類型</th><th class="r">底薪</th><th class="r">加給</th><th class="r">加班費</th><th class="r">出勤</th><th class="r">勞保</th><th class="r">健保</th><th class="r">病假扣</th><th class="r">事假扣</th><th class="r">實發</th><th class="r">雇主成本</th></tr></thead><tbody>' + rows + '</tbody>')
     w.document.write('<tfoot><tr><td colspan="10" style="text-align:right">合計</td><td class="r b">$' + totalNet.toLocaleString() + '</td><td class="r">$' + totalER.toLocaleString() + '</td></tr></tfoot></table></body></html>')
     w.document.close()
-    setTimeout(() => w.print(), 500)
+    setTimeout(() => { try { if (!w.closed) w.print() } catch {} }, 500)
   }
 
   function printSlip(emp) {
@@ -150,7 +150,7 @@ export default function PayrollExport() {
     w.document.write('<div class="ft">W Cigar Bar 紳士雪茄館 · 統一營運平台<br>遲到寬限' + LATE_GRACE_MIN + '分 · 加班寬限' + OT_GRACE_MIN + '分 · 勞基法加班費率</div>')
     w.document.write('</body></html>')
     w.document.close()
-    setTimeout(() => w.print(), 500)
+    setTimeout(() => { try { if (!w.closed) w.print() } catch {} }, 500)
   }
 
   if (loading) return <div>{[1, 2].map(i => <div key={i} className="loading-shimmer" style={{ height: 60, marginBottom: 8 }} />)}</div>

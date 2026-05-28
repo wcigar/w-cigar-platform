@@ -555,7 +555,7 @@ export default function Payroll() {
 <div class="r rd"><span>勞保20%</span><span>-$${p.li.toLocaleString()}</span></div><div class="r rd"><span>健保30%</span><span>-$${p.hi.toLocaleString()}</span></div>${p.sickDeduct?`<div class="r rd"><span>病假扣薪</span><span>-$${p.sickDeduct.toLocaleString()}</span></div>`:''}${p.personalDeduct?`<div class="r rd"><span>事假扣薪</span><span>-$${p.personalDeduct.toLocaleString()}</span></div>`:''}
 <div class="r bold gl"><span>✦ 截至今日可領</span><span>$${p.currentPayable.toLocaleString()}</span></div><div class="r bold"><span>雇主總成本</span><span>$${p.erCost.toLocaleString()}</span></div>
 <div class="ft">W Cigar Bar · ${format(new Date(),'yyyy-MM-dd HH:mm')}<br>${isCurrentMonth?'⚠️ 依實際出勤，非月底應發':'已結算'}</div></body></html>`)
-    w.document.close(); setTimeout(() => w.print(), 300)
+    w.document.close(); setTimeout(() => { try { if (!w.closed) w.print() } catch {} }, 300)
   }
 
   const months = Array.from({ length: 6 }, (_, i) => format(subMonths(new Date(), i), 'yyyy-MM'))

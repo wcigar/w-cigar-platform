@@ -64,7 +64,7 @@ export default function KPIReport() {
     w.document.write(printArea.innerHTML)
     w.document.write('</body></html>')
     w.document.close()
-    setTimeout(() => w.print(), 500)
+    setTimeout(() => { try { if (!w.closed) w.print() } catch {} }, 500)
   }
 
   if (loading) return <div>{[1,2,3].map(i => <div key={i} className="loading-shimmer" style={{ height: 80, marginBottom: 8 }} />)}</div>

@@ -42,16 +42,43 @@ export default function StaffHome() {
   const [pairedPunchOut, setPairedPunchOut] = useState(null)
   const [pairedSchedule, setPairedSchedule] = useState(null)
   const [punchAsEmp, setPunchAsEmp] = useState(null) // null = 自己、{id,name} = paired
-  const today = format(new Date(), 'yyyy-MM-dd')
+  const [today, setToday] = useState(() => format(new Date(), 'yyyy-MM-dd'))
+  const [month, setMonth] = useState(() => format(new Date(), 'yyyy-MM'))
   const punchCamRef = useRef(null)
   const punchCanvasRef = useRef(null)
   const [punchType, setPunchType] = useState(null)
   const [punchStream, setPunchStream] = useState(null)
   const [showPunchCam, setShowPunchCam] = useState(false)
-  const month = format(new Date(), 'yyyy-MM')
+  const notifiedNoticeIds = useRef(new Set())
+  const motivationTimer = useRef(null)
 
-  useEffect(() => { load() }, [])
-  useEffect(() => { if (notices.length > 0 && user) markNoticesRead(notices, user.employee_id, user.name) }, [notices])
+  useEffect(() => { load() }, [today])
+  // 跨午夜 / 跨月：每 60 秒檢查、視窗回前景時也檢查；變動時 today/month state 更新 → load() 觸發 reload
+  useEffect(() => {
+    const tick = () => {
+      const nowToday = format(new Date(), 'yyyy-MM-dd')
+      const nowMonth = format(new Date(), 'yyyy-MM')
+      setToday(t => t !== nowToday ? nowToday : t)
+      setMonth(m => m !== nowMonth ? nowMonth : m)
+    }
+    const id = setInterval(tick, 60000)
+    const onVis = () => { if (document.visibilityState === 'visible') tick() }
+    document.addEventListener('visibilitychange', onVis)
+    return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVis) }
+  }, [])
+  useEffect(() => {
+    if (notices.length > 0 && user) {
+      const unseen = notices.filter(n => !notifiedNoticeIds.current.has(n.id))
+      if (unseen.length > 0) {
+        unseen.forEach(n => notifiedNoticeIds.current.add(n.id))
+        markNoticesRead(unseen, user.employee_id, user.name)
+      }
+    }
+  }, [notices, user])
+  // 相機卸載 cleanup（unmount 時關閉鏡頭）
+  useEffect(() => () => { if (punchStream) punchStream.getTracks().forEach(t => t.stop()) }, [punchStream])
+  // motivation timer 卸載 cleanup
+  useEffect(() => () => { if (motivationTimer.current) clearTimeout(motivationTimer.current) }, [])
 
   async function load() {
     setLoading(true)
@@ -187,7 +214,8 @@ export default function StaffHome() {
       if (valid) {
         const msgs = ['今天也是充滿雪茄香氣的一天！🚬','每一支雪茄背後都有你的專業服務 💎','好的開始是成功的一半，準備好迎接貴客了！✨','專業、熱情、細心 — 這就是你 🌟','讓每位客人都感受到 VIP 尊榮 👑','今天的努力是明天的業績 💰','雪茄不只是商品，是一種生活態度 🎩','服務從微笑開始，業績從細節累積 📈','你的專業讓每支雪茄都更有價值 🏆','準備好了嗎？今天又是滿分服務日！⭐','細心呵護每一位會員的窖藏 🗄️','用心推薦，讓客人找到命定的那支 💫','每一次開櫃都是信任的延續 🔑','你不只是店員，你是雪茄管家 🎯','今天的一杯好茶配一支好茄 = 完美 ☕']
         setMotivation({ text: msgs[Math.floor(Math.random() * msgs.length)], type })
-        setTimeout(() => setMotivation(null), 5000)
+        if (motivationTimer.current) clearTimeout(motivationTimer.current)
+        motivationTimer.current = setTimeout(() => setMotivation(null), 5000)
       } else { alert(`距離店面 ${Math.round(dist)}m，超出範圍`) }
       setPunchAsEmp(null) // 重置雙身份打卡狀態
       load()

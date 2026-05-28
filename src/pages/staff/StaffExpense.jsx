@@ -65,8 +65,8 @@ export default function StaffExpense() {
   const [loading, setLoading] = useState(true)
   const fileRef = useRef(null)
   const galleryRef = useRef(null)
-  const today = format(new Date(), 'yyyy-MM-dd')
-  const month = format(new Date(), 'yyyy-MM')
+  const [today, setToday] = useState(() => format(new Date(), 'yyyy-MM-dd'))
+  const [month, setMonth] = useState(() => format(new Date(), 'yyyy-MM'))
   const [showCashForm, setShowCashForm] = useState(false)
   const [newCatName, setNewCatName] = useState('')
   const [newVendorName, setNewVendorName] = useState('')
@@ -85,7 +85,17 @@ export default function StaffExpense() {
   const [filterHandler, setFilterHandler] = useState('all')
   const isBoss = user.role === 'boss' || user.employee_id === 'ADMIN' || user.is_admin
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [today, month])
+  useEffect(() => {
+    const tick = () => {
+      const t = format(new Date(), 'yyyy-MM-dd'); const m = format(new Date(), 'yyyy-MM')
+      setToday(p => p !== t ? t : p); setMonth(p => p !== m ? m : p)
+    }
+    const id = setInterval(tick, 60000)
+    const onVis = () => { if (document.visibilityState === 'visible') tick() }
+    document.addEventListener('visibilitychange', onVis)
+    return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVis) }
+  }, [])
 
   async function load() {
     setLoading(true)

@@ -32,9 +32,16 @@ function SOPView() {
   const [notes, setNotes] = useState({})
   const [humData, setHumData] = useState({})
   const [expanded, setExpanded] = useState({})
-  const today = format(new Date(), 'yyyy-MM-dd')
+  const [today, setToday] = useState(() => format(new Date(), 'yyyy-MM-dd'))
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [today])
+  useEffect(() => {
+    const tick = () => { const t = format(new Date(), 'yyyy-MM-dd'); setToday(p => p !== t ? t : p) }
+    const id = setInterval(tick, 60000)
+    const onVis = () => { if (document.visibilityState === 'visible') tick() }
+    document.addEventListener('visibilitychange', onVis)
+    return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVis) }
+  }, [])
 
   async function load() {
     setLoading(true)
@@ -228,9 +235,16 @@ function CleanView() {
   const [checked, setChecked] = useState({})
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(true)
-  const today = format(new Date(), 'yyyy-MM-dd')
+  const [today, setToday] = useState(() => format(new Date(), 'yyyy-MM-dd'))
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [today])
+  useEffect(() => {
+    const tick = () => { const t = format(new Date(), 'yyyy-MM-dd'); setToday(p => p !== t ? t : p) }
+    const id = setInterval(tick, 60000)
+    const onVis = () => { if (document.visibilityState === 'visible') tick() }
+    document.addEventListener('visibilitychange', onVis)
+    return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVis) }
+  }, [])
   async function load() {
     setLoading(true)
     const { data } = await supabase.from('cleaning_status').select('*').eq('date', today).eq('owner', user.employee_id).order('clean_id')

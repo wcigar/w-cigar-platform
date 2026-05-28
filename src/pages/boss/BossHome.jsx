@@ -29,10 +29,22 @@ export default function BossHome() {
   const [showMoreMenu, setShowMoreMenu] = useState(false)
   const [showSchedule, setShowSchedule] = useState(false)
   const [showActions, setShowActions] = useState(true)
-  const today = format(new Date(), 'yyyy-MM-dd')
-  const month = format(new Date(), 'yyyy-MM')
+  const [today, setToday] = useState(() => format(new Date(), 'yyyy-MM-dd'))
+  const [month, setMonth] = useState(() => format(new Date(), 'yyyy-MM'))
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [today])
+  useEffect(() => {
+    const tick = () => {
+      const t = format(new Date(), 'yyyy-MM-dd')
+      const m = format(new Date(), 'yyyy-MM')
+      setToday(p => p !== t ? t : p)
+      setMonth(p => p !== m ? m : p)
+    }
+    const id = setInterval(tick, 60000)
+    const onVis = () => { if (document.visibilityState === 'visible') tick() }
+    document.addEventListener('visibilitychange', onVis)
+    return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVis) }
+  }, [])
 
   async function load() {
     setLoading(true)
