@@ -278,8 +278,9 @@ export function calcSalaryToDate(emp, cfg, bonusDefs, att, isCurrentMonth, targe
   // 全月出勤 → 直接拿 monthlyBase（避免 Math.round 累積誤差、e.g. 31 天月 ±8 元）
   const proratedBase = att.work === daysInMonth ? monthlyBase : dailyBase * att.work
 
-  let otPay = 0
-  att.otDetails.forEach(d => { d.pay = calcOvertimePay(hourlyBase, d.minutes); otPay += d.pay })
+  // 不直接 mutate att.otDetails（React 反 pattern），map 出新陣列
+  const otDetails = att.otDetails.map(d => ({ ...d, pay: calcOvertimePay(hourlyBase, d.minutes) }))
+  const otPay = otDetails.reduce((s, d) => s + (d.pay || 0), 0)
 
   const empBonuses = bonusDefs.filter(b => b.employee_id === emp.id && b.enabled)
   const attendanceBonusDef = empBonuses.find(b => b.bonus_name && b.bonus_name.includes('全勤'))
@@ -315,7 +316,7 @@ export function calcSalaryToDate(emp, cfg, bonusDefs, att, isCurrentMonth, targe
     monthlyBase, daysInMonth, dayOfMonth, dailyBase, hourlyBase,
     actualWorkedDays: att.work, proratedBase, empBonuses, otherBonuses,
     attendanceBonus: { def: attendanceBonusDef, amount: attendanceBonusAmount, status: attendanceBonusStatus, effective: effectiveAttendanceBonus },
-    otPay, otDetails: att.otDetails, sickDeduct, personalDeduct, absentDeduct,
+    otPay, otDetails, sickDeduct, personalDeduct, absentDeduct,
     sopPenalties: empPenalties || [], sopPenaltyTotal,
     li, hi, lp, liER, hiER, lb, totalBonuses, totalDeductions, currentPayable, erCost, att,
   }

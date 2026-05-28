@@ -47,7 +47,21 @@ export default function HRSchedule() {
 
   async function setMonthStatus(newStatus) {
     setPublishing(true)
-    if (newStatus === 'published') { const { data: pr } = await supabase.from('schedule_preferences').select('employee_id, date, preferred_shift').eq('month', monthStr).not('submitted_at', 'is', null); if (pr && pr.length) { const dates = [...new Set(pr.map(p => p.date))]; const { data: ex } = await supabase.from('schedules').select('employee_id, date').in('date', dates); const eset = new Set((ex || []).map(r => r.employee_id + '|' + r.date)); const ins = pr.filter(p => !eset.has(p.employee_id + '|' + p.date)).map(p => ({ employee_id: p.employee_id, date: p.date, shift: p.preferred_shift === '都可' ? '早班' : p.preferred_shift === '不可' ? '休假' : p.preferred_shift })); if (ins.length) await supabase.from('schedules').insert(ins); } } const { error } = await supabase.from('schedule_months').upsert({ month: monthStr, status: newStatus, updated_at: new Date().toISOString() }, { onConflict: 'month' })
+    if (newStatus === 'published') {
+      const { data: pr, error: prErr } = await supabase.from('schedule_preferences').select('employee_id, date, preferred_shift').eq('month', monthStr).not('submitted_at', 'is', null)
+      if (prErr) { setPublishing(false); alert('❌ 讀取偏好失敗：' + prErr.message); return }
+      if (pr && pr.length) {
+        const dates = [...new Set(pr.map(p => p.date))]
+        const { data: ex } = await supabase.from('schedules').select('employee_id, date').in('date', dates)
+        const eset = new Set((ex || []).map(r => r.employee_id + '|' + r.date))
+        const ins = pr.filter(p => !eset.has(p.employee_id + '|' + p.date)).map(p => ({ employee_id: p.employee_id, date: p.date, shift: p.preferred_shift === '都可' ? '早班' : p.preferred_shift === '不可' ? '休假' : p.preferred_shift }))
+        if (ins.length) {
+          const { error: insErr } = await supabase.from('schedules').insert(ins)
+          if (insErr) { setPublishing(false); alert('❌ 發布失敗（部分排班寫入失敗）：' + insErr.message); return }
+        }
+      }
+    }
+    const { error } = await supabase.from('schedule_months').upsert({ month: monthStr, status: newStatus, updated_at: new Date().toISOString() }, { onConflict: 'month' })
     setPublishing(false)
     if (error) { alert('狀態更新失敗：' + error.message); return }
     const labels = { collecting: '已重新開放收集偏好', draft: '已鎖定為草稿（員工無法再改希望）', published: '✅ 已發布！員工前台會同步看到正式排班' }
