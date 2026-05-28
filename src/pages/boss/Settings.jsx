@@ -159,10 +159,28 @@ function EmployeeManager() {
 
   async function addEmployee() {
     if (!newEmp.id || !newEmp.name || !newEmp.login_code) return alert('ID、名稱、登入碼必填')
-    if (newEmp.login_code.length < 4) return alert('登入碼至少4碼')
-    if (emps.find(e => e.id === newEmp.id.toUpperCase())) return alert('ID已存在')
-    await supabase.from('employees').insert({ ...newEmp, id: newEmp.id.toUpperCase(), enabled: true, is_admin: false })
-    setNewEmp({ id: '', name: '', title: '', login_code: '', emp_type: '正職' }); setAdding(false); load()
+    if (newEmp.login_code.length < 4) return alert('登入碼至少 4 碼')
+    if (emps.find(e => e.id === newEmp.id.toUpperCase())) return alert('ID 已存在')
+    const adminId = JSON.parse(localStorage.getItem('w_cigar_user') || '{}')?.employee_id || 'ADMIN'
+    const { data, error } = await supabase.rpc('admin_create_employee', {
+      p_admin_id: adminId,
+      p_id: newEmp.id,
+      p_name: newEmp.name,
+      p_title: newEmp.title || '',
+      p_login_code: newEmp.login_code,
+      p_emp_type: newEmp.emp_type || '正職',
+      p_salary_type: newEmp.salary_type || '月薪',
+      p_salary_amount: Number(newEmp.salary_amount || 0),
+      p_phone: newEmp.phone || '',
+      p_hire_date: newEmp.hire_date || null,
+      p_primary_shift: newEmp.primary_shift || null,
+    })
+    if (error) { alert('❌ 新增失敗: ' + error.message); return }
+    if (data && !data.success) { alert('❌ ' + (data.error || '新增失敗')); return }
+    alert('✅ 已新增 ' + newEmp.name)
+    setNewEmp({ id: '', name: '', title: '', login_code: '', emp_type: '正職' })
+    setAdding(false)
+    load()
   }
 
   if (loading) return <Loading />
