@@ -397,14 +397,17 @@ function ConsumeModal({ item, member, employee, onClose, onDone }) {
     if (qty > item.qty) return alert(`最多 ${item.qty} 支`)
     if (!sigData) return alert('請客戶簽名')
     setBusy(true)
-    try {
-      const { data, error } = await supabase.rpc('vip_withdraw', { p_vip_id:member.vip_code||member.id, p_cabinet_id:item.id, p_qty:qty, p_destination:dest, p_staff_id:employee.login_code||employee.id, p_staff_name:employee.name, p_signature_url:sigData, p_notes:'' })
-      if (error) throw error
-      if (data && !data.success) throw new Error(data.error || '領取失敗')
-    } catch (e) {
-      // Fallback to direct update if RPC doesn't exist
-      await supabase.from('vip_cabinets').update({ quantity: item.qty - qty, updated_at: new Date().toISOString() }).eq('id', item.id)
-      await supabase.from('vip_withdrawals').insert({ vip_id:member.vip_code||member.id, vip_name:member.name, cabinet_id:item.id, cabinet_no:item.cabinet_no, product_name:item.product_name, qty_withdrawn:qty, qty_remaining:item.qty-qty, destination:dest, staff_id:employee.login_code||employee.id, staff_name:employee.name, signature_url:sigData, withdrawn_at:new Date().toISOString() })
+    const { data, error } = await supabase.rpc('vip_withdraw', { p_vip_id:member.vip_code||member.id, p_cabinet_id:item.id, p_qty:qty, p_destination:dest, p_staff_id:employee.login_code||employee.id, p_staff_name:employee.name, p_signature_url:sigData, p_notes:'' })
+    // 只在「RPC 不存在」時 fallback (PGRST202 / 42883)、業務邏輯失敗 (e.g. 庫存不足) 不繞過
+    const rpcMissing = error && (error.code === 'PGRST202' || error.code === '42883' || /could not find the function|function .* does not exist/i.test(error.message || ''))
+    if (error && !rpcMissing) { setBusy(false); alert('領取失敗：' + error.message); return }
+    if (data && data.success === false) { setBusy(false); alert('領取失敗：' + (data.error || '未知')); return }
+    if (rpcMissing) {
+      // TOCTOU 保護：條件 update 必須 quantity >= qty 才更新
+      const { data: upd, error: e1 } = await supabase.from('vip_cabinets').update({ quantity: item.qty - qty, updated_at: new Date().toISOString() }).eq('id', item.id).gte('quantity', qty).select()
+      if (e1 || !upd || upd.length === 0) { setBusy(false); alert('領取失敗：庫存不足或資料已被修改'); return }
+      const { error: e2 } = await supabase.from('vip_withdrawals').insert({ vip_id:member.vip_code||member.id, vip_name:member.name, cabinet_id:item.id, cabinet_no:item.cabinet_no, product_name:item.product_name, qty_withdrawn:qty, qty_remaining:item.qty-qty, destination:dest, staff_id:employee.login_code||employee.id, staff_name:employee.name, signature_url:sigData, withdrawn_at:new Date().toISOString() })
+      if (e2) { setBusy(false); alert('⚠️ 庫存已扣但領取紀錄寫入失敗：' + e2.message); return }
     }
     setBusy(false); onDone()
   }

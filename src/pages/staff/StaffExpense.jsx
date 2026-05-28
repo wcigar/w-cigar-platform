@@ -136,7 +136,7 @@ export default function StaffExpense() {
     const { data: insertData, error: insertErr } = await supabase.from('expenses').insert({ date: today, category: form.category, vendor: form.vendor, item: form.item || form.category, amount: +form.amount, payment: form.payment, handler: user.name, submitted_by: user.employee_id, photo_url: photoUrls.length > 1 ? JSON.stringify(photoUrls) : (photoUrls[0] || ''), note: (noReceipt ? '[無收據:' + noReceiptReason + '] ' : '') + form.note }).select().single()
     setSubmitting(false)
     if (insertErr) { alert('❌ 提交失敗: ' + insertErr.message + '\n\n請截圖傳給老闆'); console.error('expenses insert error:', insertErr); return }
-    alert('✅ 支出已提交（ID: ' + insertData?.id + '）')
+    alert('✅ 支出已提交' + (insertData?.id ? '（ID: ' + insertData.id + '）' : ''))
     setForm({ category: '', vendor: '', item: '', amount: '', payment: '現金', note: '' }); setPhotos([]); setPreviews([]); setNoReceipt(false); setNoReceiptReason(''); load()
   }
 
@@ -368,7 +368,7 @@ export default function StaffExpense() {
           </div>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 6 }}>收據照片</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-            <input type="checkbox" checked={noReceipt} onChange={e => { setNoReceipt(e.target.checked); if (e.target.checked) { setPhoto(null); setPreview(null) } }} style={{ width: 22, height: 22, accentColor: '#f59e0b' }} />
+            <input type="checkbox" checked={noReceipt} onChange={e => { setNoReceipt(e.target.checked); if (e.target.checked) { setPhotos([]); setPreviews([]) } }} style={{ width: 22, height: 22, accentColor: '#f59e0b' }} />
             <span style={{ fontSize: 13, color: noReceipt ? '#f59e0b' : 'var(--text-dim)' }}>無收據</span>
             {noReceipt && (
               <select value={noReceiptReason} onChange={e => setNoReceiptReason(e.target.value)} style={{ flex: 1, fontSize: 13, padding: '6px 8px', minHeight: 36 }}>

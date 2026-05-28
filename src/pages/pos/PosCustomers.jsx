@@ -63,7 +63,7 @@ export default function PosCustomers() {
         .order('last_purchase', { ascending: false, nullsFirst: false })
 
       if (search.trim()) {
-        const s = `%${search.trim()}%`
+        const s = `%${search.trim().replace(/[,()\\]/g, ' ')}%`
         q = q.or(`name.ilike.${s},phone.ilike.${s},line_id.ilike.${s},ig_handle.ilike.${s},vip_code.ilike.${s}`)
       }
       if (typeFilter !== '全部') q = q.eq('customer_type', typeFilter)

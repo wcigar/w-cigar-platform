@@ -119,7 +119,7 @@ export default function StaffHome() {
     const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
     if (lastDay - now.getDate() <= 2) {
       const { data: invItems } = await supabase.from('inventory_master').select('id, name, category, current_stock, safe_stock, unit').eq('enabled', true).eq('owner', user.employee_id)
-      const todayRecords = await supabase.from('inventory_records').select('item_id').eq('staff_code', user.employee_id).gte('created_at', today + 'T00:00:00')
+      const todayRecords = await supabase.from('inventory_records').select('item_id').eq('staff_code', user.employee_id).gte('created_at', today + 'T00:00:00+08:00')
       const doneIds = new Set((todayRecords.data || []).map(r => r.item_id))
       setInvReminder((invItems || []).filter(i => !doneIds.has(i.id)))
     } else { setInvReminder([]) }

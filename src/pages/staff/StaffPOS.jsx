@@ -219,7 +219,7 @@ export default function StaffPOS() {
   async function searchCustomers(q) {
     setCustomerSearching(true)
     let query = supabase.from('customers').select('id, name, phone, customer_type, membership_tier, total_spent, belongs_to').eq('enabled', true).order('total_spent', { ascending: false }).limit(50)
-    if (q?.trim()) query = query.or(`name.ilike.%${q.trim()}%,phone.ilike.%${q.trim()}%`)
+    if (q?.trim()) { const sq = q.trim().replace(/[,()\\]/g, ' '); query = query.or(`name.ilike.%${sq}%,phone.ilike.%${sq}%`) }
     const { data } = await query; setCustomerResults(data || []); setCustomerSearching(false)
   }
   useEffect(() => { if (showCustomerSearch) searchCustomers(customerQuery) }, [showCustomerSearch])

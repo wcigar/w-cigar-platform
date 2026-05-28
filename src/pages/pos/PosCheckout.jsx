@@ -174,7 +174,7 @@ export default function PosCheckout({ session, shift, onShiftChange, onCartCount
   // ── Today Orders ──
   async function loadTodayOrders() {
     const td = todayTaipei()
-    const { data } = await supabase.from('unified_orders').select('*').in('channel', ['store', 'pos-v2']).gte('created_at', td + 'T00:00:00').lte('created_at', td + 'T23:59:59').order('created_at', { ascending: false })
+    const { data } = await supabase.from('unified_orders').select('*').in('channel', ['store', 'pos-v2']).gte('created_at', td + 'T00:00:00+08:00').lte('created_at', td + 'T23:59:59+08:00').order('created_at', { ascending: false })
     setTodayOrders(data || [])
   }
 
@@ -190,7 +190,7 @@ export default function PosCheckout({ session, shift, onShiftChange, onCartCount
   async function searchCustomers(q) {
     setCustomerSearching(true)
     let query = supabase.from('customers').select('id, name, phone, customer_type, membership_tier, total_spent, belongs_to').eq('enabled', true).order('total_spent', { ascending: false }).limit(50)
-    if (q?.trim()) query = query.or(`name.ilike.%${q.trim()}%,phone.ilike.%${q.trim()}%`)
+    if (q?.trim()) { const sq = q.trim().replace(/[,()\\]/g, ' '); query = query.or(`name.ilike.%${sq}%,phone.ilike.%${sq}%`) }
     const { data } = await query
     setCustomerResults(data || [])
     setCustomerSearching(false)

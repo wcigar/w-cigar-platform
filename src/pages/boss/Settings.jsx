@@ -119,7 +119,7 @@ function EmployeeManager() {
 
   async function saveEdit() {
     if (!editing) return
-    const adminId = JSON.parse(localStorage.getItem('user') || '{}')?.employee_id || 'ADMIN'
+    const adminId = JSON.parse(localStorage.getItem('w_cigar_user') || '{}')?.employee_id || 'ADMIN'
     const { data, error } = await supabase.rpc('admin_update_employee', {
       p_admin_employee_id: adminId,
       p_target_employee_id: editing.id,

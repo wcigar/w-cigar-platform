@@ -275,7 +275,8 @@ export function calcSalaryToDate(emp, cfg, bonusDefs, att, isCurrentMonth, targe
   const monthlyBase = cfg.monthly_salary || 0
   const dailyBase = monthlyBase > 0 ? Math.round(monthlyBase / daysInMonth) : 0
   const hourlyBase = dailyBase > 0 ? Math.round(dailyBase / 8) : 0
-  const proratedBase = dailyBase * att.work
+  // 全月出勤 → 直接拿 monthlyBase（避免 Math.round 累積誤差、e.g. 31 天月 ±8 元）
+  const proratedBase = att.work === daysInMonth ? monthlyBase : dailyBase * att.work
 
   let otPay = 0
   att.otDetails.forEach(d => { d.pay = calcOvertimePay(hourlyBase, d.minutes); otPay += d.pay })
@@ -487,6 +488,7 @@ export default function Payroll() {
     }]
     const { data, error } = await supabase.rpc('payroll_finalize', { p_admin_id: adminId, p_month: month, p_records: records })
     if (error) { alert('結轉失敗: ' + error.message); return }
+    if (data && data.ok === false) { alert('結轉失敗: ' + (data.error || '未知原因')); return }
 
     // LINE 個人私推（鐵律：薪資資料絕不進員工群）
     // 抓員工的 line_user_id、直接推他個人 → 只有他自己看得到
