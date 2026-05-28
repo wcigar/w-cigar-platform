@@ -406,12 +406,11 @@ export default function Payroll() {
 
   async function saveSalConfig(eid) {
     if (!editingSal) return
-    await supabase.rpc('upsert_salary_config', {
-      p_admin_id: user?.employee_id,
-      p_employee_id: eid,
-      p_monthly_salary: +editingSal.monthly_salary,
-      p_salary_type: editingSal.salary_type
+    const { error } = await supabase.rpc('upsert_salary_config', {
+      p_admin_id: user?.employee_id, p_employee_id: eid,
+      p_monthly_salary: +editingSal.monthly_salary, p_salary_type: editingSal.salary_type
     })
+    if (error) { alert('❌ 薪資設定失敗：' + error.message); return }
     logAudit('Salary', `更新 ${eid} $${editingSal.monthly_salary}`, 'ADMIN')
     setEditingSal(null); load()
   }
@@ -425,17 +424,13 @@ export default function Payroll() {
       reason: adjForm.reason,
     }
     if (!row.base_override && !row.bonus_override && !row.deduction_override && !row.final_pay_override) return alert('請至少填寫一項覆寫')
-    await supabase.rpc('upsert_payroll_adjustment', {
-      p_admin_id: user?.employee_id,
-      p_employee_id: eid,
-      p_month: month,
-      p_base_override: row.base_override,
-      p_bonus_override: row.bonus_override,
-      p_deduction_override: row.deduction_override,
-      p_final_pay_override: row.final_pay_override,
-      p_amount: row.amount,
-      p_reason: row.reason
+    const { error } = await supabase.rpc('upsert_payroll_adjustment', {
+      p_admin_id: user?.employee_id, p_employee_id: eid, p_month: month,
+      p_base_override: row.base_override, p_bonus_override: row.bonus_override,
+      p_deduction_override: row.deduction_override, p_final_pay_override: row.final_pay_override,
+      p_amount: row.amount, p_reason: row.reason
     })
+    if (error) { alert('❌ 薪資覆寫失敗：' + error.message); return }
     logAudit('PayrollAdjust', `${eid} 覆寫 底薪:${row.base_override||'-'} 獎金:${row.bonus_override||'-'} 扣款:${row.deduction_override||'-'} 實發:${row.final_pay_override||'-'} ${row.reason}`, 'ADMIN')
     setEditingAdj(null); setAdjForm({ base: '', bonus: '', deduction: '', final_pay: '', reason: '' }); load()
   }
@@ -444,27 +439,36 @@ export default function Payroll() {
     const existing = adjustments[eid]
     if (!existing?.id) return
     if (!confirm('確定移除此調整？')) return
-    await supabase.rpc('delete_payroll_adjustment', { p_admin_id: user?.employee_id, p_id: existing.id })
+    const { error } = await supabase.rpc('delete_payroll_adjustment', { p_admin_id: user?.employee_id, p_id: existing.id })
+    if (error) { alert('❌ 移除失敗：' + error.message); return }
     setEditingAdj(null); load()
   }
 
   async function addBonus() {
     if (!newBonus.employee_id || !newBonus.bonus_name || !newBonus.amount) return alert('請填完')
     const name = emps.find(e => e.id === newBonus.employee_id)?.name || ''
-    await supabase.rpc('add_bonus_definition', {
-      p_admin_id: user?.employee_id,
-      p_employee_id: newBonus.employee_id,
-      p_name: name,
-      p_bonus_name: newBonus.bonus_name,
-      p_amount: +newBonus.amount
+    const { error } = await supabase.rpc('add_bonus_definition', {
+      p_admin_id: user?.employee_id, p_employee_id: newBonus.employee_id,
+      p_name: name, p_bonus_name: newBonus.bonus_name, p_amount: +newBonus.amount
     })
+    if (error) { alert('❌ 加給新增失敗：' + error.message); return }
     setNewBonus({ employee_id: '', bonus_name: '', amount: '' }); setShowBonusForm(false); load()
   }
-  async function toggleBonus(id, en) { await supabase.rpc('toggle_bonus_definition', { p_admin_id: user?.employee_id, p_id: id, p_enabled: en }); load() }
-  async function deleteBonus(id) { if (!confirm('刪除？')) return; await supabase.rpc('delete_bonus_definition', { p_admin_id: user?.employee_id, p_id: id }); load() }
+  async function toggleBonus(id, en) {
+    const { error } = await supabase.rpc('toggle_bonus_definition', { p_admin_id: user?.employee_id, p_id: id, p_enabled: en })
+    if (error) { alert('❌ 切換失敗：' + error.message); return }
+    load()
+  }
+  async function deleteBonus(id) {
+    if (!confirm('刪除？')) return
+    const { error } = await supabase.rpc('delete_bonus_definition', { p_admin_id: user?.employee_id, p_id: id })
+    if (error) { alert('❌ 刪除失敗：' + error.message); return }
+    load()
+  }
   async function addExpense() {
-    if (!newExp.category || !newExp.amount) return
-    await supabase.from('expenses').insert({ date: newExp.date, category: newExp.category, item: newExp.item, amount: +newExp.amount, payment: newExp.payment, handler: 'ADMIN' })
+    if (!newExp.category || !newExp.amount) return alert('請填分類 + 金額')
+    const { error } = await supabase.from('expenses').insert({ date: newExp.date, category: newExp.category, item: newExp.item, amount: +newExp.amount, payment: newExp.payment, handler: 'ADMIN' })
+    if (error) { alert('❌ 新增支出失敗：' + error.message); return }
     setNewExp({ category: '', item: '', amount: '', payment: '現金', date: format(new Date(), 'yyyy-MM-dd') }); setShowExpForm(false); load()
   }
   async function deleteExpense(id) { if (!confirm('刪除？')) return; await supabase.from('expenses').delete().eq('id', id); load() }

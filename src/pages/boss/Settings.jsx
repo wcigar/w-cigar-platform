@@ -360,15 +360,13 @@ function SOPManager() {
   async function saveEdit() {
     if (!editing) return
     const { task_id, ...rest } = editing
-    await supabase.from('sop_definitions').update(rest).eq('task_id', task_id)
-    // ✅ 同步更新今日 task_status（標題、負責人、類別、截止時間）
+    const { error: e1 } = await supabase.from('sop_definitions').update(rest).eq('task_id', task_id)
+    if (e1) { alert('❌ SOP 定義更新失敗：' + e1.message); return }
     const today = format(new Date(), 'yyyy-MM-dd')
-    await supabase.from('task_status').update({
-      title: rest.title,
-      owner: rest.owner,
-      category: rest.category,
-      due_time: rest.due_time || null
+    const { error: e2 } = await supabase.from('task_status').update({
+      title: rest.title, owner: rest.owner, category: rest.category, due_time: rest.due_time || null
     }).eq('task_id', task_id).eq('date', today)
+    if (e2) { alert('⚠️ SOP 定義已更新但今日任務同步失敗：' + e2.message); }
     setEditing(null); load()
     alert('SOP定義已更新，今日任務已同步')
   }
@@ -376,8 +374,8 @@ function SOPManager() {
   async function addTask() {
     if (!newTask.task_id || !newTask.title) return alert('ID和名稱必填')
     if (defs.find(d => d.task_id === newTask.task_id)) return alert('ID已存在')
-    await supabase.from('sop_definitions').insert(newTask)
-    // ✅ 清除播種快取，重跑 seeder 讓新任務立即出現在員工端
+    const { error } = await supabase.from('sop_definitions').insert(newTask)
+    if (error) { alert('❌ SOP 新增失敗：' + error.message); return }
     const today = format(new Date(), 'yyyy-MM-dd')
     sessionStorage.removeItem('seeded_' + today)
     await seedTodayTasks()
@@ -388,10 +386,11 @@ function SOPManager() {
 
   async function deleteTask(tid) {
     if (!confirm(`確定刪除「${tid}」？`)) return
-    await supabase.from('sop_definitions').delete().eq('task_id', tid)
-    // ✅ 同步刪除今日未完成的 task_status（已完成的保留不動）
+    const { error: e1 } = await supabase.from('sop_definitions').delete().eq('task_id', tid)
+    if (e1) { alert('❌ SOP 刪除失敗：' + e1.message); return }
     const today = format(new Date(), 'yyyy-MM-dd')
-    await supabase.from('task_status').delete().eq('task_id', tid).eq('date', today).eq('completed', false)
+    const { error: e2 } = await supabase.from('task_status').delete().eq('task_id', tid).eq('date', today).eq('completed', false)
+    if (e2) { alert('⚠️ SOP 已刪除但今日任務清除失敗：' + e2.message); }
     load()
     alert('SOP定義已刪除，今日未完成任務已移除')
   }
@@ -528,8 +527,10 @@ function KPIManager() {
     const m = calcMetrics(empId, empName)
     const existing = kpis.find(k => k.employee_id === empId)
     const row = { month, employee_id: empId, name: empName, sop_rate: m.rate, grab_count: m.grabs, suggested_grade: m.grade, boss_grade: bossGrade, boss_comment: comment, lock_status: '草稿' }
-    if (existing) await supabase.from('kpi_evaluations').update(row).eq('id', existing.id)
-    else await supabase.from('kpi_evaluations').insert(row)
+    const { error } = existing
+      ? await supabase.from('kpi_evaluations').update(row).eq('id', existing.id)
+      : await supabase.from('kpi_evaluations').insert(row)
+    if (error) { alert('❌ 評鑑儲存失敗：' + error.message); return }
     alert('評鑑已儲存'); load()
   }
 
@@ -537,7 +538,9 @@ function KPIManager() {
     if (lock && !confirm('鎖定後無法修改，確定？')) return
     const existing = kpis.find(k => k.employee_id === empId)
     if (!existing) return alert('請先儲存評鑑')
-    await supabase.from('kpi_evaluations').update({ lock_status: lock ? '已鎖定' : '草稿' }).eq('id', existing.id); load()
+    const { error } = await supabase.from('kpi_evaluations').update({ lock_status: lock ? '已鎖定' : '草稿' }).eq('id', existing.id)
+    if (error) { alert('❌ 鎖定狀態更新失敗：' + error.message); return }
+    load()
   }
 
   if (loading) return <Loading />
