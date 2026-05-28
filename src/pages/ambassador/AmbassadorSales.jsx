@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { todayTw } from '../../lib/timezone'
 import { BarChart3, Plus, Minus, Send, CheckCircle2 } from 'lucide-react'
 
 export default function AmbassadorSales({ user }) {
@@ -10,7 +11,7 @@ export default function AmbassadorSales({ user }) {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [msg, setMsg] = useState('')
-  const [saleDate, setSaleDate] = useState(new Date().toISOString().slice(0, 10))
+  const [saleDate, setSaleDate] = useState(todayTw())
   const [search, setSearch] = useState('')
 
   useEffect(() => { loadData() }, [])

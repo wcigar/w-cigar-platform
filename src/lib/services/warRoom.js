@@ -1,12 +1,13 @@
 // src/lib/services/warRoom.js
 // 老闆戰情室（昨日/今日營運總覽）
 import { supabase } from '../supabase'
+import { todayTw } from '../timezone'
 
 const USE_MOCK = true
 
 export async function getBossWarRoomDaily(date) {
   if (USE_MOCK) return buildMock()
-  const { data, error } = await supabase.rpc('get_boss_war_room_daily', { p_date: date || new Date().toISOString().slice(0,10) })
+  const { data, error } = await supabase.rpc('get_boss_war_room_daily', { p_date: date || todayTw() })
   if (error) throw error
   return data
 }

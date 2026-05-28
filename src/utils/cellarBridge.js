@@ -3,6 +3,7 @@
  * 結帳後自動建立 VIP 訂單 + 入櫃紀錄 + 扣庫存 + 庫存異動紀錄
  */
 import { supabase } from '../lib/supabase'
+import { todayTw } from '../lib/timezone'
 
 function genOrderNo() {
   const d = new Date()
@@ -98,7 +99,7 @@ export async function bridgePosToCellar({ customer, items, staff, signatureUrl, 
           quantity: item.qty,
           unit_price: item.price,
           market_value: item.price * item.qty,
-          stored_date: new Date().toISOString().slice(0, 10),
+          stored_date: todayTw(),
           stored_at: new Date().toISOString()
         })
     }
@@ -162,6 +163,6 @@ export async function bridgePosToCellar({ customer, items, staff, signatureUrl, 
       cabinet_no: i.cabinet_no || customer.cabinet_no || 'A1'
     })),
     customer,
-    storedDate: new Date().toISOString().slice(0, 10)
+    storedDate: todayTw()
   }
 }

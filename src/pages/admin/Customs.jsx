@@ -5,6 +5,7 @@
 // ============================================================
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { todayTw } from '../../lib/timezone'
 import { FileText, Plus, Trash2, Download, Share2, Package, Edit3, X, ChevronRight, ChevronDown, ChevronUp, FileBadge, Link2, Copy, Check, Calculator, Settings } from 'lucide-react'
 import {
   generateAllDocs, downloadPdf, sharePdfFiles, computeShipmentTotals,
@@ -51,8 +52,8 @@ export default function Customs() {
 
   function newDraft() {
     return {
-      shipment_no: 'INV-' + new Date().toISOString().slice(2,10).replace(/-/g, ''),
-      shipment_date: new Date().toISOString().slice(0, 10),
+      shipment_no: 'INV-' + todayTw().slice(2).replace(/-/g, ''),
+      shipment_date: todayTw(),
       buyer_name: '', buyer_address: '',
       shipment_method: 'Passenger checked baggage',
       total_packages: '1 checked baggage',

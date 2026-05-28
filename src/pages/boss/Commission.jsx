@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
+import { monthTw } from '../../lib/timezone'
 import { TrendingUp, RefreshCw, ArrowRight } from 'lucide-react'
 
 export default function Commission() {
   const { user } = useAuth()
-  const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7))
+  const [month, setMonth] = useState(() => monthTw())
   const [summary, setSummary] = useState(null)
   const [details, setDetails] = useState([])
   const [rules, setRules] = useState([])

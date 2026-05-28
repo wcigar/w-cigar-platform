@@ -5,6 +5,7 @@
 // ============================================================
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { todayTw } from '../../lib/timezone'
 import { Plus, Trash2, X, ChevronRight, FileText, Download, Check, Briefcase } from 'lucide-react'
 import {
   generateAllDocs, downloadPdf, sharePdfFiles, computeShipmentTotals,
@@ -32,8 +33,8 @@ export default function FactorySubmit() {
   const [showBrowse, setShowBrowse] = useState(false)
 
   const [draft, setDraft] = useState({
-    shipment_no: 'INV-' + new Date().toISOString().slice(2,10).replace(/-/g,'') + '-' + Math.floor(Math.random()*900+100),
-    shipment_date: new Date().toISOString().slice(0, 10),
+    shipment_no: 'INV-' + todayTw().slice(2).replace(/-/g,'') + '-' + Math.floor(Math.random()*900+100),
+    shipment_date: todayTw(),
     package_count: 1,
     shipment_method: 'Passenger checked baggage',
     invoice_terms: 'FOB, ex-Factory',
@@ -295,7 +296,7 @@ export default function FactorySubmit() {
             <button onClick={() => downloadAll('download')} style={S.btnSecondary}><Download size={16} style={{ verticalAlign: -3, marginRight: 6 }} /> 下載到電腦 · Download to Computer</button>
           </div>
           <div style={{ marginTop: 20, padding: 12, background: 'rgba(74,222,128,0.1)', borderRadius: 8, border: '1px solid rgba(74,222,128,0.3)', fontSize: 12, lineHeight: 1.6 }}>✓ 已提交至 W Cigar Bar 總部，老闆會在後台看到此筆紀錄<br/>✓ Submitted to W Cigar Bar HQ. Boss will see this in admin panel.</div>
-          <button onClick={() => { setStep(1); setSuccess(null); setDraft({ shipment_no: 'INV-' + new Date().toISOString().slice(2,10).replace(/-/g,'') + '-' + Math.floor(Math.random()*900+100), shipment_date: new Date().toISOString().slice(0, 10), package_count: 1, shipment_method: 'Passenger checked baggage', invoice_terms: 'FOB, ex-Factory', items: [] }) }} style={{ ...S.btnSecondary, marginTop: 12 }}>+ 再提交一筆 / Submit Another</button>
+          <button onClick={() => { setStep(1); setSuccess(null); setDraft({ shipment_no: 'INV-' + todayTw().slice(2).replace(/-/g,'') + '-' + Math.floor(Math.random()*900+100), shipment_date: todayTw(), package_count: 1, shipment_method: 'Passenger checked baggage', invoice_terms: 'FOB, ex-Factory', items: [] }) }} style={{ ...S.btnSecondary, marginTop: 12 }}>+ 再提交一筆 / Submit Another</button>
         </div>
       )}
       <div style={S.footer}>由 W Cigar Bar 提供 — wcigarbar.com</div>

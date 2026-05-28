@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { todayTw } from '../lib/timezone'
 import { printVipLabel } from '../utils/printer'
 
 /* ═══ CONSTANTS ═══ */
@@ -505,7 +506,7 @@ function NewOrderModal({ employee, productCatalog, staffMembers, onClose, onDone
     if (error) { setBusy(false); return alert('建立失敗: '+error.message) }
     for (const i of validItems) { const tq = (+i.qtyCab||0)+(+i.qtyOut||0)+(+i.qtySite||0)+(+i.qtyPend||0); const up = +i.price||0; await supabase.from('vip_order_items').insert({ order_id:ord.id, order_no:orderNo, product_name:i.name, qty_ordered:tq, qty_delivered:tq-(+i.qtyPend||0), qty_pending:+i.qtyPend||0, unit_price:up, subtotal:tq*up, destination:orderType, cabinet_no:i.cab||null, status:(+i.qtyPend||0)>0?'部分到貨':'已到齊' }) }
     // Cabinet upsert: check existing then update or insert
-    for (const i of validItems) { if ((+i.qtyCab||0) > 0 && i.cab) { const vid = vipId.trim(); const { data:existing } = await supabase.from('vip_cabinets').select('id,quantity').eq('vip_id',vid).eq('cabinet_no',i.cab).eq('product_name',i.name).maybeSingle(); if (existing) { await supabase.from('vip_cabinets').update({ quantity:(existing.quantity||0)+(+i.qtyCab), updated_at:new Date().toISOString() }).eq('id',existing.id) } else { await supabase.from('vip_cabinets').insert({ vip_id:vid, cabinet_no:i.cab, product_name:i.name, quantity:+i.qtyCab, unit_price:+i.price||0, market_value:(+i.qtyCab)*(+i.price||0), stored_date:new Date().toISOString().slice(0,10) }) } } }
+    for (const i of validItems) { if ((+i.qtyCab||0) > 0 && i.cab) { const vid = vipId.trim(); const { data:existing } = await supabase.from('vip_cabinets').select('id,quantity').eq('vip_id',vid).eq('cabinet_no',i.cab).eq('product_name',i.name).maybeSingle(); if (existing) { await supabase.from('vip_cabinets').update({ quantity:(existing.quantity||0)+(+i.qtyCab), updated_at:new Date().toISOString() }).eq('id',existing.id) } else { await supabase.from('vip_cabinets').insert({ vip_id:vid, cabinet_no:i.cab, product_name:i.name, quantity:+i.qtyCab, unit_price:+i.price||0, market_value:(+i.qtyCab)*(+i.price||0), stored_date:todayTw() }) } } }
     if (paid > 0) await supabase.from('vip_payments').insert({ order_id:ord.id, order_no:orderNo, vip_id:vipId.trim(), amount:paid, payment_method:payMethod, staff_id:employee.login_code||employee.id, staff_name:employee.name, receipt_url:receiptData||null })
     setBusy(false); alert('✅ 訂單已建立'); onDone()
   }
