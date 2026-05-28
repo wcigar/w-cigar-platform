@@ -16,8 +16,18 @@ export default function PettyCash() {
   const [cashForm, setCashForm] = useState({ amount: '', method: '', given_by: '', received_by: '', note: '' })
 
   function startEdit(r) { setEditingCash(r.id); setCashForm({ amount: String(r.amount || ''), method: r.method || '現金', given_by: r.given_by || 'Wilson', received_by: r.received_by || r.employee_name || '', note: r.note || '' }) }
-  async function saveEdit(id) { if (!cashForm.amount || +cashForm.amount <= 0) return alert('金額不可為空'); await supabase.from('petty_cash').update({ amount: +cashForm.amount, method: cashForm.method, given_by: cashForm.given_by, received_by: cashForm.received_by, note: cashForm.note }).eq('id', id); setEditingCash(null); load() }
-  async function deleteCash(r) { if (!confirm(`確定刪除這筆零用金？金額：$${r.amount.toLocaleString()}`)) return; await supabase.from('petty_cash').delete().eq('id', r.id); load() }
+  async function saveEdit(id) {
+    if (!cashForm.amount || +cashForm.amount <= 0) return alert('金額不可為空')
+    const { error } = await supabase.from('petty_cash').update({ amount: +cashForm.amount, method: cashForm.method, given_by: cashForm.given_by, received_by: cashForm.received_by, note: cashForm.note }).eq('id', id)
+    if (error) { alert('❌ 編輯失敗：' + error.message); return }
+    setEditingCash(null); load()
+  }
+  async function deleteCash(r) {
+    if (!confirm(`確定刪除這筆零用金？金額：$${r.amount.toLocaleString()}`)) return
+    const { error } = await supabase.from('petty_cash').delete().eq('id', r.id)
+    if (error) { alert('❌ 刪除失敗：' + error.message); return }
+    load()
+  }
   const months = Array.from({ length: 6 }, (_, i) => format(subMonths(new Date(), i), 'yyyy-MM'))
 
   useEffect(() => { load() }, [month])

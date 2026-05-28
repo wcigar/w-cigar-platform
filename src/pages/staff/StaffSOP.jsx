@@ -72,6 +72,7 @@ function SOPView() {
     }
     setSubmitting(true)
     let success = 0
+    const failed = []
     for (const taskId of checkedIds) {
       const task = tasks.find(t => t.task_id === taskId)
       if (!task) continue
@@ -85,21 +86,24 @@ function SOPView() {
         photoUrl = data.publicUrl
       }
       const h = humData[taskId] || {}
-      await supabase.from('task_status').update({
+      const { error: upErr } = await supabase.from('task_status').update({
         completed: true, completed_at: new Date().toISOString(), completed_by: user.name, completed_by_id: user.employee_id,
         photo_url: photoUrl, humidor_temp: h.ht || '', humidor_rh: h.hr || '', cabinet_temp: h.ct || '', cabinet_rh: h.cr || '', note: notes[taskId] || '',
       }).eq('id', task.id)
+      if (upErr) { failed.push(task.title + '：' + upErr.message); continue }
       success++
     }
     setSubmitting(false)
-    alert(`成功送出 ${success} 項任務`)
+    if (failed.length > 0) alert(`成功送出 ${success} 項、失敗 ${failed.length} 項：\n` + failed.join('\n'))
+    else alert(`成功送出 ${success} 項任務`)
     load()
   }
 
   async function recallTask(task) {
     if (!confirm('確定撤回？')) return
     if (task.completed_by !== user.name) return alert('只能撤回自己的')
-    await supabase.from('task_status').update({ completed: false, completed_at: null, completed_by: '', completed_by_id: '', photo_url: '' }).eq('id', task.id)
+    const { error } = await supabase.from('task_status').update({ completed: false, completed_at: null, completed_by: '', completed_by_id: '', photo_url: '' }).eq('id', task.id)
+    if (error) { alert('❌ 撤回失敗：' + error.message); return }
     load()
   }
 

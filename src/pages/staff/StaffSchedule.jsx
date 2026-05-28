@@ -313,8 +313,12 @@ function PreferenceContent() {
     const rows = Object.entries(prefs).filter(([_, v]) => v).map(([date, preference]) => ({
       employee_id: user.employee_id, employee_name: user.name, date, preferred_shift: preference, month: monthStr, submitted_at: null,
     }))
-    await supabase.from('schedule_preferences').delete().eq('employee_id', user.employee_id).gte('date', format(start, 'yyyy-MM-dd')).lte('date', format(end, 'yyyy-MM-dd'))
-    if (rows.length) await supabase.from('schedule_preferences').insert(rows)
+    const { error: delErr } = await supabase.from('schedule_preferences').delete().eq('employee_id', user.employee_id).gte('date', format(start, 'yyyy-MM-dd')).lte('date', format(end, 'yyyy-MM-dd'))
+    if (delErr) { setSaving(false); alert('❌ 清除舊偏好失敗：' + delErr.message); return }
+    if (rows.length) {
+      const { error: insErr } = await supabase.from('schedule_preferences').insert(rows)
+      if (insErr) { setSaving(false); alert('❌ 暫存失敗：' + insErr.message + '\n⚠️ 舊偏好已清除、請重試'); return }
+    }
     setSaving(false)
     alert('已暫存')
   }
@@ -325,8 +329,12 @@ function PreferenceContent() {
     const rows = Object.entries(prefs).filter(([_, v]) => v).map(([date, preference]) => ({
       employee_id: user.employee_id, employee_name: user.name, date, preferred_shift: preference, month: monthStr, submitted_at: new Date().toISOString(),
     }))
-    await supabase.from('schedule_preferences').delete().eq('employee_id', user.employee_id).gte('date', format(start, 'yyyy-MM-dd')).lte('date', format(end, 'yyyy-MM-dd'))
-    if (rows.length) await supabase.from('schedule_preferences').insert(rows)
+    const { error: delErr } = await supabase.from('schedule_preferences').delete().eq('employee_id', user.employee_id).gte('date', format(start, 'yyyy-MM-dd')).lte('date', format(end, 'yyyy-MM-dd'))
+    if (delErr) { setSaving(false); alert('❌ 清除舊偏好失敗：' + delErr.message); return }
+    if (rows.length) {
+      const { error: insErr } = await supabase.from('schedule_preferences').insert(rows)
+      if (insErr) { setSaving(false); alert('❌ 提交失敗：' + insErr.message + '\n⚠️ 舊偏好已清除、請重試'); return }
+    }
     setSaving(false)
     alert('已提交，老闆會根據你的意願排班')
     load()

@@ -219,12 +219,14 @@ export default function StaffHome() {
   const sopPct = tasks.length ? Math.round(done / tasks.length * 100) : 0
 
   async function updateActionItem(id, updates) {
-    await supabase.from('meeting_action_items').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id)
+    const { error } = await supabase.from('meeting_action_items').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id)
+    if (error) { alert('❌ 任務更新失敗：' + error.message); return }
     const { data } = await supabase.from('meeting_action_items').select('*').eq('assigned_to', user.employee_id).in('status', ['pending', 'in_progress']).order('due_date', { ascending: true })
     setActionItems(data || [])
   }
   async function reassignTask(taskId, newEmpId, newEmpName) {
-    await supabase.from('meeting_action_items').update({ assigned_to: newEmpId, assigned_to_name: newEmpName, progress_note: `由 ${user.name} 轉派`, updated_at: new Date().toISOString() }).eq('id', taskId)
+    const { error } = await supabase.from('meeting_action_items').update({ assigned_to: newEmpId, assigned_to_name: newEmpName, progress_note: `由 ${user.name} 轉派`, updated_at: new Date().toISOString() }).eq('id', taskId)
+    if (error) { alert('❌ 轉派失敗：' + error.message); return }
     setReassigning(null)
     const { data } = await supabase.from('meeting_action_items').select('*').eq('assigned_to', user.employee_id).in('status', ['pending', 'in_progress']).order('due_date', { ascending: true })
     setActionItems(data || [])

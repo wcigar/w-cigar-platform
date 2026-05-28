@@ -87,18 +87,34 @@ export default function ExpenseDashboard() {
   }, [allExpenses])
 
   async function addCategory() {
-    if (!newCat.name) return
-    await supabase.from('expense_categories').insert({ name: newCat.name, icon: newCat.icon || '📁', sort_order: categories.length + 1, enabled: true })
+    if (!newCat.name) return alert('請填分類名稱')
+    const { error } = await supabase.from('expense_categories').insert({ name: newCat.name, icon: newCat.icon || '📁', sort_order: categories.length + 1, enabled: true })
+    if (error) { alert('❌ 新增分類失敗：' + error.message); return }
     setNewCat({ name: '', icon: '📁' }); load()
   }
-  async function toggleCat(id, en) { await supabase.from('expense_categories').update({ enabled: en }).eq('id', id); load() }
-  async function deleteCat(id) { if (!confirm('刪除？')) return; await supabase.from('expense_categories').delete().eq('id', id); load() }
+  async function toggleCat(id, en) {
+    const { error } = await supabase.from('expense_categories').update({ enabled: en }).eq('id', id)
+    if (error) { alert('❌ 切換失敗：' + error.message); return }
+    load()
+  }
+  async function deleteCat(id) {
+    if (!confirm('刪除？')) return
+    const { error } = await supabase.from('expense_categories').delete().eq('id', id)
+    if (error) { alert('❌ 刪除失敗：' + error.message); return }
+    load()
+  }
   async function addVendorFn() {
-    if (!newVendor.name) return
-    await supabase.from('expense_vendors').insert({ name: newVendor.name, category: newVendor.category, contact: newVendor.contact, enabled: true })
+    if (!newVendor.name) return alert('請填廠商名稱')
+    const { error } = await supabase.from('expense_vendors').insert({ name: newVendor.name, category: newVendor.category, contact: newVendor.contact, enabled: true })
+    if (error) { alert('❌ 新增廠商失敗：' + error.message); return }
     setNewVendor({ name: '', category: '', contact: '' }); load()
   }
-  async function deleteVendor(id) { if (!confirm('刪除？')) return; await supabase.from('expense_vendors').delete().eq('id', id); load() }
+  async function deleteVendor(id) {
+    if (!confirm('刪除？')) return
+    const { error } = await supabase.from('expense_vendors').delete().eq('id', id)
+    if (error) { alert('❌ 刪除失敗：' + error.message); return }
+    load()
+  }
 
   if (loading) return <div>{[1,2,3].map(i => <div key={i} className="loading-shimmer" style={{ height: 60, marginBottom: 8 }} />)}</div>
 

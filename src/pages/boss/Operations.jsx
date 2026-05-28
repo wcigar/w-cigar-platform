@@ -44,18 +44,35 @@ export default function Operations() {
     setLoading(false)
   }
 
-  async function publish() { if (!newNotice) return; await supabase.from('notices').insert({ content: newNotice, enabled: true, publisher: 'ADMIN' }); setNewNotice(''); setShowForm(false); load() }
-  async function toggleNotice(id, en) { await supabase.from('notices').update({ enabled: en }).eq('id', id); load() }
-  async function deleteNotice(id) { if (!confirm('刪除？')) return; await supabase.from('notices').delete().eq('id', id); load() }
+  async function publish() {
+    if (!newNotice) return
+    const { error } = await supabase.from('notices').insert({ content: newNotice, enabled: true, publisher: 'ADMIN' })
+    if (error) { alert('❌ 公告發布失敗：' + error.message); return }
+    setNewNotice(''); setShowForm(false); load()
+  }
+  async function toggleNotice(id, en) {
+    const { error } = await supabase.from('notices').update({ enabled: en }).eq('id', id)
+    if (error) { alert('❌ 切換失敗：' + error.message); return }
+    load()
+  }
+  async function deleteNotice(id) {
+    if (!confirm('刪除？')) return
+    const { error } = await supabase.from('notices').delete().eq('id', id)
+    if (error) { alert('❌ 刪除失敗：' + error.message); return }
+    load()
+  }
   async function auditTask(id, result) {
-    if (result === '不合格') await supabase.from('task_status').update({ audit_status: '不合格', completed: false, completed_at: null }).eq('id', id)
-    else await supabase.from('task_status').update({ audit_status: '合格' }).eq('id', id)
+    const payload = result === '不合格' ? { audit_status: '不合格', completed: false, completed_at: null } : { audit_status: '合格' }
+    const { error } = await supabase.from('task_status').update(payload).eq('id', id)
+    if (error) { alert('❌ 稽核失敗：' + error.message); return }
     load()
   }
   async function updateAbnormalStatus(id, status) {
     const update = { status }
     if (status === '已解決') update.escalated = false
-    await supabase.from('abnormal_reports').update(update).eq('id', id); load()
+    const { error } = await supabase.from('abnormal_reports').update(update).eq('id', id)
+    if (error) { alert('❌ 狀態更新失敗：' + error.message); return }
+    load()
   }
 
   const byOwner = {}; tasks.forEach(t => { const k = t.owner; if (!byOwner[k]) byOwner[k] = []; byOwner[k].push(t) })
