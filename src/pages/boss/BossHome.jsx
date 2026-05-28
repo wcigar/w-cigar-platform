@@ -192,6 +192,24 @@ export default function BossHome() {
       )}
 
       {/* === Zone 2：核心指標（4 個大數字 + 點開看更多） === */}
+      {/* 經銷商月結 — 拉出折疊區放最明顯位置（單獨橫排） */}
+      <div
+        onClick={() => window.open('https://dealer.wcigarbar.com/admin', '_blank')}
+        style={{
+          cursor: 'pointer', marginBottom: 8, padding: '14px 18px', borderRadius: 12,
+          background: dealerUnsettled > 0 ? 'linear-gradient(135deg, rgba(245,158,11,.18), rgba(245,158,11,.06))' : 'rgba(255,255,255,.03)',
+          border: `1px solid ${dealerUnsettled > 0 ? 'rgba(245,158,11,.45)' : 'var(--border)'}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+        }}
+      >
+        <div>
+          <div style={{ fontSize: 12, color: dealerUnsettled > 0 ? '#f59e0b' : 'var(--text-dim)', fontWeight: 700, letterSpacing: 1 }}>💳 經銷商月結 · 未付款</div>
+          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>{dealerUnsettledCount > 0 ? `${dealerUnsettledCount} 筆未結算 · 點擊查看明細` : '目前無未結帳訂單'}</div>
+        </div>
+        <div style={{ fontSize: 28, fontFamily: 'var(--font-mono)', fontWeight: 700, color: dealerUnsettled > 0 ? '#f59e0b' : 'var(--text-muted)' }}>
+          ${dealerUnsettled.toLocaleString()}
+        </div>
+      </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: 8 }}>
         <SB label="本月營收" value={monthRevenue ? '$' + (monthRevenue/1000).toFixed(0) + 'K' : '$0'} color="var(--gold)" tap={() => navigate('/operations')} big />
         <SB label="SOP 達成" value={stats.sop + '%'} color={stats.sop === 100 ? 'var(--green)' : stats.sop >= 70 ? 'var(--gold)' : 'var(--red)'} big />
@@ -210,7 +228,6 @@ export default function BossHome() {
           <SB label="待交班" value={pendingHandover} color={pendingHandover > 0 ? '#f59e0b' : 'var(--text-muted)'} />
           <SB label="經銷待出貨" value={dealerPending} color={dealerPending > 0 ? 'var(--red)' : 'var(--text-muted)'} tap={() => navigate('/dealer-orders')} />
           <SB label="VIP 欠款" value={vipUnpaid ? '$' + (vipUnpaid/1000).toFixed(0) + 'K' : '$0'} color={vipUnpaid > 0 ? 'var(--red)' : 'var(--text-muted)'} tap={() => navigate('/vip-cellar/admin')} />
-          <SB label={`經銷未結${dealerUnsettledCount > 0 ? ` (${dealerUnsettledCount})` : ''}`} value={dealerUnsettled ? '$' + (dealerUnsettled >= 10000 ? (dealerUnsettled/1000).toFixed(0) + 'K' : dealerUnsettled.toLocaleString()) : '$0'} color={dealerUnsettled > 0 ? '#f59e0b' : 'var(--text-muted)'} tap={() => window.open('https://dealer.wcigarbar.com/admin', '_blank')} />
         </div>
       )}
 
