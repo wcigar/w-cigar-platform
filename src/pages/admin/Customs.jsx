@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { todayTw } from '../../lib/timezone'
 import { FileText, Plus, Trash2, Download, Share2, Package, Edit3, X, ChevronRight, ChevronDown, ChevronUp, FileBadge, Link2, Copy, Check, Calculator, Settings } from 'lucide-react'
+import CertificateFormAButton from './CertificateFormA'
 import {
   generateAllDocs, downloadPdf, sharePdfFiles, computeShipmentTotals,
 } from '../../lib/services/customsPdf'
@@ -273,13 +274,16 @@ export default function Customs() {
 
   return (
     <div className="page-container fade-in" style={{ paddingBottom: 100 }}>
-      <div style={{ marginBottom: 16 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--gold)', margin: 0 }}>
-          <FileText size={22} style={{ verticalAlign: -3, marginRight: 8 }} /> 海關報關文件
-        </h1>
-        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-          選產品（或手動輸入）→ 自動產生 Packing List / Certificate of Origin / Commercial Invoice，PDF + Word 各 3 份
+      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--gold)', margin: 0 }}>
+            <FileText size={22} style={{ verticalAlign: -3, marginRight: 8 }} /> 海關報關文件
+          </h1>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+            選產品（或手動輸入）→ 自動產生 Packing List / Certificate of Origin / Commercial Invoice，PDF + Word 各 3 份
+          </div>
         </div>
+        <CertificateFormAButton />
       </div>
       <FactoryLinkBanner />
       <CompanyDocsBanner />
