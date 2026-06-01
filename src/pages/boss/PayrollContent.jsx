@@ -250,7 +250,9 @@ export function calcSalaryToDate(emp, cfg, bonusDefs, att, isCurrentMonth, targe
 
   // PT：純時薪制 — 打卡時數 × 時薪，無遲到/早退/勞健保扣款；SOP 罰款仍扣
   if (att?.isPT || emp?.emp_type === 'PT') {
-    const hourlyBase = +(cfg.hourly_rate || cfg.monthly_salary || 0)
+    // fallback chain: salary_config.hourly_rate > salary_config.monthly_salary（誤填）> employees.salary_amount（時薪型）> 200 預設
+    const hourlyFromEmp = (emp?.salary_type === '時薪' && +emp?.salary_amount > 0) ? +emp.salary_amount : 0
+    const hourlyBase = +(cfg.hourly_rate || cfg.monthly_salary || hourlyFromEmp || 0)
     const totalHours = +att.totalPunchHours || 0
     const proratedBase = Math.round(totalHours * hourlyBase)
     const empBonuses = (bonusDefs || []).filter(b => b.employee_id === emp.id && b.enabled)
