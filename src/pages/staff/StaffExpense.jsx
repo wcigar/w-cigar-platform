@@ -320,6 +320,7 @@ export default function StaffExpense() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
         <DollarSign size={20} color="var(--gold)" />
         <span className="section-title" style={{ marginBottom: 0 }}>支出管理</span>
+        <span style={{ marginLeft: 'auto', fontSize: 9, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>v2026.06.01.2</span>
       </div>
 
       {/* 月份選擇器：標題下方、統計卡上方 */}
