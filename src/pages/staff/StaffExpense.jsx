@@ -66,7 +66,10 @@ export default function StaffExpense() {
   const fileRef = useRef(null)
   const galleryRef = useRef(null)
   const [today, setToday] = useState(() => format(new Date(), 'yyyy-MM-dd'))
-  const [month, setMonth] = useState(() => format(new Date(), 'yyyy-MM'))
+  // 月份選擇器：使用者選擇要查看哪一個月（預設當月、可往前看歷史）
+  const [selectedMonth, setSelectedMonth] = useState(() => format(new Date(), 'yyyy-MM'))
+  const month = selectedMonth // 保持向後相容（檔內其他地方仍叫 month）
+  const [availableMonths, setAvailableMonths] = useState([format(new Date(), 'yyyy-MM')])
   const [showCashForm, setShowCashForm] = useState(false)
   const [newCatName, setNewCatName] = useState('')
   const [newVendorName, setNewVendorName] = useState('')
@@ -85,16 +88,31 @@ export default function StaffExpense() {
   const [filterHandler, setFilterHandler] = useState('all')
   const isBoss = user.role === 'boss' || user.employee_id === 'ADMIN' || user.is_admin
 
-  useEffect(() => { load() }, [today, month])
+  useEffect(() => { load() }, [today, selectedMonth])
   useEffect(() => {
+    // 只 tick today（跨午夜 / 跨日 reload）— selectedMonth 由使用者控制、不自動 reset
     const tick = () => {
-      const t = format(new Date(), 'yyyy-MM-dd'); const m = format(new Date(), 'yyyy-MM')
-      setToday(p => p !== t ? t : p); setMonth(p => p !== m ? m : p)
+      const t = format(new Date(), 'yyyy-MM-dd')
+      setToday(p => p !== t ? t : p)
     }
     const id = setInterval(tick, 60000)
     const onVis = () => { if (document.visibilityState === 'visible') tick() }
     document.addEventListener('visibilitychange', onVis)
     return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVis) }
+  }, [])
+  // 初始：抓 distinct 月份（petty_cash + expenses 出現過的月份）+ 當月
+  useEffect(() => {
+    (async () => {
+      const [{ data: cd }, { data: xd }] = await Promise.all([
+        supabase.from('petty_cash').select('date'),
+        supabase.from('expenses').select('date'),
+      ])
+      const monthSet = new Set([format(new Date(), 'yyyy-MM')])
+      ;(cd || []).forEach(r => { if (r.date) monthSet.add(String(r.date).slice(0, 7)) })
+      ;(xd || []).forEach(r => { if (r.date) monthSet.add(String(r.date).slice(0, 7)) })
+      const sorted = [...monthSet].sort().reverse()
+      setAvailableMonths(sorted)
+    })().catch(() => {})
   }, [])
 
   async function load() {
@@ -111,8 +129,11 @@ export default function StaffExpense() {
     setLoading(false)
   }
 
-  const totalCashIn = cashRecords.reduce((s, r) => s + (r.amount || 0), 0)
-  const totalSpent = expenses.reduce((s, r) => s + (r.amount || 0), 0)
+  // 嚴格只算 selectedMonth 當月（雙保險：load() 已過濾、這邊用 date 前 7 碼再 filter 避免時區誤差）
+  const monthCash = cashRecords.filter(r => String(r.date || '').slice(0, 7) === selectedMonth)
+  const monthExp = expenses.filter(r => String(r.date || '').slice(0, 7) === selectedMonth)
+  const totalCashIn = monthCash.reduce((s, r) => s + Number(r.amount || 0), 0)
+  const totalSpent = monthExp.reduce((s, r) => s + Number(r.amount || 0), 0)
   const balance = totalCashIn - totalSpent
 
   async function handlePhoto(file) {
@@ -277,9 +298,20 @@ export default function StaffExpense() {
     <div className="page-container fade-in">
       {showSign && <SignaturePad title={'老闆簽名確認 — $' + (+cashForm.amount).toLocaleString()} onSave={sig => { if (!submitting) submitCashRequest(sig) }} onCancel={() => setShowSign(false)} />}
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
         <DollarSign size={20} color="var(--gold)" />
         <span className="section-title" style={{ marginBottom: 0 }}>支出管理</span>
+      </div>
+
+      {/* 月份選擇器：標題下方、統計卡上方 */}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
+        <label style={{ fontSize: 12, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>📅 查看月份</label>
+        <select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}
+          style={{ flex: 1, fontSize: 14, padding: '8px 10px', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+          {availableMonths.map(m => (
+            <option key={m} value={m}>{m}{m === format(new Date(), 'yyyy-MM') ? '（本月）' : ''}</option>
+          ))}
+        </select>
       </div>
 
       <div className="card" style={{ padding: 14, marginBottom: 12, borderColor: 'var(--border-gold)' }}>
@@ -302,22 +334,20 @@ export default function StaffExpense() {
             <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 20, color: 'var(--gold)', fontWeight: 700 }}>$</span>
             <input type="number" inputMode="numeric" placeholder="金額" value={cashForm.amount} onChange={e => setCashForm(p => ({ ...p, amount: e.target.value }))} style={{ width: '100%', paddingLeft: 34, fontSize: 24, fontFamily: 'var(--font-mono)', fontWeight: 700, padding: '12px 12px 12px 34px' }} />
           </div>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 4 }}>方式</div>
-              <div style={{ display: 'flex', gap: 4 }}>
-                {['現金', '匯款'].map(m => (
-                  <button key={m} onClick={() => setCashForm(p => ({ ...p, method: m }))} style={{ flex: 1, padding: 8, borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer', background: cashForm.method === m ? (m === '現金' ? 'rgba(201,168,76,.12)' : 'rgba(77,138,196,.12)') : 'transparent', color: cashForm.method === m ? (m === '現金' ? 'var(--gold)' : 'var(--blue)') : 'var(--text-dim)', border: cashForm.method === m ? (m === '現金' ? '1px solid var(--border-gold)' : '1px solid rgba(77,138,196,.3)') : '1px solid var(--border)' }}>{m === '現金' ? '💵 現金' : '🏦 匯款'}</button>
-                ))}
-              </div>
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 4 }}>方式</div>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {['現金', '匯款'].map(m => (
+                <button key={m} onClick={() => setCashForm(p => ({ ...p, method: m }))} style={{ flex: 1, padding: 8, borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer', background: cashForm.method === m ? (m === '現金' ? 'rgba(201,168,76,.12)' : 'rgba(77,138,196,.12)') : 'transparent', color: cashForm.method === m ? (m === '現金' ? 'var(--gold)' : 'var(--blue)') : 'var(--text-dim)', border: cashForm.method === m ? (m === '現金' ? '1px solid var(--border-gold)' : '1px solid rgba(77,138,196,.3)') : '1px solid var(--border)' }}>{m === '現金' ? '💵 現金' : '🏦 匯款'}</button>
+              ))}
             </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 4 }}>誰給的</div>
-              <div style={{ display: 'flex', gap: 4 }}>
-                {['Wilson', '珊珊'].map(g => (
-                  <button key={g} onClick={() => setCashForm(p => ({ ...p, given_by: g }))} style={{ flex: 1, padding: 8, borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer', background: cashForm.given_by === g ? 'var(--gold-glow)' : 'transparent', color: cashForm.given_by === g ? 'var(--gold)' : 'var(--text-dim)', border: cashForm.given_by === g ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>{g}</button>
-                ))}
-              </div>
+          </div>
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 4 }}>誰給的</div>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {['Wilson', '珊珊', '收銀機調撥'].map(g => (
+                <button key={g} onClick={() => setCashForm(p => ({ ...p, given_by: g, method: g === '收銀機調撥' ? '現金' : p.method }))} style={{ flex: 1, padding: 8, borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', background: cashForm.given_by === g ? 'var(--gold-glow)' : 'transparent', color: cashForm.given_by === g ? 'var(--gold)' : 'var(--text-dim)', border: cashForm.given_by === g ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>{g}</button>
+              ))}
             </div>
           </div>
           {cashForm.method === '現金' && <div style={{ fontSize: 11, color: '#f59e0b', marginBottom: 8, padding: '6px 10px', background: 'rgba(245,158,11,.06)', borderRadius: 8, border: '1px solid rgba(245,158,11,.2)' }}>⚠️ 現金需老闆在此畫面簽名確認</div>}
