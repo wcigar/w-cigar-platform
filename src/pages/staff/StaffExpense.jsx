@@ -327,7 +327,7 @@ export default function StaffExpense() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
         <DollarSign size={20} color="var(--gold)" />
         <span className="section-title" style={{ marginBottom: 0 }}>支出管理</span>
-        <span style={{ marginLeft: 'auto', fontSize: 9, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>v2026.06.01.3</span>
+        <span style={{ marginLeft: 'auto', fontSize: 9, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>v2026.06.01.4</span>
       </div>
 
       {/* 月份選擇器：標題下方、統計卡上方 */}
@@ -415,11 +415,39 @@ export default function StaffExpense() {
               <button onClick={async () => {
                 const name = newVendorName.trim()
                 if (!name) return alert('請輸入廠商名稱')
+                // 先檢查同名（或同名但已停用）→ 友善處理
+                const existing = vendors.find(v => v.name === name)
+                if (existing) {
+                  setForm(p => ({ ...p, vendor: name }))
+                  setNewVendorName('')
+                  setShowAddVendor(false)
+                  alert(`「${name}」已在清單裡、已自動選中`)
+                  return
+                }
+                // 也查 DB 看停用的 vendor（不在前端 vendors list、enabled=false）
+                const { data: disabled } = await supabase.from('expense_vendors').select('id, enabled').eq('name', name).maybeSingle()
+                if (disabled) {
+                  // 重新啟用
+                  const { error: upErr } = await supabase.from('expense_vendors').update({ enabled: true, category: form.category || disabled.category || '' }).eq('id', disabled.id)
+                  if (upErr) { alert('❌ 重新啟用失敗: ' + upErr.message); return }
+                  setForm(p => ({ ...p, vendor: name }))
+                  setNewVendorName('')
+                  setShowAddVendor(false)
+                  alert(`「${name}」之前被停用、已重新啟用並選中`)
+                  load()
+                  return
+                }
                 const { error } = await supabase.from('expense_vendors').insert({ name, category: form.category || '', enabled: true })
-                if (error) { alert('❌ 新增失敗: ' + error.message + '\n\n請截圖傳給老闆'); console.error('expense_vendors insert error:', error); return }
+                if (error) {
+                  const msg = /duplicate|unique/i.test(error.message) ? `「${name}」已存在於系統、請直接從清單選` : error.message
+                  alert('❌ 新增失敗: ' + msg)
+                  console.error('expense_vendors insert error:', error)
+                  return
+                }
                 setForm(p => ({ ...p, vendor: name }))
                 setNewVendorName('')
                 setShowAddVendor(false)
+                alert(`✅ 廠商「${name}」已加入清單`)
                 load()
               }} style={{ padding: '8px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer', background: 'rgba(77,168,108,.12)', color: 'var(--green)', border: '1px solid rgba(77,168,108,.3)', whiteSpace: 'nowrap' }}>✓ 加入</button>
               <button onClick={() => { setNewVendorName(''); setShowAddVendor(false) }} style={{ padding: '8px 10px', borderRadius: 10, fontSize: 12, cursor: 'pointer', background: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>✕</button>
