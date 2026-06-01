@@ -159,10 +159,18 @@ export default function StaffExpense() {
     if (!confirm('確定提交 $' + (+form.amount).toLocaleString() + ' 的支出？')) return
     setSubmitting(true)
     const photoUrls = []
+    const uploadFails = []
     for (let i = 0; i < photos.length; i++) {
-      const path = 'expenses/' + today + '/' + user.employee_id + '_' + Date.now() + '_' + i + '.jpg'
-      const { error } = await supabase.storage.from('photos').upload(path, photos[i])
-      if (!error) { const { data } = supabase.storage.from('photos').getPublicUrl(path); photoUrls.push(data.publicUrl) }
+      const path = 'expenses/' + today + '/' + user.employee_id + '_' + Date.now() + '_' + i + '_' + Math.random().toString(36).slice(2, 8) + '.jpg'
+      const { error: upErr } = await supabase.storage.from('photos').upload(path, photos[i], { contentType: 'image/jpeg' })
+      if (upErr) { uploadFails.push(`第 ${i + 1} 張：${upErr.message}`); continue }
+      const { data } = supabase.storage.from('photos').getPublicUrl(path)
+      photoUrls.push(data.publicUrl)
+    }
+    if (uploadFails.length > 0) {
+      setSubmitting(false)
+      alert(`❌ 照片上傳失敗 ${uploadFails.length} 張：\n${uploadFails.join('\n')}\n\n支出未提交、請重試或聯絡老闆`)
+      return
     }
     const { data: insertData, error: insertErr } = await supabase.from('expenses').insert({ date: today, category: form.category, vendor: form.vendor, item: form.item || form.category, amount: +form.amount, payment: form.payment, handler: user.name, submitted_by: user.employee_id, photo_url: photoUrls.length > 1 ? JSON.stringify(photoUrls) : (photoUrls[0] || ''), note: (noReceipt ? '[無收據:' + noReceiptReason + '] ' : '') + form.note }).select().single()
     setSubmitting(false)
@@ -228,14 +236,25 @@ export default function StaffExpense() {
     if (!editForm.amount || +editForm.amount <= 0) return alert('金額不可為空')
     const existingUrls = editPreviews.filter(p => p.startsWith('http'))
     const newUrls = []
+    const uploadFails = []
     for (let i = 0; i < editPhotos.length; i++) {
-      const path = 'expenses/' + today + '/' + user.employee_id + '_' + Date.now() + '_e' + i + '.jpg'
-      const { error } = await supabase.storage.from('photos').upload(path, editPhotos[i])
-      if (!error) { const { data } = supabase.storage.from('photos').getPublicUrl(path); newUrls.push(data.publicUrl) }
+      const path = 'expenses/' + today + '/' + user.employee_id + '_' + Date.now() + '_e' + i + '_' + Math.random().toString(36).slice(2, 8) + '.jpg'
+      const { error: upErr } = await supabase.storage.from('photos').upload(path, editPhotos[i], { contentType: 'image/jpeg' })
+      if (upErr) {
+        uploadFails.push(`第 ${i + 1} 張：${upErr.message}`)
+        continue
+      }
+      const { data } = supabase.storage.from('photos').getPublicUrl(path)
+      newUrls.push(data.publicUrl)
+    }
+    if (uploadFails.length > 0) {
+      const cont = confirm(`⚠️ ${uploadFails.length} 張照片上傳失敗：\n${uploadFails.join('\n')}\n\n要繼續儲存其他改動嗎？（已成功上傳 ${newUrls.length} 張）`)
+      if (!cont) return
     }
     const allUrls = [...existingUrls, ...newUrls]
     const { error } = await supabase.from('expenses').update({ item: editForm.item, amount: +editForm.amount, note: editForm.note, photo_url: allUrls.length > 1 ? JSON.stringify(allUrls) : (allUrls[0] || '') }).eq('id', id)
     if (error) { alert('❌ 編輯失敗：' + error.message); return }
+    if (uploadFails.length === 0 && newUrls.length > 0) alert(`✅ 已儲存（新增 ${newUrls.length} 張收據）`)
     setEditing(null); setEditPhotos([]); setEditPreviews([])
     load()
   }
