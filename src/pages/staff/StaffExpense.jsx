@@ -43,6 +43,13 @@ function SignaturePad({ title, onSave, onCancel }) {
   )
 }
 
+// Supabase Storage 不接受中文 key（硯這種中文 ID 會跳 Invalid key）→ 轉 base64 ASCII
+function safeFileId(id) {
+  if (!id) return 'u'
+  if (/^[a-zA-Z0-9_-]+$/.test(id)) return id
+  try { return 'u' + btoa(unescape(encodeURIComponent(id))).replace(/[+/=]/g, '').slice(0, 10) } catch { return 'u' }
+}
+
 function parsePhotoUrls(val) {
   if (!val) return []
   try { const p = JSON.parse(val); if (Array.isArray(p)) return p.filter(Boolean) } catch {}
@@ -161,7 +168,7 @@ export default function StaffExpense() {
     const photoUrls = []
     const uploadFails = []
     for (let i = 0; i < photos.length; i++) {
-      const path = 'expenses/' + today + '/' + user.employee_id + '_' + Date.now() + '_' + i + '_' + Math.random().toString(36).slice(2, 8) + '.jpg'
+      const path = 'expenses/' + today + '/' + safeFileId(user.employee_id) + '_' + Date.now() + '_' + i + '_' + Math.random().toString(36).slice(2, 8) + '.jpg'
       const { error: upErr } = await supabase.storage.from('photos').upload(path, photos[i], { contentType: 'image/jpeg' })
       if (upErr) { uploadFails.push(`第 ${i + 1} 張：${upErr.message}`); continue }
       const { data } = supabase.storage.from('photos').getPublicUrl(path)
@@ -185,7 +192,7 @@ export default function StaffExpense() {
     let sigUrl = ''
     if (sigDataUrl && cashForm.method === '現金') {
       const blob = await (await fetch(sigDataUrl)).blob()
-      const path = 'signatures/' + today + '/' + user.employee_id + '_' + Date.now() + '.png'
+      const path = 'signatures/' + today + '/' + safeFileId(user.employee_id) + '_' + Date.now() + '.png'
       const { error } = await supabase.storage.from('photos').upload(path, blob)
       if (!error) { const { data } = supabase.storage.from('photos').getPublicUrl(path); sigUrl = data.publicUrl }
     }
@@ -238,7 +245,7 @@ export default function StaffExpense() {
     const newUrls = []
     const uploadFails = []
     for (let i = 0; i < editPhotos.length; i++) {
-      const path = 'expenses/' + today + '/' + user.employee_id + '_' + Date.now() + '_e' + i + '_' + Math.random().toString(36).slice(2, 8) + '.jpg'
+      const path = 'expenses/' + today + '/' + safeFileId(user.employee_id) + '_' + Date.now() + '_e' + i + '_' + Math.random().toString(36).slice(2, 8) + '.jpg'
       const { error: upErr } = await supabase.storage.from('photos').upload(path, editPhotos[i], { contentType: 'image/jpeg' })
       if (upErr) {
         uploadFails.push(`第 ${i + 1} 張：${upErr.message}`)
@@ -320,7 +327,7 @@ export default function StaffExpense() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
         <DollarSign size={20} color="var(--gold)" />
         <span className="section-title" style={{ marginBottom: 0 }}>支出管理</span>
-        <span style={{ marginLeft: 'auto', fontSize: 9, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>v2026.06.01.2</span>
+        <span style={{ marginLeft: 'auto', fontSize: 9, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>v2026.06.01.3</span>
       </div>
 
       {/* 月份選擇器：標題下方、統計卡上方 */}

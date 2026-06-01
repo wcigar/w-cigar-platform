@@ -179,7 +179,8 @@ export default function StaffHome() {
     try {
       const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.8))
       if (blob && blob.size > 0) {
-        const fileName = 'punch/' + user.employee_id + '_' + (punchType === '上班' ? 'in' : 'out') + '_' + format(now, 'yyyyMMdd_HHmmss') + '.jpg'
+        const safeId = /^[a-zA-Z0-9_-]+$/.test(user.employee_id) ? user.employee_id : 'u' + btoa(unescape(encodeURIComponent(user.employee_id || 'emp'))).replace(/[+/=]/g, '').slice(0, 10)
+        const fileName = 'punch/' + safeId + '_' + (punchType === '上班' ? 'in' : 'out') + '_' + format(now, 'yyyyMMdd_HHmmss') + '.jpg'
         const { data: upData, error: upErr } = await supabase.storage.from('photos').upload(fileName, blob)
         if (upData?.path) photoUrl = supabase.storage.from('photos').getPublicUrl(upData.path).data.publicUrl
         if (upErr) console.error('Photo upload error:', upErr)

@@ -87,7 +87,7 @@ function SOPView() {
       let photoUrl = task.photo_url || ''
       if (photos[taskId]) {
         const ext = 'jpg'
-        const path = `${today}/${user.employee_id}/${taskId}_${Date.now()}.${ext}`
+        const path = `${today}/${/^[a-zA-Z0-9_-]+$/.test(user.employee_id) ? user.employee_id : 'u' + btoa(unescape(encodeURIComponent(user.employee_id || 'emp'))).replace(/[+/=]/g, '').slice(0, 10)}/${taskId}_${Date.now()}.${ext}`
         await supabase.storage.from('photos').upload(path, photos[taskId])
         const { data } = supabase.storage.from('photos').getPublicUrl(path)
         photoUrl = data.publicUrl
@@ -265,7 +265,7 @@ function CleanView() {
       let photoUrl = t.photo_url || ''
       if (photos[cid]) {
         const compressed = await compressImage(photos[cid])
-        const path = `cleaning/${today}/${user.employee_id}/${cid}_${Date.now()}.jpg`
+        const path = `cleaning/${today}/${/^[a-zA-Z0-9_-]+$/.test(user.employee_id) ? user.employee_id : 'u' + btoa(unescape(encodeURIComponent(user.employee_id || 'emp'))).replace(/[+/=]/g, '').slice(0, 10)}/${cid}_${Date.now()}.jpg`
         await supabase.storage.from('photos').upload(path, compressed)
         const { data } = supabase.storage.from('photos').getPublicUrl(path)
         photoUrl = data.publicUrl
