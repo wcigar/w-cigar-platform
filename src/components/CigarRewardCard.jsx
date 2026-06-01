@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { safeFileId } from '../lib/safeFileId'
 
 async function compressPhoto(file) {
   return new Promise(resolve => {
@@ -131,10 +132,18 @@ function ClaimModal({ reward, user, month, onClose, onDone }) {
     if (photos.length === 0) { alert('請至少拍一張照片'); return }
     setSubmitting(true)
     const urls = []
+    const upFails = []
     for (let i = 0; i < photos.length; i++) {
-      const path = `cigar-rewards/${user.employee_id}/${month}/${Date.now()}_${i}.jpg`
-      const { error } = await supabase.storage.from('photos').upload(path, photos[i])
-      if (!error) { const { data } = supabase.storage.from('photos').getPublicUrl(path); urls.push(data.publicUrl) }
+      const path = `cigar-rewards/${safeFileId(user.employee_id)}/${month}/${Date.now()}_${i}_${Math.random().toString(36).slice(2,8)}.jpg`
+      const { error: upErr } = await supabase.storage.from('photos').upload(path, photos[i], { contentType: 'image/jpeg' })
+      if (upErr) { upFails.push(`第 ${i + 1} 張：${upErr.message}`); continue }
+      const { data } = supabase.storage.from('photos').getPublicUrl(path)
+      urls.push(data.publicUrl)
+    }
+    if (upFails.length > 0) {
+      setSubmitting(false)
+      alert(`❌ 照片上傳失敗 ${upFails.length} 張：\n${upFails.join('\n')}`)
+      return
     }
     const { data, error } = await supabase.rpc('claim_cigar_reward', {
       p_employee_id: user.employee_id,

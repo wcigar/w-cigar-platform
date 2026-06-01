@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
+import { safeFileId } from '../lib/safeFileId'
 import { AlertTriangle, Send, X } from 'lucide-react'
 import { format } from 'date-fns'
 
@@ -41,11 +42,14 @@ export default function AbnormalReport({ show, onClose }) {
     let photoUrl = ''
     if (photo) {
       const ext = photo.name.split('.').pop() || 'jpg'
-      const path = 'abnormal/' + today + '/' + user.employee_id + '_' + Date.now() + '.' + ext
-      const { error } = await supabase.storage.from('photos').upload(path, photo)
-      if (!error) { const { data } = supabase.storage.from('photos').getPublicUrl(path); photoUrl = data.publicUrl }
+      const path = 'abnormal/' + today + '/' + safeFileId(user.employee_id) + '_' + Date.now() + '.' + ext
+      const { error: upErr } = await supabase.storage.from('photos').upload(path, photo, { contentType: photo.type || 'image/jpeg' })
+      if (upErr) { setSending(false); alert('❌ 照片上傳失敗：' + upErr.message); return }
+      const { data } = supabase.storage.from('photos').getPublicUrl(path)
+      photoUrl = data.publicUrl
     }
-    await supabase.from('abnormal_reports').insert({ date: today, reporter: user.name, description: note, photo_url: photoUrl, status: '待處理', sla_hours: slaHours })
+    const { error: insErr } = await supabase.from('abnormal_reports').insert({ date: today, reporter: user.name, description: note, photo_url: photoUrl, status: '待處理', sla_hours: slaHours })
+    if (insErr) { setSending(false); alert('❌ 異常回報失敗：' + insErr.message); return }
     setNote(''); setPhoto(null); setSlaHours(24); setSending(false)
     alert('異常回報已送出！老闆會收到通知'); onClose()
   }

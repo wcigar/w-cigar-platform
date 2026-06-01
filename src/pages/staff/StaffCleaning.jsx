@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
+import { safeFileId } from '../../lib/safeFileId'
 import { CheckCircle2, Circle, Camera, Send, Sparkles } from 'lucide-react'
 import { format } from 'date-fns'
 
@@ -36,6 +37,7 @@ export default function StaffCleaning() {
 
     setSubmitting(true)
     let success = 0
+    const failed = []
 
     for (const cid of ids) {
       const task = tasks.find(t => t.clean_id === cid)
@@ -44,23 +46,24 @@ export default function StaffCleaning() {
       let photoUrl = task.photo_url || ''
       if (photos[cid]) {
         const ext = photos[cid].name.split('.').pop() || 'jpg'
-        const path = `cleaning/${today}/${user.employee_id}/${cid}_${Date.now()}.${ext}`
-        const { error } = await supabase.storage.from('photos').upload(path, photos[cid])
-        if (!error) {
-          const { data } = supabase.storage.from('photos').getPublicUrl(path)
-          photoUrl = data.publicUrl
-        }
+        const path = `cleaning/${today}/${safeFileId(user.employee_id)}/${cid}_${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`
+        const { error: upErr } = await supabase.storage.from('photos').upload(path, photos[cid], { contentType: photos[cid].type || 'image/jpeg' })
+        if (upErr) { failed.push(`${cid}：${upErr.message}`); continue }
+        const { data } = supabase.storage.from('photos').getPublicUrl(path)
+        photoUrl = data.publicUrl
       }
 
-      await supabase.from('cleaning_status').update({
+      const { error: updErr } = await supabase.from('cleaning_status').update({
         completed: true, completed_at: new Date().toISOString(), completed_by: user.name,
         photo_url: photoUrl, note: notes[cid] || ''
       }).eq('id', task.id)
+      if (updErr) { failed.push(`${cid} 更新失敗：${updErr.message}`); continue }
       success++
     }
 
     setSubmitting(false)
-    alert(`成功送出 ${success} 項大掃除！`)
+    if (failed.length > 0) alert(`成功 ${success} 項、失敗 ${failed.length} 項：\n${failed.join('\n')}`)
+    else alert(`成功送出 ${success} 項大掃除！`)
     load()
   }
 

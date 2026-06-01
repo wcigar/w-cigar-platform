@@ -626,7 +626,10 @@ export default function StaffPOS() {
               <button onClick={async () => {
                 if (!newCust.name.trim()) return alert('請輸入姓名')
                 const { data, error } = await supabase.from('customers').insert({ name: newCust.name.trim(), phone: newCust.phone.trim() || null, belongs_to: newCust.belongs_to, notes: newCust.notes.trim() || null, customer_type: '會員', membership_tier: '非會員', total_spent: 0, enabled: true }).select().single()
-                if (error) return alert('新增失敗：' + error.message)
+                if (error) {
+                  const msg = /duplicate|unique/i.test(error.message) ? '此電話已有客戶資料、請在搜尋框找既有客戶' : error.message
+                  return alert('新增失敗：' + msg)
+                }
                 selectCustomer(data)
                 setShowQuickAdd(false)
                 setNewCust({ name: '', phone: '', belongs_to: '店內', notes: '' })

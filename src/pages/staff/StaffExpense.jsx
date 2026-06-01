@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { compressImage } from '../../lib/imageUtils'
+import { safeFileId } from '../../lib/safeFileId'
 import { DollarSign, Camera, Send, History, Wallet, Pen, RotateCcw } from 'lucide-react'
 import { format, endOfMonth } from 'date-fns'
 
@@ -41,13 +42,6 @@ function SignaturePad({ title, onSave, onCancel }) {
       </div>
     </div>
   )
-}
-
-// Supabase Storage 不接受中文 key（硯這種中文 ID 會跳 Invalid key）→ 轉 base64 ASCII
-function safeFileId(id) {
-  if (!id) return 'u'
-  if (/^[a-zA-Z0-9_-]+$/.test(id)) return id
-  try { return 'u' + btoa(unescape(encodeURIComponent(id))).replace(/[+/=]/g, '').slice(0, 10) } catch { return 'u' }
 }
 
 function parsePhotoUrls(val) {
@@ -159,6 +153,7 @@ export default function StaffExpense() {
   }
 
   async function handleSubmitExpense() {
+    if (submitting) return // 防連點重複提交
     if (!form.category) return alert('請選擇分類')
     if (!form.amount || +form.amount <= 0) return alert('請輸入金額')
     if (photos.length === 0 && !noReceipt) return alert('請拍照或勾選無收據')
@@ -187,6 +182,7 @@ export default function StaffExpense() {
   }
 
   async function submitCashRequest(sigDataUrl) {
+    if (submitting) return // 防連點重複提交
     if (!cashForm.amount || +cashForm.amount <= 0) return alert('請輸入金額')
     setSubmitting(true)
     let sigUrl = ''
@@ -279,7 +275,7 @@ export default function StaffExpense() {
   }
 
   async function deleteCash(r) {
-    if (!confirm(`確定要刪除這筆零用金紀錄？金額：$${r.amount.toLocaleString()}`)) return
+    if (!confirm(`確定要刪除這筆零用金紀錄？金額：$${(r.amount || 0).toLocaleString()}`)) return
     const { error } = await supabase.from('petty_cash').delete().eq('id', r.id)
     if (error) { alert('❌ 刪除失敗：' + error.message); return }
     load()
@@ -327,7 +323,7 @@ export default function StaffExpense() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
         <DollarSign size={20} color="var(--gold)" />
         <span className="section-title" style={{ marginBottom: 0 }}>支出管理</span>
-        <span style={{ marginLeft: 'auto', fontSize: 9, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>v2026.06.01.4</span>
+        <span style={{ marginLeft: 'auto', fontSize: 9, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>v2026.06.01.5</span>
       </div>
 
       {/* 月份選擇器：標題下方、統計卡上方 */}

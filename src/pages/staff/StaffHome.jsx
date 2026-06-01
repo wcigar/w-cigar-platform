@@ -51,6 +51,7 @@ export default function StaffHome() {
   const [showPunchCam, setShowPunchCam] = useState(false)
   const notifiedNoticeIds = useRef(new Set())
   const motivationTimer = useRef(null)
+  const punchingRef = useRef(false) // 防連點打卡
 
   useEffect(() => { load() }, [today])
   // 跨午夜 / 跨月：每 60 秒檢查、視窗回前景時也檢查；變動時 today/month state 更新 → load() 觸發 reload
@@ -190,8 +191,11 @@ export default function StaffHome() {
   }
 
   async function handlePunch(type, photoUrl) {
+    if (punchingRef.current) return // 防連點打卡重複 insert
     if (!navigator.geolocation) return alert('請開啟定位')
+    punchingRef.current = true
     navigator.geolocation.getCurrentPosition(async pos => {
+      try {
       const { latitude: lat, longitude: lng } = pos.coords
       const R = 6371000, dLat = (25.0269184 - lat) * Math.PI / 180, dLng = (121.5419774 - lng) * Math.PI / 180
       const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat * Math.PI / 180) * Math.cos(25.0269184 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
@@ -220,7 +224,8 @@ export default function StaffHome() {
       } else { alert(`距離店面 ${Math.round(dist)}m，超出範圍`) }
       setPunchAsEmp(null) // 重置雙身份打卡狀態
       load()
-    }, () => alert('請開啟GPS'))
+      } finally { punchingRef.current = false }
+    }, () => { punchingRef.current = false; alert('請開啟GPS') })
   }
 
   // 顯示用：以 RPC 的 schedule 為準（跨夜時會自動指向昨天的晚班），fallback 才用今天的 schedules

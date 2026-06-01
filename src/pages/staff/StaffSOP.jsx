@@ -46,8 +46,8 @@ function SOPView() {
   async function load() {
     setLoading(true)
     const [tRes, dRes] = await Promise.all([
-      supabase.from('task_status').select('*').eq('date', today).or(`owner.eq.${user.employee_id},owner.eq.ALL`).order('task_id'),
-      supabase.from('sop_definitions').select('*').or(`owner.eq.${user.employee_id},owner.eq.ALL`).order('task_id'),
+      supabase.from('task_status').select('*').eq('date', today).in('owner', [user.employee_id, 'ALL']).order('task_id'),
+      supabase.from('sop_definitions').select('*').in('owner', [user.employee_id, 'ALL']).order('task_id'),
     ])
     setTasks(tRes.data || []); setDefs(dRes.data || [])
     setChecked({}); setPhotos({}); setPreviews({}); setNotes({})
