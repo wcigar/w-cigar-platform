@@ -73,7 +73,7 @@ export default function Customs() {
       supabase.from('customs_suppliers').select('*').eq('is_default', true).limit(1).single(),
       supabase.from('customs_buyers').select('*').order('is_default', { ascending: false }),
       supabase.from('customs_products_with_cost').select('*').eq('enabled', true).order('sort_order'),
-      supabase.from('customs_shipments').select('*').order('shipment_date', { ascending: false }).limit(100),
+      supabase.from('customs_shipments').select('*').order('created_at', { ascending: false, nullsFirst: false }).order('shipment_date', { ascending: false }).limit(100),
     ])
     setSupplier(sR.data || null)
     setBuyers(bR.data || [])
