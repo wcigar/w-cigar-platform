@@ -127,6 +127,8 @@ export default function Customs() {
   async function syncManualItemsToCatalog(items) {
     const out = [...items]
     let touched = false
+    let insertedCount = 0
+    const insertedNames = []
     for (let i = 0; i < out.length; i++) {
       const it = out[i]
       if (!it.manual || !it.name || !it.name.trim()) continue
@@ -148,13 +150,15 @@ export default function Customs() {
         }).select('id').single()
         if (ins.error) { console.warn('產品庫寫入失敗:', ins.error.message); continue }
         pid = ins.data?.id
+        insertedCount++
+        insertedNames.push(trimmedName)
       }
       if (pid) {
         out[i] = { ...it, name: trimmedName, product_id: pid, manual: false }
         touched = true
       }
     }
-    return { items: out, touched }
+    return { items: out, touched, insertedCount, insertedNames }
   }
 
   async function genDocs(action) {
@@ -165,7 +169,10 @@ export default function Customs() {
     const blankManual = draft.items.find(it => it.manual && (!it.name || !it.name.trim()))
     if (blankManual) { alert('手動品項缺名稱，請填寫'); return }
     // 自動把手動品項寫入產品庫，並把 items 轉成附 product_id 的正式品項
-    const { items: syncedItems } = await syncManualItemsToCatalog(draft.items)
+    const { items: syncedItems, insertedCount, insertedNames } = await syncManualItemsToCatalog(draft.items)
+    if (insertedCount > 0) {
+      alert(`✅ 已新增 ${insertedCount} 筆到產品庫：\n${insertedNames.map(n => '・' + n).join('\n')}\n\n（之後可直接在「產品庫」tab 重複使用）`)
+    }
     const totals = computeShipmentTotals(syncedItems)
     const shipment = { ...draft, items: syncedItems, ...totals }
     const row = {
@@ -438,12 +445,20 @@ export default function Customs() {
               <details>
                 <summary style={{ padding: '10px', background: 'rgba(255,215,0,0.1)', borderRadius: 8, cursor: 'pointer', fontSize: 13, color: 'var(--gold)', listStyle: 'none', textAlign: 'center' }}><Plus size={14} style={{ verticalAlign: -2 }} /> 從產品庫選</summary>
                 <div style={{ marginTop: 8, maxHeight: 300, overflow: 'auto' }}>
-                  {products.filter(p => !draft.items.some(i => i.product_id === p.id)).map(p => (
-                    <div key={p.id} onClick={() => addItem(p.id)} style={{ padding: '8px 10px', borderBottom: '1px solid #2a2a2a', cursor: 'pointer', display: 'flex', justifyContent: 'space-between' }}>
-                      <div style={{ flex: 1, fontSize: 12 }}><div>{p.name}</div><div style={{ color: 'var(--text-muted)', fontSize: 10 }}>{p.pcs_per_bundle}/{p.package_type} · ${p.unit_price_usd} · {p.unit_weight_g}g/支</div></div>
+                  {products.filter(p => !draft.items.some(i => i.product_id === p.id)).map(p => {
+                    const isCapadura = /CAPADURA/i.test(p.name || '')
+                    return (
+                    <div key={p.id} onClick={() => addItem(p.id)} style={{ padding: '8px 10px', borderBottom: '1px solid #2a2a2a', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', background: isCapadura ? 'rgba(212,175,55,0.18)' : 'transparent', borderLeft: isCapadura ? '3px solid #d4af37' : '3px solid transparent' }}>
+                      <div style={{ flex: 1, fontSize: 12 }}>
+                        <div style={{ color: isCapadura ? '#fcd34d' : '#fff', fontWeight: isCapadura ? 700 : 400 }}>
+                          {isCapadura && <span style={{ marginRight: 4 }}>⭐</span>}{p.name}
+                        </div>
+                        <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>{p.pcs_per_bundle}/{p.package_type} · ${p.unit_price_usd} · {p.unit_weight_g}g/支</div>
+                      </div>
                       <ChevronRight size={16} style={{ color: 'var(--gold)' }} />
                     </div>
-                  ))}
+                    )
+                  })}
                   {products.filter(p => !draft.items.some(i => i.product_id === p.id)).length === 0 && (
                     <div style={{ padding: 12, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>產品庫的商品都已加入</div>
                   )}
@@ -543,12 +558,14 @@ function ProductManager({ products, onChange }) {
           </div>
         </div>
       )}
-      {products.map(p => (
-        <div key={p.id} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid #2a2a2a', borderRadius: 8, padding: 10, marginBottom: 8 }}>
+      {products.map(p => {
+        const isCapadura = /CAPADURA/i.test(p.name || '')
+        return (
+        <div key={p.id} style={{ background: isCapadura ? 'rgba(212,175,55,0.12)' : 'rgba(255,255,255,0.03)', border: isCapadura ? '1px solid rgba(212,175,55,0.5)' : '1px solid #2a2a2a', borderRadius: 8, padding: 10, marginBottom: 8, borderLeft: isCapadura ? '4px solid #d4af37' : '1px solid #2a2a2a' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {p.name}
+              <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', color: isCapadura ? '#fcd34d' : '#fff' }}>
+                {isCapadura && <span style={{ marginRight: 4 }}>⭐</span>}{p.name}
                 {p.has_under_declared && <span style={{ marginLeft: 6, fontSize: 9, padding: '1px 5px', background: 'rgba(251,146,60,0.2)', color: '#fb923c', borderRadius: 3, fontWeight: 700 }}>低報</span>}
               </div>
               <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
@@ -577,7 +594,8 @@ function ProductManager({ products, onChange }) {
             </div>
           )}
         </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
