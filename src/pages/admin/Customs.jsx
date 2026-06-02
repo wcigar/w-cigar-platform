@@ -119,6 +119,44 @@ export default function Customs() {
     setDraft(d => ({ ...d, items: d.items.filter((_, i) => i !== idx) }))
   }
 
+  // 將 item 當前規格寫回 customs_products（單價/重量/包裝/支數同步）
+  async function pushItemToCatalog(it) {
+    if (!it.product_id) { alert('此項目不在產品庫，無法同步'); return }
+    const dbProduct = products.find(p => p.id === it.product_id)
+    if (!dbProduct) { alert('找不到對應產品'); return }
+    const ok = confirm(
+      `將「${it.name}」的規格寫回產品庫？\n\n` +
+      `單價: $${dbProduct.unit_price_usd} → $${it.unit_price_usd}\n` +
+      `單支重: ${dbProduct.unit_weight_g}g → ${it.unit_weight_g}g\n` +
+      `支/束: ${dbProduct.pcs_per_bundle} → ${it.pcs_per_bundle}\n` +
+      `包裝: ${dbProduct.package_type} → ${it.package_type}\n\n` +
+      `（之後此產品從 dropdown 選都會帶新規格）`
+    )
+    if (!ok) return
+    const { error } = await supabase.from('customs_products').update({
+      unit_price_usd: +it.unit_price_usd || 0,
+      unit_weight_g: +it.unit_weight_g || 0,
+      pcs_per_bundle: +it.pcs_per_bundle || 25,
+      package_type: it.package_type || 'Bundle',
+      updated_at: new Date().toISOString(),
+    }).eq('id', it.product_id)
+    if (error) { alert('❌ 同步失敗: ' + error.message); return }
+    alert(`✅ 已同步到產品庫`)
+    loadAll()
+  }
+
+  // 偵測 item 是否跟產品庫不同（dirty）
+  function itemIsDirty(it) {
+    if (!it.product_id) return false
+    const p = products.find(x => x.id === it.product_id)
+    if (!p) return false
+    const eq = (a, b) => Math.abs(+a - +b) < 0.001
+    return !eq(p.unit_price_usd, it.unit_price_usd)
+        || !eq(p.unit_weight_g, it.unit_weight_g)
+        || +p.pcs_per_bundle !== +it.pcs_per_bundle
+        || (p.package_type || '') !== (it.package_type || '')
+  }
+
   function pickBuyer(b) {
     setDraft(d => ({ ...d, buyer_name: b.name, buyer_address: b.address, notify_to: b.notify_to || d.notify_to }))
   }
@@ -444,6 +482,16 @@ export default function Customs() {
                     </div>
                   )
                 })()}
+                {itemIsDirty(it) && (
+                  <div style={{ marginTop: 8, padding: 8, background: 'rgba(251,146,60,0.12)', border: '1px solid rgba(251,146,60,0.4)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                    <div style={{ fontSize: 11, color: '#fb923c', flex: 1 }}>
+                      ⚠️ 規格與產品庫不同（單價/重量/包裝/支數）
+                    </div>
+                    <button onClick={() => pushItemToCatalog(it)} style={{ padding: '6px 10px', borderRadius: 6, background: '#fb923c', color: '#000', border: 'none', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                      💾 同步回產品庫
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 6, marginTop: 8 }}>
