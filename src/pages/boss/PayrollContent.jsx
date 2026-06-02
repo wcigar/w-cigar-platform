@@ -166,8 +166,9 @@ export function getAttendanceData(eid, schedules, punches, emp) {
         if (!isNaN(h) && !isNaN(m)) {
           outHM = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`
           let pm = h * 60 + m
-          if (v === '晚班' && h < 12) pm += 1440
           const endMin = shift.endH * 60 + shift.endM
+          // 通用跨日判斷：下班時刻 + 12hr 還小於預定下班 → 視為跨日（涵蓋晚班/單人班/早班加班）
+          if (pm + 720 < endMin) pm += 1440
           if (resolvedOut?.overridden && resolvedOut.isEarly === false) { /* 已取消早退 */ }
           else if (pm < endMin) {
             const mins = endMin - pm
@@ -533,6 +534,37 @@ export default function Payroll() {
     load()
   }
 
+  // 補卡：未打卡日新增 punch 紀錄
+  async function addMissingPunch(eid, date, type) {
+    const t = window.prompt(`輸入 ${date} ${type}打卡時間 (HH:MM，下班可跨日填如 01:11):`)
+    if (!t) return
+    const mm = /^(\d{1,2}):(\d{2})$/.exec(t.trim())
+    if (!mm) { alert('格式錯誤，例：14:00 或 01:11'); return }
+    const hh = +mm[1], mn = +mm[2]
+    if (hh > 47 || mn > 59) { alert('時間範圍錯誤'); return }
+    // 跨日下班：用次日的 00-12:00 + hh:mm
+    const punchDate = new Date(date + 'T00:00:00+08:00')
+    if (type === '下班' && hh < 12) punchDate.setDate(punchDate.getDate() + 1)
+    punchDate.setHours(hh, mn, 0, 0)
+    setOverrideSaving(`new-${date}-${type}`)
+    const { error } = await supabase.from('punch_records').insert({
+      employee_id: eid,
+      date,
+      punch_type: type,
+      time: punchDate.toISOString(),
+      is_valid: true,
+      manual_override: true,
+      override_reason: `補卡 (${type} ${t})`,
+      override_by: 'ADMIN',
+      override_at: new Date().toISOString(),
+    })
+    setOverrideSaving(null)
+    if (error) { alert('❌ 補卡失敗：' + error.message); return }
+    await logAudit('AttendanceAddPunch', `補卡 ${eid} ${date} ${type} ${t}`, 'ADMIN')
+    alert(`✅ 已補卡 ${date} ${type} ${t}`)
+    load()
+  }
+
   async function cancelOverride(punchId) {
     setOverrideSaving(punchId)
     const { error } = await supabase.from('punch_records').update({
@@ -603,8 +635,9 @@ export default function Payroll() {
       if (shift && clockOut?.time) {
         const [h, m] = taipeiHM(clockOut.time)
         let pm = h * 60 + m
-        if (s.shift === '晚班' && h < 12) pm += 1440
         const endMin = shift.endH * 60 + shift.endM
+        // 通用跨日判斷：下班時刻 + 12hr 還小於預定下班 → 跨日
+        if (pm + 720 < endMin) pm += 1440
         if (pm < endMin) { autoEarly = true; earlyMins = endMin - pm }
       }
 
@@ -846,8 +879,12 @@ export default function Payroll() {
           {emps.map(e=><option key={e.id} value={e.id}>{e.name} ({e.id})</option>)}
         </select>
         {overrideEmp && getDayRows(overrideEmp).map(day => {
-          const isWorkDay = day.shift === '早班' || day.shift === '晚班'
-          const hasIssue = day.autoLate || day.autoEarly
+          // 工作日：除「休假/請假類」之外都算（含早班/晚班/單人班/彈性班/PT*）
+          const nonWork = ['休假','臨時請假','病假','事假','特休','調班']
+          const isWorkDay = !nonWork.includes(day.shift)
+          const missingIn = isWorkDay && !day.clockInPunch
+          const missingOut = isWorkDay && !day.clockOutPunch
+          const hasIssue = day.autoLate || day.autoEarly || missingIn || missingOut
           const isFixed = day.inOverridden || day.outOverridden
           const lateFixed = day.inOverridden && day.inCorrectedLate === false
           const earlyFixed = day.outOverridden && day.outCorrectedEarly === false
@@ -868,6 +905,24 @@ export default function Payroll() {
               {isFixed && <span style={{fontSize:10,color:'var(--blue)',fontWeight:700}}>⚙️</span>}
             </div>
 
+            {/* 補卡：上班 */}
+            {missingIn && (
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 0',borderTop:'1px solid var(--border)'}}>
+                <div style={{fontSize:12,color:'var(--red)'}}>⚠️ 缺上班打卡</div>
+                <button onClick={()=>addMissingPunch(overrideEmp, day.date, '上班')} disabled={overrideSaving===`new-${day.date}-上班`} style={{fontSize:11,padding:'4px 10px',borderRadius:8,cursor:'pointer',background:'rgba(212,175,55,.12)',color:'var(--gold)',border:'1px solid rgba(212,175,55,.4)',fontWeight:600}}>
+                  {overrideSaving===`new-${day.date}-上班`?'...':'✏️ 補打卡'}
+                </button>
+              </div>
+            )}
+            {/* 補卡：下班 */}
+            {missingOut && (
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 0',borderTop:'1px solid var(--border)'}}>
+                <div style={{fontSize:12,color:'var(--red)'}}>⚠️ 缺下班打卡</div>
+                <button onClick={()=>addMissingPunch(overrideEmp, day.date, '下班')} disabled={overrideSaving===`new-${day.date}-下班`} style={{fontSize:11,padding:'4px 10px',borderRadius:8,cursor:'pointer',background:'rgba(212,175,55,.12)',color:'var(--gold)',border:'1px solid rgba(212,175,55,.4)',fontWeight:600}}>
+                  {overrideSaving===`new-${day.date}-下班`?'...':'✏️ 補打卡'}
+                </button>
+              </div>
+            )}
             {/* 遲到修正 */}
             {isWorkDay && day.autoLate && (
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 0',borderTop:'1px solid var(--border)'}}>
