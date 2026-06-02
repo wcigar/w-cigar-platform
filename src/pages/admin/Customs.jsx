@@ -205,7 +205,12 @@ export default function Customs() {
     // 純儲存 (save) — 不產生檔案不下載
     if (action === 'save') {
       const { error: saveErr } = await dbPromise
-      if (saveErr) { alert((editingId ? '更新失敗: ' : '儲存失敗: ') + saveErr.message); return }
+      if (saveErr) { alert((editingId ? '❌ 更新失敗: ' : '❌ 儲存失敗: ') + saveErr.message); return }
+      alert(`✅ ${editingId ? '已更新' : '已儲存'}：${shipment.shipment_no}\n` +
+            `・${totals.total_bundles} 束 / ${totals.total_sticks} 支\n` +
+            `・金額 USD$${totals.total_amount_usd}\n` +
+            `・淨重 ${totals.total_net_weight_kg} kg\n\n` +
+            `（已切換到「貨件記錄」tab，可看到該筆排第一）`)
       setEditingId(null); setDraft(newDraft()); setTab('list'); loadAll()
       return
     }
