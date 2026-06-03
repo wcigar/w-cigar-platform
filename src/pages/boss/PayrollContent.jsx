@@ -345,6 +345,7 @@ export default function Payroll() {
   const [showBonusForm, setShowBonusForm] = useState(false)
   const [newExp, setNewExp] = useState({ category: '', item: '', amount: '', payment: '現金', date: format(new Date(), 'yyyy-MM-dd') })
   const [showExpForm, setShowExpForm] = useState(false)
+  const [expenseSubmitterFilter, setExpenseSubmitterFilter] = useState('ALL')
   const [payslip, setPayslip] = useState(null)
   const [loading, setLoading] = useState(true)
   // 出勤修正
@@ -978,12 +979,66 @@ export default function Payroll() {
       </div>)}
 
       {/* ===== 支出管理 ===== */}
-      {tab==='expenses'&&(<div>
-        <div className="card" style={{padding:14,marginBottom:16}}><div style={{fontSize:11,color:'var(--text-dim)'}}>本月支出</div><div style={{fontSize:22,fontFamily:'var(--font-mono)',color:'var(--red)',fontWeight:600}}>${totalExp.toLocaleString()}</div></div>
+      {tab==='expenses'&&(() => {
+        // 統計：依「提交者」分組
+        const bySubmitter = {}
+        expenses.forEach(x => {
+          const k = x.submitted_by || 'ADMIN'
+          if (!bySubmitter[k]) bySubmitter[k] = { count: 0, total: 0 }
+          bySubmitter[k].count++
+          bySubmitter[k].total += +x.amount || 0
+        })
+        const submitterFilter = expenseSubmitterFilter || 'ALL'
+        const filtered = submitterFilter === 'ALL' ? expenses : expenses.filter(x => (x.submitted_by || 'ADMIN') === submitterFilter)
+        return (<div>
+        <div className="card" style={{padding:14,marginBottom:12}}><div style={{fontSize:11,color:'var(--text-dim)'}}>本月支出（含員工）</div><div style={{fontSize:22,fontFamily:'var(--font-mono)',color:'var(--red)',fontWeight:600}}>${totalExp.toLocaleString()}</div></div>
+        {/* 員工 / ADMIN filter chips */}
+        <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
+          <button onClick={()=>setExpenseSubmitterFilter('ALL')} style={{padding:'6px 12px',borderRadius:18,fontSize:11,fontWeight:600,cursor:'pointer',background:submitterFilter==='ALL'?'var(--gold-glow)':'transparent',color:submitterFilter==='ALL'?'var(--gold)':'var(--text-dim)',border:submitterFilter==='ALL'?'1px solid var(--border-gold)':'1px solid var(--border)'}}>全部 ({expenses.length})</button>
+          {Object.entries(bySubmitter).map(([sub, s]) => (
+            <button key={sub} onClick={()=>setExpenseSubmitterFilter(sub)} style={{padding:'6px 12px',borderRadius:18,fontSize:11,fontWeight:600,cursor:'pointer',background:submitterFilter===sub?'var(--gold-glow)':'transparent',color:submitterFilter===sub?'var(--gold)':'var(--text-dim)',border:submitterFilter===sub?'1px solid var(--border-gold)':'1px solid var(--border)'}}>
+              {sub === 'ADMIN' ? '👑 老闆' : `👤 ${sub}`} ({s.count}) ${s.total.toLocaleString()}
+            </button>
+          ))}
+        </div>
         <button className="btn-outline" style={{marginBottom:16,display:'flex',alignItems:'center',gap:6}} onClick={()=>setShowExpForm(!showExpForm)}><Plus size={14}/> 新增</button>
         {showExpForm&&<div className="card" style={{marginBottom:16,padding:16}}><div style={{display:'flex',gap:8,marginBottom:8}}><input type="date" value={newExp.date} onChange={e=>setNewExp(p=>({...p,date:e.target.value}))} style={{flex:1,fontSize:13,padding:8}}/><select value={newExp.category} onChange={e=>setNewExp(p=>({...p,category:e.target.value}))} style={{flex:1,fontSize:13,padding:8}}><option value="">分類</option>{['食材','酒水','雪茄進貨','設備','房租','水電','人事','行銷','雜支'].map(c=><option key={c}>{c}</option>)}</select></div><input value={newExp.item} onChange={e=>setNewExp(p=>({...p,item:e.target.value}))} placeholder="項目" style={{marginBottom:8}}/><div style={{display:'flex',gap:8,marginBottom:8}}><input type="number" inputMode="numeric" value={newExp.amount} onChange={e=>setNewExp(p=>({...p,amount:e.target.value}))} placeholder="金額" style={{flex:1}} pattern="[0-9]*"/><select value={newExp.payment} onChange={e=>setNewExp(p=>({...p,payment:e.target.value}))} style={{width:100,fontSize:13,padding:8}}>{['現金','刷卡','轉帳','LINE Pay'].map(p=><option key={p}>{p}</option>)}</select></div><button className="btn-gold" onClick={addExpense}>儲存</button></div>}
-        {expenses.map(e=><div key={e.id} className="card" style={{padding:12,marginBottom:6,display:'flex',justifyContent:'space-between'}}><div><div style={{fontSize:13,fontWeight:500}}>{e.item||e.category}</div><div style={{fontSize:11,color:'var(--text-muted)'}}>{e.date} · {e.category} · {e.payment}</div></div><div style={{display:'flex',alignItems:'center',gap:6}}><span style={{fontSize:15,fontFamily:'var(--font-mono)',color:'var(--red)',fontWeight:600}}>-${(e.amount||0).toLocaleString()}</span><button style={{...ib,color:'var(--red)'}} onClick={()=>deleteExpense(e.id)}><Trash2 size={12}/></button></div></div>)}
-      </div>)}
+        {filtered.length === 0 && <div style={{textAlign:'center',padding:30,color:'var(--text-muted)',fontSize:13}}>此區間無支出紀錄</div>}
+        {filtered.map(e => {
+          const isStaff = e.submitted_by && e.submitted_by !== 'ADMIN'
+          return (
+          <div key={e.id} className="card" style={{padding:12,marginBottom:8,borderColor: isStaff ? 'rgba(212,175,55,.25)' : 'var(--border)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:13,fontWeight:600,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                  {e.item || e.category}
+                  {isStaff && <span style={{fontSize:9,padding:'1px 6px',background:'rgba(212,175,55,.18)',color:'var(--gold)',borderRadius:4,fontWeight:700}}>👤 {e.submitted_by}</span>}
+                  {!isStaff && <span style={{fontSize:9,padding:'1px 6px',background:'rgba(77,138,196,.12)',color:'#4d8ac4',borderRadius:4,fontWeight:700}}>👑 老闆</span>}
+                </div>
+                <div style={{fontSize:11,color:'var(--text-muted)',marginTop:3}}>
+                  {e.date} · {e.category} · {e.payment}
+                  {e.vendor && <span> · 🏪 {e.vendor}</span>}
+                  {e.handler && e.handler !== 'ADMIN' && <span> · 💰 {e.handler}</span>}
+                </div>
+                {e.note && <div style={{fontSize:11,color:'var(--text-dim)',marginTop:4,fontStyle:'italic'}}>📝 {e.note}</div>}
+              </div>
+              <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:6}}>
+                <span style={{fontSize:15,fontFamily:'var(--font-mono)',color:'var(--red)',fontWeight:700}}>-${(e.amount||0).toLocaleString()}</span>
+                <button style={{...ib,color:'var(--red)'}} onClick={()=>deleteExpense(e.id)}><Trash2 size={12}/></button>
+              </div>
+            </div>
+            {e.photo_url && (
+              <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid var(--border)'}}>
+                <img src={e.photo_url} alt="收據" onClick={() => window.open(e.photo_url, '_blank')}
+                  style={{width:'100%',maxHeight:200,objectFit:'cover',borderRadius:8,cursor:'pointer',border:'1px solid var(--border)'}}/>
+                <div style={{fontSize:10,color:'var(--text-muted)',marginTop:4,textAlign:'center'}}>🧾 點圖看大張收據</div>
+              </div>
+            )}
+          </div>
+          )
+        })}
+      </div>)
+      })()}
     </div>
   )
 }
