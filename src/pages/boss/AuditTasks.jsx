@@ -82,9 +82,9 @@ export default function AuditTasks() {
 
   return (
     <div className="page-container fade-in">
-      <div className="section-title">📋 任務查核</div>
+      <div className="section-title">🧹 環境整潔查核</div>
       <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12 }}>
-        查核員工每日拍照、駁回會 LINE 私推員工 + 扣 $50。
+        查核員工每日環境整潔拍照、駁回會 LINE 私推員工 + 扣 $50。
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center', flexWrap: 'wrap' }}>

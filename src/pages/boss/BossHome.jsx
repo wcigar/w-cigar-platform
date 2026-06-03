@@ -130,7 +130,7 @@ export default function BossHome() {
   // === 主要 menu（5 個常用）===
   const mainCards = [
     { icon: Briefcase, label: '營運管理', sub: 'SOP ' + stats.sop + '% · 異常 ' + stats.abnPending, path: '/operations', color: '#c9a84c' },
-    { icon: CheckCircle2, label: '任務查核', sub: '昨日待審 ' + (stats.pendingAudit || 0), path: '/audit-tasks', color: '#d4af37' },
+    { icon: CheckCircle2, label: '環境整潔查核', sub: '昨日待審 ' + (stats.pendingAudit || 0), path: '/audit-tasks', color: '#d4af37' },
     { icon: Users, label: '人事排班', sub: '今日 ' + stats.working + ' 人 · 假單 ' + stats.leavePending, path: '/hr', color: '#4da86c' },
     { icon: DollarSign, label: '薪資財務', sub: '薪資 · 支出 · 勞健保', path: '/payroll', color: '#4d8ac4' },
     { icon: Package, label: '庫存盤點', sub: '進貨 · 庫存 · 盤點', path: '/boss-inventory', color: '#7a8c4d' },
@@ -234,6 +234,35 @@ export default function BossHome() {
           <SB label="VIP 欠款" value={vipUnpaid ? '$' + (vipUnpaid/1000).toFixed(0) + 'K' : '$0'} color={vipUnpaid > 0 ? 'var(--red)' : 'var(--text-muted)'} tap={() => navigate('/vip-cellar/admin')} />
         </div>
       )}
+
+      {/* === 環境整潔查核 醒目 banner（永遠顯示、有待審紅色強調） === */}
+      <div
+        onClick={() => navigate('/audit-tasks')}
+        style={{
+          cursor: 'pointer', marginBottom: 12, padding: '18px 20px', borderRadius: 14,
+          background: (stats.pendingAudit || 0) > 0
+            ? 'linear-gradient(135deg, rgba(196,77,77,.25), rgba(196,77,77,.08))'
+            : 'linear-gradient(135deg, rgba(212,175,55,.18), rgba(212,175,55,.04))',
+          border: `2px solid ${(stats.pendingAudit || 0) > 0 ? 'rgba(196,77,77,.6)' : 'rgba(212,175,55,.5)'}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+          boxShadow: (stats.pendingAudit || 0) > 0 ? '0 4px 16px rgba(196,77,77,.2)' : '0 2px 8px rgba(212,175,55,.15)',
+        }}
+      >
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: (stats.pendingAudit || 0) > 0 ? '#ff6b6b' : '#d4af37', letterSpacing: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
+            🧹 環境整潔查核
+            {(stats.pendingAudit || 0) > 0 && <span style={{ fontSize: 10, padding: '3px 10px', background: 'rgba(196,77,77,.3)', color: '#fff', borderRadius: 12, fontWeight: 700, letterSpacing: 1 }}>急</span>}
+          </div>
+          <div style={{ fontSize: 12, color: (stats.pendingAudit || 0) > 0 ? '#ffb4b4' : 'var(--text-dim)', marginTop: 4, fontWeight: 600 }}>
+            {(stats.pendingAudit || 0) > 0
+              ? `昨日 ${stats.pendingAudit} 筆照片等查核 → 點我審`
+              : '✓ 昨日照片皆已審完'}
+          </div>
+        </div>
+        <div style={{ fontSize: 36, fontFamily: 'var(--font-mono)', fontWeight: 800, color: (stats.pendingAudit || 0) > 0 ? '#ff6b6b' : '#d4af37' }}>
+          {stats.pendingAudit || 0}
+        </div>
+      </div>
 
       {/* === Zone 3：功能入口（5 大常用 + 6 個進階折疊） === */}
       <div style={{ marginBottom: 12 }}>
