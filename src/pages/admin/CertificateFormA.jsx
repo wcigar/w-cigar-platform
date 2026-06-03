@@ -1,15 +1,11 @@
 import { useState, useLayoutEffect, useRef, useCallback } from "react";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas-pro";
 
 /**
- * GSP Form A 產地證明 — 正本掃描底圖 + 可填欄位 + 列印
+ * GSP Form A 產地證明 — 正本掃描底圖 + 可填欄位 + 列印 + PDF 下載
  * W Cigar Bar 老闆後台「報關」模組
- *
- * 用法（最簡）：
- *   import CertificateFormAButton from "@/.../CertificateFormA";
- *   <CertificateFormAButton />        // 直接給你一顆「📋 產地證明生成」按鈕
- *
- * 底圖請放： public/customs/form-a-bg.jpg
- * （Vite 中 public/ 的檔案以根路徑引用 → /customs/form-a-bg.jpg）
+ * 底圖請放：public/customs/form-a-bg.jpg
  */
 
 const BG_SRC = "/customs/form-a-bg.jpg";
@@ -36,17 +32,16 @@ const LABELS = {
   weight9: "毛重", inv10a: "發票號", inv10b: "發票日期", prod12: "生產國",
 };
 
-// 預設帶值的欄位（其餘留空 → 透明顯示正本原值，打字才覆蓋）
 const DEFAULTS = { certNo: "154013" };
 
 function CertificateFormA({ bgSrc = BG_SRC }) {
   const [vals, setVals] = useState(DEFAULTS);
   const [showFields, setShowFields] = useState(true);
+  const [downloading, setDownloading] = useState(false);
   const sheetRef = useRef(null);
 
   const set = (id) => (e) => setVals((s) => ({ ...s, [id]: e.target.value }));
 
-  // 單行欄位垂直置中：lineHeight = 欄位實際像素高
   const centerSingles = useCallback(() => {
     const root = sheetRef.current;
     if (!root) return;
@@ -61,25 +56,107 @@ function CertificateFormA({ bgSrc = BG_SRC }) {
     return () => window.removeEventListener("resize", centerSingles);
   }, [centerSingles]);
 
+  // ⬇ 下載 PDF（用 html2canvas-pro + jsPDF、Letter 直式）
+  async function downloadPdf() {
+    const sheet = sheetRef.current;
+    if (!sheet) return;
+    setDownloading(true);
+    const prevShowFields = showFields;
+    setShowFields(false); // 隱藏藍框
+    // 等 React re-render + 圖片載入
+    await new Promise((r) => setTimeout(r, 250));
+    try {
+      // 確保底圖已載入
+      const img = sheet.querySelector("img");
+      if (img && !img.complete) {
+        await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
+      }
+      const canvas = await html2canvas(sheet, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        logging: false,
+      });
+      const imgData = canvas.toDataURL("image/jpeg", 0.92);
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      pdf.addImage(imgData, "JPEG", 0, 0, pageW, pageH);
+      const today = new Date().toISOString().slice(0, 10);
+      pdf.save(`FormA_${vals.certNo || "COO"}_${today}.pdf`);
+    } catch (e) {
+      console.error("PDF 下載失敗:", e);
+      alert("❌ PDF 下載失敗：" + (e.message || e));
+    } finally {
+      setShowFields(prevShowFields);
+      setDownloading(false);
+    }
+  }
+
   return (
     <div className="cfa-wrap">
       <style>{CSS}</style>
 
       <div className="cfa-bar cfa-no-print">
         <strong>GSP Form A 產地證明</strong>
-        <button className="cfa-btn print" onClick={() => window.print()}>🖨️ 列印 / 另存 PDF</button>
+        <button className="cfa-btn dl" onClick={downloadPdf} disabled={downloading}>
+          {downloading ? "⏳ 產生中..." : "⬇ 下載 PDF"}
+        </button>
+        <button className="cfa-btn print" onClick={() => window.print()}>🖨️ 列印</button>
         <button className="cfa-btn reset" onClick={() => { if (window.confirm("清空所有填寫欄位？")) setVals({}); }}>↺ 清空</button>
         <button className="cfa-btn reset" onClick={() => setVals(DEFAULTS)}>↩ 還原預設</button>
         <label className="cfa-toggle">
           <input type="checkbox" checked={showFields} onChange={(e) => setShowFields(e.target.checked)} />
-          標示可填欄位
+          標示欄位
         </label>
-        <small>未填欄位＝正本原值，打字才覆蓋。列印自動隱藏標示框（請選 Letter 尺寸、邊界：無）</small>
+      </div>
+
+      {/* ⭐ 頂端快速編輯區 — 最常改的 4 項放這裡 */}
+      <div className="cfa-quick cfa-no-print">
+        <div className="cfa-quick-title">⭐ 快速編輯（最常改的欄位）</div>
+        <div className="cfa-quick-grid">
+          <label className="cfa-quick-fld">
+            <span>證明號 N°</span>
+            <input value={vals.certNo || ""} onChange={set("certNo")} placeholder="如：154013" />
+          </label>
+          <label className="cfa-quick-fld">
+            <span>發票號</span>
+            <input value={vals.inv10a || ""} onChange={set("inv10a")} placeholder="如：INV-260602" />
+          </label>
+          <label className="cfa-quick-fld">
+            <span>發票日期</span>
+            <input value={vals.inv10b || ""} onChange={set("inv10b")} placeholder="如：2026-06-02 / 02-JUN-2026" />
+          </label>
+          <label className="cfa-quick-fld">
+            <span>運送/航班</span>
+            <input value={vals.transport || ""} onChange={set("transport")} placeholder="如：BY AIR / FedEx 12345" />
+          </label>
+          <label className="cfa-quick-fld cfa-quick-wide">
+            <span>貨物說明 / 品項</span>
+            <textarea rows={3} value={vals.desc || ""} onChange={set("desc")}
+              placeholder="CIGARS, BUNDLES / BOXES, NICARAGUA ORIGIN..." />
+          </label>
+          <label className="cfa-quick-fld">
+            <span>毛重 (kg)</span>
+            <input value={vals.weight9 || ""} onChange={set("weight9")} placeholder="如：17.2" />
+          </label>
+          <label className="cfa-quick-fld">
+            <span>原產地標準</span>
+            <input value={vals.crit8 || ""} onChange={set("crit8")} placeholder="如：P" />
+          </label>
+          <label className="cfa-quick-fld">
+            <span>項次</span>
+            <input value={vals.item5 || ""} onChange={set("item5")} placeholder="如：1" />
+          </label>
+        </div>
+        <div className="cfa-hint">
+          💡 上方改完會立即同步到下方表單；其他細節欄位（出口商/收貨人/嘜頭/生產國）也可直接在表單上點擊修改。
+        </div>
       </div>
 
       <div className="cfa-center">
         <div ref={sheetRef} className={"cfa-sheet" + (showFields ? " show-fields" : "")}>
-          <img src={bgSrc} alt="Form A 產地證明" draggable={false} />
+          <img src={bgSrc} alt="Form A 產地證明" draggable={false} crossOrigin="anonymous" />
           {FIELDS.map(([id, l, t, w, h, multi, fs, color, align]) => {
             const style = {
               left: l + "%", top: t + "%", width: w + "%", height: h + "%",
@@ -99,7 +176,6 @@ function CertificateFormA({ bgSrc = BG_SRC }) {
   );
 }
 
-/** 對外：一顆按鈕 + 全螢幕 Modal */
 export default function CertificateFormAButton({ label = "📋 產地證明生成", bgSrc = BG_SRC, className = "" }) {
   const [open, setOpen] = useState(false);
   return (
@@ -140,10 +216,25 @@ const CSS = `
  align-items:center;flex-wrap:wrap;padding:12px 16px 12px 60px;}
 .cfa-bar strong{font-size:15px;margin-right:6px;}
 .cfa-btn{font-size:14px;font-weight:600;border:0;border-radius:6px;padding:8px 14px;cursor:pointer;}
+.cfa-btn:disabled{opacity:.55;cursor:wait;}
+.cfa-btn.dl{background:#4d8ac4;color:#fff;font-weight:700;}
 .cfa-btn.print{background:#c9a227;color:#111;}
 .cfa-btn.reset{background:#444;color:#fff;}
 .cfa-toggle{font-size:13px;color:#ddd;display:flex;align-items:center;gap:5px;cursor:pointer;}
-.cfa-bar small{color:#999;margin-left:auto;max-width:320px;line-height:1.3;}
+
+.cfa-quick{background:#1a1a1a;color:#fff;padding:16px 24px 12px;border-bottom:1px solid #2a2a2a;}
+.cfa-quick-title{font-size:13px;font-weight:700;color:#c9a227;letter-spacing:1px;margin-bottom:10px;}
+.cfa-quick-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+.cfa-quick-wide{grid-column:span 2;}
+.cfa-quick-fld{display:flex;flex-direction:column;gap:4px;}
+.cfa-quick-fld span{font-size:11px;color:#888;font-weight:600;letter-spacing:.5px;}
+.cfa-quick-fld input,.cfa-quick-fld textarea{background:#0f0f0f;border:1px solid #333;border-radius:6px;
+ color:#fff;font-size:13px;padding:8px 10px;font-family:inherit;outline:none;}
+.cfa-quick-fld input:focus,.cfa-quick-fld textarea:focus{border-color:#c9a227;background:#181818;}
+.cfa-quick-fld textarea{resize:vertical;min-height:60px;}
+.cfa-hint{margin-top:10px;font-size:11px;color:#888;}
+@media (max-width:720px){.cfa-quick-grid{grid-template-columns:1fr 1fr;}.cfa-quick-wide{grid-column:span 2;}}
+
 .cfa-center{display:flex;justify-content:center;padding:18px;}
 .cfa-sheet{position:relative;width:850px;max-width:100%;aspect-ratio:1700/2200;background:#fff;
  box-shadow:0 4px 20px rgba(0,0,0,.5);container-type:inline-size;}
@@ -160,7 +251,7 @@ const CSS = `
 @media print{
  @page{size:letter portrait;margin:0;}
  .cfa-wrap{background:#fff;}
- .cfa-bar{display:none!important;}
+ .cfa-bar,.cfa-quick{display:none!important;}
  .cfa-center{padding:0;}
  .cfa-sheet{width:100%;box-shadow:none;}
  .show-fields .cfa-fld{box-shadow:none;background:transparent;}
