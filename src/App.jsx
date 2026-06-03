@@ -16,6 +16,7 @@ import StaffExpense from './pages/staff/StaffExpense'
 import StaffMeeting from './pages/staff/StaffMeeting'
 import StaffPOS from './pages/staff/StaffPOS'
 import BossHome from './pages/boss/BossHome'
+import BossAuditTasks from './pages/boss/AuditTasks'
 import BossOperations from './pages/boss/Operations'
 import BossHR from './pages/boss/HRSchedule'
 import BossPayroll from './pages/boss/Payroll'
@@ -93,6 +94,7 @@ function AppInner() {
           <>
             <Route path="/" element={<BossHome />} />
             <Route path="/operations" element={<BossOperations />} />
+            <Route path="/audit-tasks" element={<BossAuditTasks />} />
             <Route path="/hr" element={<BossHR />} />
             <Route path="/payroll" element={<BossPayroll />} />
             <Route path="/boss-inventory" element={<BossInventory />} />

@@ -32,6 +32,7 @@ function SOPView() {
   const [notes, setNotes] = useState({})
   const [humData, setHumData] = useState({})
   const [expanded, setExpanded] = useState({})
+  const [yesterdayRejected, setYesterdayRejected] = useState([])
   const [today, setToday] = useState(() => format(new Date(), 'yyyy-MM-dd'))
 
   useEffect(() => { load() }, [today])
@@ -45,11 +46,14 @@ function SOPView() {
 
   async function load() {
     setLoading(true)
-    const [tRes, dRes] = await Promise.all([
+    const yesterdayStr = format(new Date(Date.now() - 86400000), 'yyyy-MM-dd')
+    const [tRes, dRes, rejRes] = await Promise.all([
       supabase.from('task_status').select('*').eq('date', today).in('owner', [user.employee_id, 'ALL']).order('task_id'),
       supabase.from('sop_definitions').select('*').in('owner', [user.employee_id, 'ALL']).order('task_id'),
+      supabase.from('task_status').select('task_id,title,audit_reason,photo_url,audited_by').eq('date', yesterdayStr).eq('owner', user.employee_id).eq('audit_status', 'rejected'),
     ])
     setTasks(tRes.data || []); setDefs(dRes.data || [])
+    setYesterdayRejected(rejRes.data || [])
     setChecked({}); setPhotos({}); setPreviews({}); setNotes({})
     setLoading(false)
   }
@@ -125,6 +129,22 @@ function SOPView() {
 
   return (
     <div>
+      {yesterdayRejected.length > 0 && (
+        <div style={{ marginBottom: 16, padding: 14, background: 'linear-gradient(135deg, rgba(196,77,77,.15), rgba(196,77,77,.05))', border: '2px solid rgba(196,77,77,.5)', borderRadius: 12 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--red)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+            ⚠️ 昨日 {yesterdayRejected.length} 項拍照被駁回 — 已扣 ${yesterdayRejected.length * 50}
+          </div>
+          {yesterdayRejected.map(r => (
+            <div key={r.task_id} style={{ fontSize: 12, color: 'var(--text-dim)', padding: '6px 0', borderBottom: '1px dashed rgba(196,77,77,.2)' }}>
+              <div style={{ fontWeight: 600, color: 'var(--text)' }}>📌 {r.title}</div>
+              <div style={{ marginTop: 2, color: 'var(--red)' }}>駁回原因（{r.audited_by}）：{r.audit_reason}</div>
+            </div>
+          ))}
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 8, paddingTop: 6, borderTop: '1px solid rgba(196,77,77,.2)' }}>
+            💡 今日請務必確實重新拍照、避免再次被駁回
+          </div>
+        </div>
+      )}
       <div className="card" style={{ marginBottom: 20, textAlign: 'center' }}>
         <div style={{ fontSize: 48, fontFamily: 'var(--font-mono)', color: pct === 100 ? 'var(--green)' : 'var(--gold)', fontWeight: 600, lineHeight: 1 }}>{pct}%</div>
         <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 6 }}>{myDone} / {myTasks.length} 完成</div>

@@ -48,7 +48,8 @@ export default function BossHome() {
 
   async function load() {
     setLoading(true)
-    const [eR, sR, tR, aR, lbR, leaveR, invR, punchR, revR, hoR, abnR] = await Promise.all([
+    const yesterdayStr = format(new Date(Date.now() - 86400000), 'yyyy-MM-dd')
+    const [eR, sR, tR, aR, lbR, leaveR, invR, punchR, revR, hoR, abnR, audR] = await Promise.all([
       supabase.from('employees').select('*').eq('enabled', true),
       supabase.from('schedules').select('*').eq('date', today),
       supabase.from('task_status').select('*').eq('date', today),
@@ -60,6 +61,7 @@ export default function BossHome() {
       supabase.from('daily_revenue').select('total').gte('date', month + '-01').lte('date', format(endOfMonth(new Date(month + '-01')), 'yyyy-MM-dd')),
       supabase.from('shift_handover').select('id').eq('date', today).eq('acknowledged', false),
       supabase.from('abnormal_reports').select('*').neq('status', '已解決').order('time', { ascending: false }).limit(10),
+      supabase.from('task_status').select('id', { count: 'exact' }).eq('date', yesterdayStr).eq('completed', true).not('photo_url', 'is', null).neq('photo_url', '').or('audit_status.is.null,audit_status.eq.'),
     ])
     const tasks = tR.data || [], sc = sR.data || [], emps = eR.data || [], low = invR.data || [], abns = abnR.data || []
     setStats({
@@ -69,6 +71,7 @@ export default function BossHome() {
       abnPending: aR.count || 0,
       leavePending: leaveR.count || 0,
       lowStock: low.length,
+      pendingAudit: audR.count || 0,
     })
     setScheds(sc); setLowItems(low); setAllEmps(emps.filter(e => !e.is_admin)); setPunches(punchR.data || [])
     setMonthRevenue((revR.data || []).reduce((s, r) => s + (+r.total || 0), 0))
@@ -127,6 +130,7 @@ export default function BossHome() {
   // === 主要 menu（5 個常用）===
   const mainCards = [
     { icon: Briefcase, label: '營運管理', sub: 'SOP ' + stats.sop + '% · 異常 ' + stats.abnPending, path: '/operations', color: '#c9a84c' },
+    { icon: CheckCircle2, label: '任務查核', sub: '昨日待審 ' + (stats.pendingAudit || 0), path: '/audit-tasks', color: '#d4af37' },
     { icon: Users, label: '人事排班', sub: '今日 ' + stats.working + ' 人 · 假單 ' + stats.leavePending, path: '/hr', color: '#4da86c' },
     { icon: DollarSign, label: '薪資財務', sub: '薪資 · 支出 · 勞健保', path: '/payroll', color: '#4d8ac4' },
     { icon: Package, label: '庫存盤點', sub: '進貨 · 庫存 · 盤點', path: '/boss-inventory', color: '#7a8c4d' },
