@@ -167,8 +167,18 @@ export function getAttendanceData(eid, schedules, punches, emp) {
           outHM = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`
           let pm = h * 60 + m
           const endMin = shift.endH * 60 + shift.endM
-          // 通用跨日判斷：下班時刻 + 12hr 還小於預定下班 → 視為跨日（涵蓋晚班/單人班/早班加班）
-          if (pm + 720 < endMin) pm += 1440
+          // 跨日判斷（雙重保險）：
+          //   A. 下班時刻 < 上班時刻 → 一定跨日（最可靠）
+          //   B. 沒有上班時刻時 fallback：下班時刻 + 12hr 還小於預定下班
+          // Daniel 5/25 晚班 15:00 補卡 → 下班 00:24 補卡，舊規則 12:24+720=1464 > endMin=1440 不跨日，誤判早退 696 分
+          // 新規則：00:24 (24) < 15:00 (900) → 跨日 +1440 → pm=1464、加班 24 分
+          if (inHM) {
+            const [ih, im] = inHM.split(':').map(Number)
+            const inPm = ih * 60 + im
+            if (pm < inPm) pm += 1440
+          } else if (pm + 720 < endMin) {
+            pm += 1440
+          }
           if (resolvedOut?.overridden && resolvedOut.isEarly === false) { /* 已取消早退 */ }
           else if (pm < endMin) {
             const mins = endMin - pm
@@ -278,23 +288,28 @@ export function calcSalaryToDate(emp, cfg, bonusDefs, att, isCurrentMonth, targe
   const monthlyBase = cfg.monthly_salary || 0
   const dailyBase = monthlyBase > 0 ? Math.round(monthlyBase / daysInMonth) : 0
   const hourlyBase = dailyBase > 0 ? Math.round(dailyBase / 8) : 0
-  // 全月出勤 → 直接拿 monthlyBase（避免 Math.round 累積誤差、e.g. 31 天月 ±8 元）
-  const proratedBase = att.work === daysInMonth ? monthlyBase : dailyBase * att.work
+  // 月薪：給整月 monthlyBase（含週休）。請假/曠職由 sickDeduct/personalDeduct/absentDeduct 個別扣。
+  // 本月未結束 → 仍按到今日比例（避免月初就顯示整月）
+  const proratedBase = isCurrentMonth
+    ? Math.round(monthlyBase * dayOfMonth / daysInMonth)
+    : monthlyBase
 
   // 不直接 mutate att.otDetails（React 反 pattern），map 出新陣列
   const otDetails = att.otDetails.map(d => ({ ...d, pay: calcOvertimePay(hourlyBase, d.minutes) }))
   const otPay = otDetails.reduce((s, d) => s + (d.pay || 0), 0)
 
-  const empBonuses = bonusDefs.filter(b => b.employee_id === emp.id && b.enabled)
+  // 加給：只算 enabled=true、不按出勤天 prorate（整月固定發）
+  // 本月未結束時仍按今日比例顯示
+  const empBonuses = bonusDefs.filter(b => b.employee_id === emp.id && b.enabled === true)
   const attendanceBonusDef = empBonuses.find(b => b.bonus_name && b.bonus_name.includes('全勤'))
-  const attendanceRatio = daysInMonth > 0 ? att.work / daysInMonth : 0
+  const monthRatio = isCurrentMonth && daysInMonth > 0 ? dayOfMonth / daysInMonth : 1
   const otherBonuses = empBonuses
     .filter(b => !b.bonus_name?.includes('全勤'))
-    .map(b => ({ ...b, originalAmount: b.amount || 0, amount: Math.round((b.amount || 0) * attendanceRatio) }))
+    .map(b => ({ ...b, originalAmount: b.amount || 0, amount: Math.round((b.amount || 0) * monthRatio) }))
   let attendanceBonusStatus = 'pending'
   if (att.lateCount > 0 || att.earlyCount > 0 || att.sick > 0 || att.personal > 0 || att.absent > 0 || att.missingPunch?.length > 0) attendanceBonusStatus = 'lost'
   else if (!isCurrentMonth) attendanceBonusStatus = 'eligible'
-  const attendanceBonusAmount = attendanceBonusDef?.amount || 0
+  const attendanceBonusAmount = Math.round((attendanceBonusDef?.amount || 0) * monthRatio)
   const effectiveAttendanceBonus = attendanceBonusStatus === 'lost' ? 0 : attendanceBonusAmount
   const otherBonusTotal = otherBonuses.reduce((s, b) => s + (b.amount || 0), 0)
   const totalBonuses = effectiveAttendanceBonus + otherBonusTotal + otPay
@@ -637,8 +652,14 @@ export default function Payroll() {
         const [h, m] = taipeiHM(clockOut.time)
         let pm = h * 60 + m
         const endMin = shift.endH * 60 + shift.endM
-        // 通用跨日判斷：下班時刻 + 12hr 還小於預定下班 → 跨日
-        if (pm + 720 < endMin) pm += 1440
+        // 跨日判斷：下班時刻 < 上班時刻 → 跨日（含補卡 12:24 = 00:24 凌晨情境）
+        if (clockIn?.time) {
+          const [ih, im] = taipeiHM(clockIn.time)
+          const inPm = ih * 60 + im
+          if (pm < inPm) pm += 1440
+        } else if (pm + 720 < endMin) {
+          pm += 1440
+        }
         if (pm < endMin) { autoEarly = true; earlyMins = endMin - pm }
       }
 
@@ -975,7 +996,25 @@ export default function Payroll() {
       {tab==='bonus'&&(<div>
         <button className="btn-outline" style={{marginBottom:16,display:'flex',alignItems:'center',gap:6}} onClick={()=>setShowBonusForm(!showBonusForm)}><Plus size={14}/> 新增加給</button>
         {showBonusForm&&<div className="card" style={{marginBottom:16,padding:16}}><select value={newBonus.employee_id} onChange={e=>setNewBonus(p=>({...p,employee_id:e.target.value}))} style={{marginBottom:8}}><option value="">選擇員工</option>{emps.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select><input value={newBonus.bonus_name} onChange={e=>setNewBonus(p=>({...p,bonus_name:e.target.value}))} placeholder="加給名稱（含「全勤」自動判斷）" style={{marginBottom:8}}/><input type="number" inputMode="numeric" value={newBonus.amount} onChange={e=>setNewBonus(p=>({...p,amount:e.target.value}))} placeholder="金額" style={{marginBottom:8}} pattern="[0-9]*"/><button className="btn-gold" onClick={addBonus}>新增</button></div>}
-        {emps.map(emp=>{const eb=bonuses.filter(b=>b.employee_id===emp.id);if(!eb.length)return null;return <div key={emp.id} style={{marginBottom:12}}><div style={{fontSize:13,fontWeight:700,color:'var(--gold)',marginBottom:4}}>{emp.name}</div>{eb.map(b=><div key={b.id} className="card" style={{padding:12,marginBottom:4,display:'flex',justifyContent:'space-between',alignItems:'center',opacity:b.enabled?1:.5}}><span style={{fontSize:13}}>{b.bonus_name} <strong style={{color:'var(--green)'}}>+${(b.amount||0).toLocaleString()}</strong></span><div style={{display:'flex',gap:4}}><button style={{...ib,color:b.enabled?'var(--red)':'var(--green)'}} onClick={()=>toggleBonus(b.id,!b.enabled)}>{b.enabled?'停':'啟'}</button><button style={{...ib,color:'var(--red)'}} onClick={()=>deleteBonus(b.id)}><Trash2 size={12}/></button></div></div>)}</div>})}
+        {emps.map(emp=>{const eb=bonuses.filter(b=>b.employee_id===emp.id);if(!eb.length)return null;return <div key={emp.id} style={{marginBottom:12}}><div style={{fontSize:13,fontWeight:700,color:'var(--gold)',marginBottom:4}}>{emp.name}</div>{eb.map(b=>(
+          <div key={b.id} className="card" style={{padding:12,marginBottom:4,display:'flex',justifyContent:'space-between',alignItems:'center',opacity:b.enabled===true?1:.55,borderColor:b.enabled===true?'rgba(77,168,108,.3)':'var(--border)'}}>
+            <div style={{flex:1}}>
+              <div style={{fontSize:13,fontWeight:600,display:'flex',alignItems:'center',gap:6}}>
+                {b.bonus_name}
+                <span style={{fontSize:9,padding:'2px 8px',borderRadius:10,fontWeight:700,letterSpacing:1, background:b.enabled===true?'rgba(77,168,108,.18)':'rgba(138,130,120,.15)', color:b.enabled===true?'var(--green)':'var(--text-muted)'}}>
+                  {b.enabled===true?'● 啟用中':'○ 已停用'}
+                </span>
+              </div>
+              <div style={{fontSize:12,color:b.enabled===true?'var(--green)':'var(--text-muted)',fontWeight:700,marginTop:2}}>+${(b.amount||0).toLocaleString()} / 月</div>
+            </div>
+            <div style={{display:'flex',gap:4}}>
+              <button onClick={()=>toggleBonus(b.id,!b.enabled)} style={{padding:'6px 12px',borderRadius:8,fontSize:11,fontWeight:700,cursor:'pointer',background:b.enabled===true?'rgba(196,77,77,.12)':'rgba(77,168,108,.15)',color:b.enabled===true?'var(--red)':'var(--green)',border:b.enabled===true?'1px solid rgba(196,77,77,.3)':'1px solid rgba(77,168,108,.35)'}}>
+                {b.enabled===true?'停用':'啟用'}
+              </button>
+              <button style={{...ib,color:'var(--red)'}} onClick={()=>deleteBonus(b.id)}><Trash2 size={12}/></button>
+            </div>
+          </div>
+        ))}</div>})}
       </div>)}
 
       {/* ===== 支出管理 ===== */}
