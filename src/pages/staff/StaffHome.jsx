@@ -421,7 +421,7 @@ export default function StaffHome() {
           <div className="wcb-card" style={{borderColor:'rgba(190,70,60,.2)'}}>
             <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}><span style={{fontFamily:'var(--serif)',fontSize:13,color:'rgba(190,70,60,.8)'}}>📦 月底盤點提醒</span><span className="wcb-tag wcb-tag-red">{invReminder.length} 項待盤</span></div>
             {invReminder.slice(0,5).map(item => <div key={item.id} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderBottom:'1px solid rgba(196,163,90,.04)',fontFamily:'var(--serif)',fontSize:12}}><span style={{color:'var(--bone)'}}>{item.name} <span style={{color:'var(--ash)'}}>{item.category}</span></span><span style={{fontFamily:'var(--mono)',fontSize:11,color:item.current_stock<=(item.safe_stock||0)?'rgba(190,70,60,.7)':'var(--ash)'}}>{item.current_stock??'?'} {item.unit}</span></div>)}
-            <button className="wcb-btn-outline" style={{width:'100%',marginTop:10}} onClick={() => navigate('/inventory')}>📋 前往盤點</button>
+            <button className="wcb-btn-outline" style={{width:'100%',marginTop:10}} onClick={() => navigate('/inventory-count')}>📋 我的盤點（同步 POS）</button>
           </div>
         )}
 

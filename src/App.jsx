@@ -13,6 +13,7 @@ import StaffKPI from './pages/staff/StaffKPI'
 import StaffRevenue from './pages/staff/StaffRevenue'
 import StaffInventory from './pages/staff/StaffInventory'
 import StaffExpense from './pages/staff/StaffExpense'
+import StaffInventoryCount from './pages/staff/StaffInventoryCount'
 import StaffMeeting from './pages/staff/StaffMeeting'
 import StaffPOS from './pages/staff/StaffPOS'
 import BossHome from './pages/boss/BossHome'
@@ -120,6 +121,7 @@ function AppInner() {
             <Route path="/revenue" element={<StaffRevenue />} />
             <Route path="/kpi" element={<StaffKPI />} />
             <Route path="/expense" element={<StaffExpense />} />
+            <Route path="/inventory-count" element={<StaffInventoryCount />} />
             <Route path="/meeting" element={<StaffMeeting />} />
           </>
         )}
