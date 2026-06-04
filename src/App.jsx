@@ -18,6 +18,7 @@ import StaffMeeting from './pages/staff/StaffMeeting'
 import StaffPOS from './pages/staff/StaffPOS'
 import BossHome from './pages/boss/BossHome'
 import BossAuditTasks from './pages/boss/AuditTasks'
+import CustomerApp from './pages/customer/CustomerApp'
 import BossOperations from './pages/boss/Operations'
 import BossHR from './pages/boss/HRSchedule'
 import BossPayroll from './pages/boss/Payroll'
@@ -82,6 +83,10 @@ function AppInner() {
   if (window.location.pathname.startsWith('/qrcode')) return <QRCodePage />
   if (window.location.pathname.startsWith('/customs/submit')) return <FactorySubmit />
   if (window.location.pathname.startsWith('/investment-dashboard')) return <InvestmentDashboard />
+  // 客戶匿名展示頁（大使分享 URL）— 完全獨立、無公司資料、無登入
+  if (window.location.pathname.startsWith('/c/')) {
+    return (<Routes><Route path="/c/:ambassador_code" element={<CustomerApp />} /></Routes>)
+  }
   if (window.location.pathname.startsWith('/vip-cellar')) return (<Routes><Route path="/vip-cellar/*" element={<VipCellar />} /></Routes>)
   if (window.location.pathname.startsWith('/pos-app')) return (<Routes><Route path="/pos-app/*" element={<PosApp />} /></Routes>)
   if (window.location.pathname.startsWith('/ambassador')) return (<Routes><Route path="/ambassador/*" element={<AmbassadorApp />} /></Routes>)
