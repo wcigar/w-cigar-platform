@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { logAudit } from '../../lib/audit'
 import { CigarRewardPayrollStatus } from '../../components/CigarRewardCard'
-import { calcLaborIns, calcHealthIns, calcLaborPension, calcLaborInsER, calcHealthInsER, findBracket, calcOvertimePay, LABOR_INS_BRACKETS, HEALTH_INS_BRACKETS, SHIFTS, LATE_GRACE_MIN, OT_GRACE_MIN } from '../../lib/constants'
+import { calcLaborIns, calcHealthIns, calcLaborPension, calcLaborInsER, calcHealthInsER, findBracket, calcOvertimePay, calcOvertimePayByDayType, calcCompLeaveHours, inferDayType, LABOR_INS_BRACKETS, HEALTH_INS_BRACKETS, SHIFTS, LATE_GRACE_MIN, OT_GRACE_MIN } from '../../lib/constants'
 import { ChevronDown, ChevronUp, Plus, Trash2, Save, FileText, Printer, Edit3, Clock, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react'
 import { taipeiHM } from '../../lib/timezone'
 import { format, subMonths, endOfMonth } from 'date-fns'
@@ -37,7 +37,7 @@ function resolvePunch(punch) {
 /* ================================================================
    出勤統計
    ================================================================ */
-export function getAttendanceData(eid, schedules, punches, emp) {
+export function getAttendanceData(eid, schedules, punches, emp, holidayMap = {}) {
   const es = schedules.filter(s => s.employee_id === eid)
   const ep = punches.filter(p => p.employee_id === eid && p.is_valid)
   const isPT = emp?.emp_type === 'PT'
@@ -190,7 +190,23 @@ export function getAttendanceData(eid, schedules, punches, emp) {
           if (pm > graceMin) {
             const otMin = pm - endMin
             otTotalMin += otMin
-            otDetails.push({ date: s.date, minutes: otMin, hours: +(otMin / 60).toFixed(1) })
+            const dt = inferDayType(s.date, holidayMap)
+            const otChoice = resolvedOut?.otChoice || clockOutPunch?.ot_choice || 'pay'
+            otDetails.push({
+              date: s.date, minutes: otMin, hours: +(otMin / 60).toFixed(2),
+              dayType: dt, otChoice,
+              compLeaveHours: otChoice === 'comp_leave' ? calcCompLeaveHours(otMin, dt) : 0,
+            })
+          }
+          // 國定假日 / 例假即使沒超時加班、整日工資也應加計
+          const dt0 = inferDayType(s.date, holidayMap)
+          if ((dt0 === '國定' || dt0 === '例假') && countsAsWorked && !otDetails.find(d => d.date === s.date)) {
+            const otChoice = resolvedOut?.otChoice || clockOutPunch?.ot_choice || 'pay'
+            otDetails.push({
+              date: s.date, minutes: 0, hours: 0,
+              dayType: dt0, otChoice,
+              compLeaveHours: otChoice === 'comp_leave' ? calcCompLeaveHours(0, dt0) : 0,
+            })
           }
         }
       }
@@ -307,9 +323,18 @@ export function calcSalaryToDate(emp, cfg, bonusDefs, att, isCurrentMonth, targe
     ? Math.round(monthlyBase * dayOfMonth / daysInMonth)
     : monthlyBase
 
-  // 不直接 mutate att.otDetails（React 反 pattern），map 出新陣列
-  const otDetails = att.otDetails.map(d => ({ ...d, pay: calcOvertimePay(hourlyBase, d.minutes) }))
+  // 加班費按日類型分倍率、且員工可選「補休」→ 不計入加班費（轉計入 comp_leave_balance）
+  const otDetails = att.otDetails.map(d => {
+    const dt = d.dayType || '平日'
+    if (d.otChoice === 'comp_leave') {
+      // 補休：不發加班費（但仍記錄時數）
+      return { ...d, dayType: dt, pay: 0, breakdown: [], compLeaveHours: d.compLeaveHours || calcCompLeaveHours(d.minutes, dt) }
+    }
+    const r = calcOvertimePayByDayType(hourlyBase, d.minutes, dt)
+    return { ...d, dayType: dt, pay: r.otPay, dailyBase: r.dailyBase, breakdown: r.breakdown }
+  })
   const otPay = otDetails.reduce((s, d) => s + (d.pay || 0), 0)
+  const compLeaveEarned = otDetails.reduce((s, d) => s + (d.otChoice === 'comp_leave' ? (d.compLeaveHours || 0) : 0), 0)
 
   // 加給：只算 enabled=true、不按出勤天 prorate（整月固定發）
   // 本月未結束時仍按今日比例顯示
@@ -349,7 +374,7 @@ export function calcSalaryToDate(emp, cfg, bonusDefs, att, isCurrentMonth, targe
     monthlyBase, daysInMonth, dayOfMonth, dailyBase, hourlyBase,
     actualWorkedDays: att.work, proratedBase, empBonuses, otherBonuses,
     attendanceBonus: { def: attendanceBonusDef, amount: attendanceBonusAmount, status: attendanceBonusStatus, effective: effectiveAttendanceBonus },
-    otPay, otDetails, sickDeduct, personalDeduct, absentDeduct,
+    otPay, otDetails, compLeaveEarned, sickDeduct, personalDeduct, absentDeduct,
     sopPenalties: empPenalties || [], sopPenaltyTotal,
     li, hi, lp, liER, hiER, lb, totalBonuses, totalDeductions, currentPayable, erCost, att,
   }
@@ -369,6 +394,8 @@ export default function Payroll() {
   const [schedules, setSchedules] = useState([])
   const [punches, setPunches] = useState([])
   const [sopPenalties, setSopPenalties] = useState([])
+  const [holidayMap, setHolidayMap] = useState({}) // { 'YYYY-MM-DD': { name, type } }
+  const [compLeaveBalance, setCompLeaveBalance] = useState([])
   const [expanded, setExpanded] = useState(null)
   const [editingSal, setEditingSal] = useState(null)
   const [newBonus, setNewBonus] = useState({ employee_id: '', bonus_name: '', amount: '' })
@@ -408,7 +435,7 @@ export default function Payroll() {
     setLoading(true)
     const s = month + '-01'
     const e = isCurrentMonth ? todayStr : format(endOfMonth(new Date(month + '-01')), 'yyyy-MM-dd')
-    const [eR, sR, bR, xR, scR, pR, penR] = await Promise.all([
+    const [eR, sR, bR, xR, scR, pR, penR, hR, clR] = await Promise.all([
       supabase.from('employees').select('*').eq('enabled', true).order('name'),
       supabase.rpc('get_salary_configs', { p_admin_id: user?.employee_id }),
       supabase.rpc('get_bonus_definitions', { p_admin_id: user?.employee_id }),
@@ -416,11 +443,16 @@ export default function Payroll() {
       supabase.from('schedules').select('*').gte('date', s).lte('date', e),
       supabase.from('punch_records').select('*').gte('date', s).lte('date', e),
       supabase.from('sop_penalties').select('*').gte('date', s).lte('date', e),
+      supabase.from('national_holidays').select('*').gte('date', s).lte('date', e),
+      supabase.from('comp_leave_balance').select('*').order('source_date', { ascending: false }),
     ])
     setEmps((eR.data || []).filter(x => !x.is_admin))
     setSalConfigs(sR.data || []); setBonuses(bR.data || [])
     setExpenses(xR.data || []); setSchedules(scR.data || []); setPunches(pR.data || [])
     setSopPenalties(penR?.data || [])
+    const hmap = {}; (hR.data || []).forEach(h => { hmap[h.date] = { name: h.name, type: h.type } })
+    setHolidayMap(hmap)
+    setCompLeaveBalance(clR.data || [])
     // 載入薪資手動調整
     try {
       const { data: adjData } = await supabase.rpc('get_payroll_adjustments', { p_admin_id: user?.employee_id, p_month: month })
@@ -434,7 +466,7 @@ export default function Payroll() {
   function getCfg(eid) { return salConfigs.find(s => s.employee_id === eid) || {} }
   function getCalc(emp) {
     const cfg = getCfg(emp.id)
-    const att = getAttendanceData(emp.id, schedules, punches, emp)
+    const att = getAttendanceData(emp.id, schedules, punches, emp, holidayMap)
     const targetDate = isCurrentMonth ? today : new Date(yr, mo - 1, daysInMonth)
     const empPenalties = sopPenalties.filter(p => p.employee_id === emp.id)
     return calcSalaryToDate(emp, cfg, bonuses, att, isCurrentMonth, targetDate, empPenalties)
@@ -596,6 +628,15 @@ export default function Payroll() {
     load()
   }
 
+  // 加班選擇切換：pay = 領加班費（預設）/ comp_leave = 換補休
+  async function setOtChoice(punchId, choice) {
+    setOverrideSaving(punchId)
+    const { error } = await supabase.from('punch_records').update({ ot_choice: choice }).eq('id', punchId)
+    setOverrideSaving(null)
+    if (error) { alert('❌ 失敗：' + error.message); return }
+    load()
+  }
+
   async function cancelOverride(punchId) {
     setOverrideSaving(punchId)
     const { error } = await supabase.from('punch_records').update({
@@ -678,8 +719,10 @@ export default function Payroll() {
         if (pm < endMin) { autoEarly = true; earlyMins = endMin - pm }
       }
 
+      const dayType = inferDayType(s.date, holidayMap)
+      const holiday = holidayMap[s.date]
       return {
-        date: s.date, shift: s.shift,
+        date: s.date, shift: s.shift, dayType, holidayName: holiday?.name || null,
         clockInTime: clockIn?.time ? new Date(clockIn.time).toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false }) : null,
         clockOutTime: clockOut?.time ? new Date(clockOut.time).toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false }) : null,
         clockInId: clockIn?.id, clockOutId: clockOut?.id,
@@ -689,6 +732,7 @@ export default function Payroll() {
         outOverridden: clockOut?.manual_override || false,
         inCorrectedLate: clockIn?.corrected_is_late,
         outCorrectedEarly: clockOut?.corrected_is_early,
+        otChoice: clockOut?.ot_choice || 'pay',
       }
     })
   }
@@ -705,7 +749,18 @@ export default function Payroll() {
               : <R label={`出勤${payslip.p.actualWorkedDays}天 底薪`} value={payslip.p.proratedBase}/>}
             {payslip.p.attendanceBonus.amount>0&&<R label={`全勤獎金（${payslip.p.attendanceBonus.status==='lost'?'已失效':'暫符合'}）`} value={payslip.p.attendanceBonus.effective} positive={payslip.p.attendanceBonus.status!=='lost'}/>}
             {payslip.p.otherBonuses.map(b=><R key={b.id} label={`+ ${b.bonus_name}`} value={b.amount} positive/>)}
-            {payslip.p.otPay>0&&<R label="+ 加班費" value={payslip.p.otPay} positive/>}
+            {payslip.p.otPay>0&&<R label="+ 加班費（依勞基法分倍率）" value={payslip.p.otPay} positive/>}
+            {(payslip.p.otDetails||[]).map(d => (
+              d.pay > 0 && (
+                <div key={d.date} style={{paddingLeft:10,fontSize:11,color:'var(--text-dim)',display:'flex',justifyContent:'space-between',padding:'2px 0 2px 10px'}}>
+                  <span>{d.date.slice(5)} {d.dayType==='國定'?'🎌':d.dayType==='休息日'?'🛌':d.dayType==='例假'?'⛔':'⌛'} {d.dayType}</span>
+                  <span style={{color:'var(--green)'}}>+${d.pay.toLocaleString()}</span>
+                </div>
+              )
+            ))}
+            {payslip.p.compLeaveEarned > 0 && (
+              <R label={`🌴 補休累積 ${payslip.p.compLeaveEarned.toFixed(1)} hr（已選換補休）`} value="0" dim/>
+            )}
             {!payslip.p.isPT && <><R label="- 勞保" value={-payslip.p.li} negative/><R label="- 健保" value={-payslip.p.hi} negative/></>}
             {payslip.p.sickDeduct>0&&<R label="- 病假" value={-payslip.p.sickDeduct} negative/>}
             <div style={{height:2,background:'var(--gold)',margin:'10px 0'}}/>
@@ -926,12 +981,21 @@ export default function Payroll() {
           const lateFixed = day.inOverridden && day.inCorrectedLate === false
           const earlyFixed = day.outOverridden && day.outCorrectedEarly === false
 
-          return <div key={day.date} className="card" style={{padding:12,marginBottom:6,borderColor:isFixed?'rgba(77,138,196,.3)':hasIssue?'rgba(196,77,77,.3)':'var(--border)'}}>
+          // 日類型 chip 顏色
+          const dt = day.dayType
+          const dtColor = dt === '國定' ? '#fb923c' : dt === '休息日' ? '#a78bfa' : dt === '例假' ? '#ef4444' : null
+          return <div key={day.date} className="card" style={{padding:12,marginBottom:6,borderColor:isFixed?'rgba(77,138,196,.3)':hasIssue?'rgba(196,77,77,.3)':dt==='國定'?'rgba(251,146,60,.35)':'var(--border)'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:isWorkDay&&(hasIssue||isFixed)?8:0}}>
               <div>
-                <div style={{fontSize:13,fontWeight:600,display:'flex',alignItems:'center',gap:6}}>
+                <div style={{fontSize:13,fontWeight:600,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                   {day.date.slice(5)}
                   <span style={{fontSize:10,padding:'2px 6px',borderRadius:6,background: !isWorkDay?'rgba(138,130,120,.1)':hasIssue&&!isFixed?'rgba(196,77,77,.1)':isFixed?'rgba(77,138,196,.1)':'rgba(77,168,108,.1)', color: !isWorkDay?'var(--text-muted)':hasIssue&&!isFixed?'var(--red)':isFixed?'var(--blue)':'var(--green)'}}>{!isWorkDay?day.shift:isFixed?'⚙️已修正':hasIssue?'異常':'正常'}</span>
+                  {dtColor && (
+                    <span style={{fontSize:9,padding:'2px 7px',borderRadius:10,background:dtColor+'22',color:dtColor,border:`1px solid ${dtColor}55`,fontWeight:700,letterSpacing:1}}>
+                      {dt === '國定' ? '🎌 國定' : dt === '休息日' ? '🛌 休息日' : '⛔ 例假'}
+                    </span>
+                  )}
+                  {day.holidayName && <span style={{fontSize:9,color:dtColor||'var(--text-muted)',fontStyle:'italic'}}>{day.holidayName}</span>}
                 </div>
                 {isWorkDay&&<div style={{fontSize:11,color:'var(--text-muted)',marginTop:2}}>
                   {day.shift} · 上班 {day.clockInTime||'未打'} · 下班 {day.clockOutTime||'未打'}
@@ -941,6 +1005,28 @@ export default function Payroll() {
               {isWorkDay && hasIssue && !isFixed && <AlertTriangle size={16} color="var(--red)"/>}
               {isFixed && <span style={{fontSize:10,color:'var(--blue)',fontWeight:700}}>⚙️</span>}
             </div>
+            {/* 加班費 / 補休 切換（國定/休息日/例假 整日工資、或平日有加班）*/}
+            {isWorkDay && day.clockOutId && (dt === '國定' || dt === '休息日' || dt === '例假') && (
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderTop:'1px dashed rgba(251,146,60,.3)'}}>
+                <div style={{fontSize:11,color:dtColor,fontWeight:600}}>{dt} 加班費結算方式</div>
+                <div style={{display:'flex',gap:4}}>
+                  <button onClick={()=>setOtChoice(day.clockOutId, 'pay')} disabled={overrideSaving===day.clockOutId}
+                    style={{fontSize:11,padding:'5px 10px',borderRadius:8,cursor:'pointer',fontWeight:700,
+                      background: day.otChoice==='pay'?'rgba(77,168,108,.25)':'transparent',
+                      color: day.otChoice==='pay'?'var(--green)':'var(--text-muted)',
+                      border: `1px solid ${day.otChoice==='pay'?'rgba(77,168,108,.5)':'var(--border)'}`}}>
+                    💰 領加班費
+                  </button>
+                  <button onClick={()=>setOtChoice(day.clockOutId, 'comp_leave')} disabled={overrideSaving===day.clockOutId}
+                    style={{fontSize:11,padding:'5px 10px',borderRadius:8,cursor:'pointer',fontWeight:700,
+                      background: day.otChoice==='comp_leave'?'rgba(167,139,250,.25)':'transparent',
+                      color: day.otChoice==='comp_leave'?'#a78bfa':'var(--text-muted)',
+                      border: `1px solid ${day.otChoice==='comp_leave'?'rgba(167,139,250,.5)':'var(--border)'}`}}>
+                    🌴 換補休
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* 補卡：上班 */}
             {missingIn && (
