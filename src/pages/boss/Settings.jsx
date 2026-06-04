@@ -139,10 +139,14 @@ function EmployeeManager() {
     })
     if (error) { alert('儲存失敗：' + error.message); return }
 
-    // 加保基數覆寫（admin_update_employee RPC 沒這參數、直接更新）
-    if (editing.ins_grade_override !== undefined) {
-      const v = editing.ins_grade_override === '' || editing.ins_grade_override == null ? null : +editing.ins_grade_override
-      const { error: insOvErr } = await supabase.from('employees').update({ ins_grade_override: v }).eq('id', editing.id)
+    // 加保基數覆寫（拆勞保/健保兩欄、admin_update_employee RPC 沒這參數、直接更新）
+    {
+      const labor  = editing.labor_ins_grade_override  === '' || editing.labor_ins_grade_override  == null ? null : +editing.labor_ins_grade_override
+      const health = editing.health_ins_grade_override === '' || editing.health_ins_grade_override == null ? null : +editing.health_ins_grade_override
+      const { error: insOvErr } = await supabase.from('employees').update({
+        labor_ins_grade_override:  labor,
+        health_ins_grade_override: health,
+      }).eq('id', editing.id)
       if (insOvErr) { alert('⚠️ 加保基數覆寫更新失敗：' + insOvErr.message) }
     }
 
@@ -275,19 +279,28 @@ function EmployeeManager() {
                   <input type="date" value={editing.health_ins_end_date || ''} onChange={e => setEditing(p => ({ ...p, health_ins_end_date: e.target.value }))} style={{ width: 140, fontSize: 13, padding: 8 }} />
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 6 }}>留空 = 不限期間（一直在保）。月中加退保系統自動按日比例計算保費。</div>
-                <div style={{ display: 'flex', gap: 8, marginTop: 8, paddingTop: 8, borderTop: '1px dashed rgba(77,138,196,.2)', flexWrap: 'wrap', alignItems: 'center' }}>
-                  <label style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 80, fontWeight: 600 }}>⚠️ 加保基數覆寫</label>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    value={editing.ins_grade_override == null ? '' : editing.ins_grade_override}
-                    onChange={e => setEditing(p => ({ ...p, ins_grade_override: e.target.value === '' ? null : e.target.value }))}
-                    placeholder="留空=照月薪自動分級"
-                    style={{ width: 180, fontSize: 13, padding: 8, color: '#fbbf24' }}
-                  />
-                  <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-                    Ricky 入職低保 36300、實薪 37000 → 此處填 36300
-                  </span>
+                <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed rgba(77,138,196,.2)' }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 600, marginBottom: 6 }}>⚠️ 加保基數覆寫（留空=照月薪自動分級；填 0=不加保）</div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <label style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 60 }}>勞保基數</label>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={editing.labor_ins_grade_override == null ? '' : editing.labor_ins_grade_override}
+                      onChange={e => setEditing(p => ({ ...p, labor_ins_grade_override: e.target.value === '' ? null : e.target.value }))}
+                      placeholder="留空=自動"
+                      style={{ width: 130, fontSize: 13, padding: 8, color: '#fbbf24' }}
+                    />
+                    <label style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 60 }}>健保基數</label>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={editing.health_ins_grade_override == null ? '' : editing.health_ins_grade_override}
+                      onChange={e => setEditing(p => ({ ...p, health_ins_grade_override: e.target.value === '' ? null : e.target.value }))}
+                      placeholder="留空=自動"
+                      style={{ width: 130, fontSize: 13, padding: 8, color: '#fbbf24' }}
+                    />
+                  </div>
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8 }}>

@@ -356,16 +356,22 @@ export function calcSalaryToDate(emp, cfg, bonusDefs, att, isCurrentMonth, targe
   const personalDeduct = att.personal * dailyBase
   const absentDeduct = att.absent * dailyBase
   // 勞健保按日比例計算（台灣法規）
-  // ⚠️ 加保基數可被 employees.ins_grade_override 覆寫（如 Ricky 入職時低保 36300、實領 37000）
-  const insBase = +emp?.ins_grade_override > 0 ? +emp.ins_grade_override : monthlyBase
-  const li_full = calcLaborIns(insBase), hi_full = calcHealthIns(insBase)
-  const lp_full = calcLaborPension(insBase), liER_full = calcLaborInsER(insBase), hiER_full = calcHealthInsER(insBase)
+  // ⚠️ 加保基數可被 employees.labor_ins_grade_override / health_ins_grade_override 分別覆寫
+  //    - null = 自動分級（用月薪）
+  //    - 0    = 不加保（PT 常見）
+  //    - 有值 = 強制此基數
+  const laborOv = emp?.labor_ins_grade_override
+  const healthOv = emp?.health_ins_grade_override
+  const laborBase  = laborOv === null || laborOv === undefined  ? monthlyBase : +laborOv
+  const healthBase = healthOv === null || healthOv === undefined ? monthlyBase : +healthOv
+  const li_full = calcLaborIns(laborBase), hi_full = calcHealthIns(healthBase)
+  const lp_full = calcLaborPension(laborBase), liER_full = calcLaborInsER(laborBase), hiER_full = calcHealthInsER(healthBase)
   const li   = prorateInsurance(li_full,   emp?.labor_ins_date,  emp?.labor_ins_end_date,  monthStartDt, monthEndDt)
   const liER = prorateInsurance(liER_full, emp?.labor_ins_date,  emp?.labor_ins_end_date,  monthStartDt, monthEndDt)
   const lp   = prorateInsurance(lp_full,   emp?.labor_ins_date,  emp?.labor_ins_end_date,  monthStartDt, monthEndDt)
   const hi   = prorateInsurance(hi_full,   emp?.health_ins_date, emp?.health_ins_end_date, monthStartDt, monthEndDt)
   const hiER = prorateInsurance(hiER_full, emp?.health_ins_date, emp?.health_ins_end_date, monthStartDt, monthEndDt)
-  const lb = findBracket(insBase, LABOR_INS_BRACKETS)
+  const lb = findBracket(laborBase, LABOR_INS_BRACKETS)
   const totalDeductions = li + hi + sickDeduct + personalDeduct + absentDeduct + sopPenaltyTotal
   const currentPayable = proratedBase + totalBonuses - totalDeductions
   const erCost = proratedBase + totalBonuses + liER + hiER + lp
