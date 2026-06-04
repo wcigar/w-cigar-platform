@@ -140,14 +140,17 @@ function EmployeeManager() {
     })
     if (error) { alert('儲存失敗：' + error.message); return }
 
-    // 加保基數覆寫（拆勞保/健保兩欄、admin_update_employee RPC 沒這參數、直接更新）
+    // 加保基數覆寫（拆勞保/健保兩欄、走 admin RPC 繞 RLS）
     {
       const labor  = editing.labor_ins_grade_override  === '' || editing.labor_ins_grade_override  == null ? null : +editing.labor_ins_grade_override
       const health = editing.health_ins_grade_override === '' || editing.health_ins_grade_override == null ? null : +editing.health_ins_grade_override
-      const { error: insOvErr } = await supabase.from('employees').update({
-        labor_ins_grade_override:  labor,
-        health_ins_grade_override: health,
-      }).eq('id', editing.id)
+      const adminId3 = JSON.parse(localStorage.getItem('w_cigar_user') || '{}')?.employee_id || 'ADMIN'
+      const { error: insOvErr } = await supabase.rpc('admin_set_ins_grade_override', {
+        p_admin_id: adminId3,
+        p_target_employee_id: editing.id,
+        p_labor_grade: labor,
+        p_health_grade: health,
+      })
       if (insOvErr) { alert('⚠️ 加保基數覆寫更新失敗：' + insOvErr.message) }
     }
 

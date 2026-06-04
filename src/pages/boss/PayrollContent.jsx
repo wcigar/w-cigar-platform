@@ -314,9 +314,10 @@ export function calcSalaryToDate(emp, cfg, bonusDefs, att, isCurrentMonth, targe
   }
 
   const monthlyBase = cfg.monthly_salary || 0
-  const dailyBase = monthlyBase > 0 ? Math.round(monthlyBase / daysInMonth) : 0
-  // 平日每小時工資 = 月薪 / 240（勞基法標準 240 小時月工時、不是 dailyBase/8）
+  // 平日每小時工資 = 月薪 / 240（勞基法標準 240 小時月工時）
   const hourlyBase = monthlyBase > 0 ? Math.round(monthlyBase / 240) : 0
+  // 每日底薪 = 時薪 × 8（勞基法日薪、用於請假扣項）
+  const dailyBase = hourlyBase * 8
   // 月薪：給整月 monthlyBase（含週休）。請假/曠職由 sickDeduct/personalDeduct/absentDeduct 個別扣。
   // 本月未結束 → 仍按到今日比例（避免月初就顯示整月）
   const proratedBase = isCurrentMonth
@@ -847,7 +848,7 @@ export default function Payroll() {
               </div>
               {p.att.lateDetails.length>0&&<div style={{marginBottom:8}}><div style={{fontSize:11,color:'var(--red)',fontWeight:600,marginBottom:4}}>⚠️ 遲到明細</div>{p.att.lateDetails.map((d,i)=><div key={i} style={{fontSize:11,color:'var(--text-dim)',display:'flex',justifyContent:'space-between',padding:'2px 0'}}><span>{d.date} 打卡{d.time}{d.overridden?' ⚙️':''}</span><span style={{color:'var(--red)'}}>遲{d.minutes}分</span></div>)}</div>}
               {p.att.earlyDetails.length>0&&<div style={{marginBottom:8}}><div style={{fontSize:11,color:'#f59e0b',fontWeight:600,marginBottom:4}}>⚠️ 早退明細</div>{p.att.earlyDetails.map((d,i)=><div key={i} style={{fontSize:11,color:'var(--text-dim)',display:'flex',justifyContent:'space-between',padding:'2px 0'}}><span>{d.date} 下班{d.time}{d.overridden?' ⚙️':''}</span><span style={{color:'#f59e0b'}}>早{d.minutes}分</span></div>)}</div>}
-              {p.otDetails.length>0&&<div style={{marginBottom:8}}><div style={{fontSize:11,color:'var(--green)',fontWeight:600,marginBottom:4}}>⏰ 加班（時薪${p.hourlyBase}）</div>{p.otDetails.map((d,i)=><div key={i} style={{fontSize:11,color:'var(--text-dim)',display:'flex',justifyContent:'space-between',padding:'2px 0'}}><span>{d.date} {d.hours}hr</span><span style={{color:'var(--green)'}}>+${d.pay.toLocaleString()}</span></div>)}</div>}
+              {p.otDetails.filter(d => d.pay > 0).length > 0 && <div style={{marginBottom:8}}><div style={{fontSize:11,color:'var(--green)',fontWeight:600,marginBottom:4}}>⏰ 加班（時薪${p.hourlyBase}）</div>{p.otDetails.filter(d => d.pay > 0).map((d,i)=><div key={i} style={{fontSize:11,color:'var(--text-dim)',display:'flex',justifyContent:'space-between',padding:'2px 0'}}><span>{d.date} {d.dayType==='國定'?'🎌':d.dayType==='休息日'?'🛌':d.dayType==='例假'?'⛔':''} {d.hours>0?`${d.hours}hr`:''}</span><span style={{color:'var(--green)'}}>+${d.pay.toLocaleString()}</span></div>)}</div>}
 
               {/* 每日打卡明細（PT 與正職都顯示） */}
               {p.att.dailyPunches?.length>0 && (
