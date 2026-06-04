@@ -31,6 +31,7 @@ export default function StaffHome() {
   const [reassigning, setReassigning] = useState(null)
   const [colleagues, setColleagues] = useState([])
   const [invReminder, setInvReminder] = useState([])
+  const [coverReq, setCoverReq] = useState([]) // 今天我要代盤的事件
   const [crossDayPunchDate, setCrossDayPunchDate] = useState(null)
   const [punchStatus, setPunchStatus] = useState(null) // 跨夜安全的打卡狀態 (RPC)
   const [showPerformance, setShowPerformance] = useState(false)
@@ -151,6 +152,11 @@ export default function StaffHome() {
       const doneIds = new Set((todayRecords.data || []).map(r => r.item_id))
       setInvReminder((invItems || []).filter(i => !doneIds.has(i.id)))
     } else { setInvReminder([]) }
+    // 交叉代盤：今天我要代誰盤
+    try {
+      const { data: ccData } = await supabase.rpc('get_cross_cover_alerts')
+      setCoverReq((ccData || []).filter(a => a.covering_employee_id === user.employee_id))
+    } catch {}
     setLoading(false)
   }
 
@@ -417,6 +423,24 @@ export default function StaffHome() {
         })()}
 
         {/* 盤點提醒 */}
+        {/* 交叉代盤通知（同事連休 2 天，請我代盤） */}
+        {coverReq.length > 0 && coverReq.map(cc => (
+          <div key={cc.absent_employee_id} className="wcb-card" style={{ borderColor: 'rgba(245,158,11,.5)', background: 'rgba(245,158,11,.06)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+              <span style={{ fontFamily: 'var(--serif)', fontSize: 14, color: '#f59e0b', fontWeight: 700 }}>⚠️ 代盤通知</span>
+              <span style={{ fontSize: 9, padding: '2px 8px', background: 'rgba(245,158,11,.35)', color: '#fff', borderRadius: 10, fontWeight: 700 }}>+$200/次</span>
+            </div>
+            <div style={{ fontSize: 13, color: '#fbbf24', marginBottom: 4 }}>
+              <b>{cc.absent_name}</b> 連休 {cc.consec_off_days} 天、{cc.low_stock_count} 項低庫存待補
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--ash)' }}>
+              分類：{(cc.low_stock_categories || []).join('、')}
+            </div>
+            <button className="wcb-btn-outline" style={{ width: '100%', marginTop: 10 }} onClick={() => navigate('/inventory-count')}>
+              📋 立即代盤（同步 POS、月底加給 $200）
+            </button>
+          </div>
+        ))}
         {invReminder.length > 0 && (
           <div className="wcb-card" style={{borderColor:'rgba(190,70,60,.2)'}}>
             <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}><span style={{fontFamily:'var(--serif)',fontSize:13,color:'rgba(190,70,60,.8)'}}>📦 月底盤點提醒</span><span className="wcb-tag wcb-tag-red">{invReminder.length} 項待盤</span></div>

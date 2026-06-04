@@ -31,6 +31,7 @@ export default function BossHome() {
   const [showActions, setShowActions] = useState(true)
   const [today, setToday] = useState(() => format(new Date(), 'yyyy-MM-dd'))
   const [month, setMonth] = useState(() => format(new Date(), 'yyyy-MM'))
+  const [crossCoverAlerts, setCrossCoverAlerts] = useState([])
 
   useEffect(() => { load() }, [today])
   useEffect(() => {
@@ -77,6 +78,17 @@ export default function BossHome() {
     setMonthRevenue((revR.data || []).reduce((s, r) => s + (+r.total || 0), 0))
     setPendingHandover((hoR.data || []).length)
     try { const { data: dpData } = await supabase.rpc('get_dealer_pending_orders'); if (dpData?.count !== undefined) setDealerPending(dpData.count) } catch {}
+    // 交叉代盤告警：連休 2 天 + 負責品項低庫存
+    try {
+      const { data: ccData } = await supabase.rpc('get_cross_cover_alerts')
+      // dedupe by absent_employee_id (一個缺席只算一筆)
+      const seen = new Set()
+      const deduped = (ccData || []).filter(a => {
+        if (seen.has(a.absent_employee_id)) return false
+        seen.add(a.absent_employee_id); return true
+      })
+      setCrossCoverAlerts(deduped)
+    } catch {}
     try { const { data: vd } = await supabase.rpc('get_vip_dashboard'); if (vd?.total_unpaid !== undefined) setVipUnpaid(vd.total_unpaid) } catch {}
     // 跨 project fetch dealer Supabase 月結未結算總額
     try {
@@ -234,6 +246,28 @@ export default function BossHome() {
           <SB label="VIP 欠款" value={vipUnpaid ? '$' + (vipUnpaid/1000).toFixed(0) + 'K' : '$0'} color={vipUnpaid > 0 ? 'var(--red)' : 'var(--text-muted)'} tap={() => navigate('/vip-cellar/admin')} />
         </div>
       )}
+
+      {/* === 交叉代盤告警 banner（連休 2 天 + 低庫存無人補）=== */}
+      {crossCoverAlerts.length > 0 && crossCoverAlerts.map(cc => (
+        <div key={cc.absent_employee_id}
+          style={{
+            marginBottom: 10, padding: '14px 18px', borderRadius: 12,
+            background: 'linear-gradient(135deg, rgba(245,158,11,.20), rgba(245,158,11,.05))',
+            border: '2px solid rgba(245,158,11,.6)',
+            boxShadow: '0 3px 12px rgba(245,158,11,.18)',
+          }}>
+          <div style={{ fontSize: 14, fontWeight: 800, color: '#f59e0b', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+            ⚠️ 交叉代盤：{cc.absent_name} 連休 {cc.consec_off_days} 天
+            <span style={{ fontSize: 9, padding: '2px 8px', background: 'rgba(245,158,11,.35)', color: '#fff', borderRadius: 10, fontWeight: 700 }}>急</span>
+          </div>
+          <div style={{ fontSize: 12, color: '#fbbf24' }}>
+            🔻 {cc.low_stock_count} 項低庫存無人補｜分類：{(cc.low_stock_categories || []).join('、')}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+            ✅ 已 LINE 通知今日在班員工代盤、月底加給 $200/次
+          </div>
+        </div>
+      ))}
 
       {/* === 環境整潔查核 醒目 banner（永遠顯示、有待審紅色強調） === */}
       <div
