@@ -316,8 +316,8 @@ export function calcSalaryToDate(emp, cfg, bonusDefs, att, isCurrentMonth, targe
   const monthlyBase = cfg.monthly_salary || 0
   // 平日每小時工資 = 月薪 / 240（勞基法標準 240 小時月工時）
   const hourlyBase = monthlyBase > 0 ? Math.round(monthlyBase / 240) : 0
-  // 每日底薪 = 時薪 × 8（勞基法日薪、用於請假扣項）
-  const dailyBase = hourlyBase * 8
+  // 每日底薪 = 月薪 × 8 / 240（先乘除再 round、避免 154×8=1232 而非 1233）
+  const dailyBase = monthlyBase > 0 ? Math.round(monthlyBase * 8 / 240) : 0
   // 月薪：給整月 monthlyBase（含週休）。請假/曠職由 sickDeduct/personalDeduct/absentDeduct 個別扣。
   // 本月未結束 → 仍按到今日比例（避免月初就顯示整月）
   const proratedBase = isCurrentMonth
