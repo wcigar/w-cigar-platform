@@ -57,32 +57,18 @@ export default function StaffInventoryCount() {
     let success = 0, failed = []
     for (const it of toSubmit) {
       const counted = +counts[it.id]
-      const before = +it.current_stock || 0
-      const diff = counted - before
-      // 1. 寫 inventory_tasks
-      const { error: taskErr } = await supabase.from('inventory_tasks').insert({
-        batch: 'daily-' + today,
-        week_start: today,
-        task_date: today,
-        count_day: format(new Date(), 'EEE').toLowerCase(),
-        employee_id: user.employee_id,
-        item_id: it.id,
-        item_name: it.name,
-        category: it.category,
-        before_stock: before,
-        counted_stock: counted,
-        diff,
-        status: 'done',
-        note: notes[it.id] || (Math.abs(diff) > 0 ? `差異 ${diff > 0 ? '+' : ''}${diff}` : ''),
-        done_at: new Date().toISOString(),
+      // 走 staff_count_inventory RPC：
+      //   一次完成 inventory_tasks (審計) + stock_transactions (channel='count', direction='set')
+      //   + trigger 自動同步 inventory_master.current_stock = counted
+      //   + 跟 POS 結帳走同一張 stock_transactions、完整對帳
+      const { data, error } = await supabase.rpc('staff_count_inventory', {
+        p_employee_id: user.employee_id,
+        p_inv_master_id: it.id,
+        p_counted_stock: counted,
+        p_note: notes[it.id] || null,
       })
-      if (taskErr) { failed.push(`${it.name}: ${taskErr.message}`); continue }
-      // 2. UPDATE inventory_master.current_stock + last_count_date → POS 立刻看到
-      const { error: invErr } = await supabase
-        .from('inventory_master')
-        .update({ current_stock: counted, last_count_date: today, last_update: new Date().toISOString() })
-        .eq('id', it.id)
-      if (invErr) { failed.push(`${it.name} 同步 POS 失敗: ${invErr.message}`); continue }
+      if (error) { failed.push(`${it.name}: ${error.message}`); continue }
+      if (!data?.success) { failed.push(`${it.name}: ${data?.error || 'unknown'}`); continue }
       success++
     }
     setSubmitting(false)
