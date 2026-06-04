@@ -139,6 +139,13 @@ function EmployeeManager() {
     })
     if (error) { alert('儲存失敗：' + error.message); return }
 
+    // 加保基數覆寫（admin_update_employee RPC 沒這參數、直接更新）
+    if (editing.ins_grade_override !== undefined) {
+      const v = editing.ins_grade_override === '' || editing.ins_grade_override == null ? null : +editing.ins_grade_override
+      const { error: insOvErr } = await supabase.from('employees').update({ ins_grade_override: v }).eq('id', editing.id)
+      if (insOvErr) { alert('⚠️ 加保基數覆寫更新失敗：' + insOvErr.message) }
+    }
+
     // 雙身份 setup（只對正職員工生效）
     if (editing.emp_type === '正職') {
       const adminId2 = JSON.parse(localStorage.getItem('w_cigar_user') || '{}')?.employee_id || 'ADMIN'
@@ -268,6 +275,20 @@ function EmployeeManager() {
                   <input type="date" value={editing.health_ins_end_date || ''} onChange={e => setEditing(p => ({ ...p, health_ins_end_date: e.target.value }))} style={{ width: 140, fontSize: 13, padding: 8 }} />
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 6 }}>留空 = 不限期間（一直在保）。月中加退保系統自動按日比例計算保費。</div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 8, paddingTop: 8, borderTop: '1px dashed rgba(77,138,196,.2)', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <label style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 80, fontWeight: 600 }}>⚠️ 加保基數覆寫</label>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={editing.ins_grade_override == null ? '' : editing.ins_grade_override}
+                    onChange={e => setEditing(p => ({ ...p, ins_grade_override: e.target.value === '' ? null : e.target.value }))}
+                    placeholder="留空=照月薪自動分級"
+                    style={{ width: 180, fontSize: 13, padding: 8, color: '#fbbf24' }}
+                  />
+                  <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                    Ricky 入職低保 36300、實薪 37000 → 此處填 36300
+                  </span>
+                </div>
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <input value={editing.login_code} onChange={e => setEditing(p => ({ ...p, login_code: e.target.value }))} placeholder="登入碼" type="password" style={{ flex: 1, fontSize: 13, padding: 8 }} />

@@ -195,12 +195,24 @@ export function getAttendanceData(eid, schedules, punches, emp) {
         }
       }
 
-      // 計算當日工時（純打卡，跨日已補正）
+      // 計算當日工時：
+      //   - 5min 上班彈性 + 15min 下班加班閾值內 → 視為標準 9hr (不顯示 8.97/9.01 之類零頭)
+      //   - 真遲到/真早退/真加班才用打卡實算
       let hours = null
       if (clockInTime && clockOutTime) {
         const inT = new Date(clockInTime).getTime()
         const outT = new Date(clockOutTime).getTime()
-        if (outT > inT) hours = +((outT - inT) / 3600000).toFixed(2)
+        if (outT > inT) {
+          const punchHours = (outT - inT) / 3600000
+          const targetHours = shift.hours || 9
+          // 無遲到 + 無早退 + 加班未達 15min → 視為標準工時
+          const otMin = otDetails.find(d => d.date === s.date)?.minutes || 0
+          if (!dayIsLate && !dayIsEarly && otMin < OT_GRACE_MIN && Math.abs(punchHours - targetHours) < 0.35) {
+            hours = targetHours
+          } else {
+            hours = +punchHours.toFixed(2)
+          }
+        }
       }
 
       dailyPunches.push({
@@ -287,7 +299,8 @@ export function calcSalaryToDate(emp, cfg, bonusDefs, att, isCurrentMonth, targe
 
   const monthlyBase = cfg.monthly_salary || 0
   const dailyBase = monthlyBase > 0 ? Math.round(monthlyBase / daysInMonth) : 0
-  const hourlyBase = dailyBase > 0 ? Math.round(dailyBase / 8) : 0
+  // 平日每小時工資 = 月薪 / 240（勞基法標準 240 小時月工時、不是 dailyBase/8）
+  const hourlyBase = monthlyBase > 0 ? Math.round(monthlyBase / 240) : 0
   // 月薪：給整月 monthlyBase（含週休）。請假/曠職由 sickDeduct/personalDeduct/absentDeduct 個別扣。
   // 本月未結束 → 仍按到今日比例（避免月初就顯示整月）
   const proratedBase = isCurrentMonth
@@ -318,14 +331,16 @@ export function calcSalaryToDate(emp, cfg, bonusDefs, att, isCurrentMonth, targe
   const personalDeduct = att.personal * dailyBase
   const absentDeduct = att.absent * dailyBase
   // 勞健保按日比例計算（台灣法規）
-  const li_full = calcLaborIns(monthlyBase), hi_full = calcHealthIns(monthlyBase)
-  const lp_full = calcLaborPension(monthlyBase), liER_full = calcLaborInsER(monthlyBase), hiER_full = calcHealthInsER(monthlyBase)
+  // ⚠️ 加保基數可被 employees.ins_grade_override 覆寫（如 Ricky 入職時低保 36300、實領 37000）
+  const insBase = +emp?.ins_grade_override > 0 ? +emp.ins_grade_override : monthlyBase
+  const li_full = calcLaborIns(insBase), hi_full = calcHealthIns(insBase)
+  const lp_full = calcLaborPension(insBase), liER_full = calcLaborInsER(insBase), hiER_full = calcHealthInsER(insBase)
   const li   = prorateInsurance(li_full,   emp?.labor_ins_date,  emp?.labor_ins_end_date,  monthStartDt, monthEndDt)
   const liER = prorateInsurance(liER_full, emp?.labor_ins_date,  emp?.labor_ins_end_date,  monthStartDt, monthEndDt)
   const lp   = prorateInsurance(lp_full,   emp?.labor_ins_date,  emp?.labor_ins_end_date,  monthStartDt, monthEndDt)
   const hi   = prorateInsurance(hi_full,   emp?.health_ins_date, emp?.health_ins_end_date, monthStartDt, monthEndDt)
   const hiER = prorateInsurance(hiER_full, emp?.health_ins_date, emp?.health_ins_end_date, monthStartDt, monthEndDt)
-  const lb = findBracket(monthlyBase, LABOR_INS_BRACKETS)
+  const lb = findBracket(insBase, LABOR_INS_BRACKETS)
   const totalDeductions = li + hi + sickDeduct + personalDeduct + absentDeduct + sopPenaltyTotal
   const currentPayable = proratedBase + totalBonuses - totalDeductions
   const erCost = proratedBase + totalBonuses + liER + hiER + lp
