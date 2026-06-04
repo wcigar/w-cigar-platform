@@ -1127,24 +1127,36 @@ export default function Payroll() {
 
       {/* ===== 支出管理 ===== */}
       {tab==='expenses'&&(() => {
-        // 統計：依「提交者」分組
+        // 統計：依「提交者」分組（含圖片計數）
+        const hasPhoto = (x) => !!(x.photo_url && String(x.photo_url).trim().length > 0)
         const bySubmitter = {}
         expenses.forEach(x => {
           const k = x.submitted_by || 'ADMIN'
-          if (!bySubmitter[k]) bySubmitter[k] = { count: 0, total: 0 }
+          if (!bySubmitter[k]) bySubmitter[k] = { count: 0, total: 0, withPhoto: 0 }
           bySubmitter[k].count++
           bySubmitter[k].total += +x.amount || 0
+          if (hasPhoto(x)) bySubmitter[k].withPhoto++
         })
         const submitterFilter = expenseSubmitterFilter || 'ALL'
         const filtered = submitterFilter === 'ALL' ? expenses : expenses.filter(x => (x.submitted_by || 'ADMIN') === submitterFilter)
+        const totalWithPhoto = expenses.filter(hasPhoto).length
         return (<div>
-        <div className="card" style={{padding:14,marginBottom:12}}><div style={{fontSize:11,color:'var(--text-dim)'}}>本月支出（含員工）</div><div style={{fontSize:22,fontFamily:'var(--font-mono)',color:'var(--red)',fontWeight:600}}>${totalExp.toLocaleString()}</div></div>
-        {/* 員工 / ADMIN filter chips */}
+        <div className="card" style={{padding:14,marginBottom:12,display:'flex',justifyContent:'space-between',alignItems:'center',gap:12}}>
+          <div>
+            <div style={{fontSize:11,color:'var(--text-dim)'}}>本月支出（含員工）</div>
+            <div style={{fontSize:22,fontFamily:'var(--font-mono)',color:'var(--red)',fontWeight:600}}>${totalExp.toLocaleString()}</div>
+          </div>
+          <div style={{textAlign:'right'}}>
+            <div style={{fontSize:10,color:'var(--text-dim)'}}>📷 含收據照片</div>
+            <div style={{fontSize:18,fontFamily:'var(--font-mono)',color:'var(--gold)',fontWeight:700}}>{totalWithPhoto} / {expenses.length}</div>
+          </div>
+        </div>
+        {/* 員工 / ADMIN filter chips（含圖片數）*/}
         <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
-          <button onClick={()=>setExpenseSubmitterFilter('ALL')} style={{padding:'6px 12px',borderRadius:18,fontSize:11,fontWeight:600,cursor:'pointer',background:submitterFilter==='ALL'?'var(--gold-glow)':'transparent',color:submitterFilter==='ALL'?'var(--gold)':'var(--text-dim)',border:submitterFilter==='ALL'?'1px solid var(--border-gold)':'1px solid var(--border)'}}>全部 ({expenses.length})</button>
+          <button onClick={()=>setExpenseSubmitterFilter('ALL')} style={{padding:'6px 12px',borderRadius:18,fontSize:11,fontWeight:600,cursor:'pointer',background:submitterFilter==='ALL'?'var(--gold-glow)':'transparent',color:submitterFilter==='ALL'?'var(--gold)':'var(--text-dim)',border:submitterFilter==='ALL'?'1px solid var(--border-gold)':'1px solid var(--border)'}}>全部 {expenses.length}（📷 {totalWithPhoto}）</button>
           {Object.entries(bySubmitter).map(([sub, s]) => (
             <button key={sub} onClick={()=>setExpenseSubmitterFilter(sub)} style={{padding:'6px 12px',borderRadius:18,fontSize:11,fontWeight:600,cursor:'pointer',background:submitterFilter===sub?'var(--gold-glow)':'transparent',color:submitterFilter===sub?'var(--gold)':'var(--text-dim)',border:submitterFilter===sub?'1px solid var(--border-gold)':'1px solid var(--border)'}}>
-              {sub === 'ADMIN' ? '👑 老闆' : `👤 ${sub}`} ({s.count}) ${s.total.toLocaleString()}
+              {sub === 'ADMIN' ? '👑 老闆' : `👤 ${sub}`} {s.count}（📷 {s.withPhoto}）${s.total.toLocaleString()}
             </button>
           ))}
         </div>
@@ -1174,12 +1186,22 @@ export default function Payroll() {
                 <button style={{...ib,color:'var(--red)'}} onClick={()=>deleteExpense(e.id)}><Trash2 size={12}/></button>
               </div>
             </div>
-            {e.photo_url && (
+            {hasPhoto(e) ? (
               <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid var(--border)'}}>
-                <img src={e.photo_url} alt="收據" onClick={() => window.open(e.photo_url, '_blank')}
-                  style={{width:'100%',maxHeight:200,objectFit:'cover',borderRadius:8,cursor:'pointer',border:'1px solid var(--border)'}}/>
+                <img src={e.photo_url} alt="收據" loading="lazy"
+                  onClick={() => window.open(e.photo_url, '_blank')}
+                  onError={(ev) => {
+                    console.warn('收據圖載入失敗:', e.id, e.photo_url)
+                    ev.currentTarget.style.display = 'none'
+                    const fallback = ev.currentTarget.nextElementSibling
+                    if (fallback) fallback.style.display = 'block'
+                  }}
+                  style={{width:'100%',maxHeight:240,objectFit:'contain',borderRadius:8,cursor:'pointer',border:'1px solid var(--border-gold)',background:'#000'}}/>
+                <div style={{display:'none',padding:12,textAlign:'center',color:'var(--red)',fontSize:11,background:'rgba(196,77,77,.08)',borderRadius:6,marginTop:4}}>⚠️ 收據圖載入失敗（檔案可能已刪除）</div>
                 <div style={{fontSize:10,color:'var(--text-muted)',marginTop:4,textAlign:'center'}}>🧾 點圖看大張收據</div>
               </div>
+            ) : (
+              <div style={{marginTop:8,paddingTop:8,borderTop:'1px dashed var(--border)',fontSize:11,color:'var(--text-muted)',fontStyle:'italic',textAlign:'center'}}>📷 此筆無收據照片</div>
             )}
           </div>
           )
