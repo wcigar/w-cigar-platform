@@ -147,16 +147,18 @@ export default function CustomerApp() {
       setError('連結已停用、請聯絡您的服務專員'); setLoading(false); return
     }
     setAmbassador(dealer)
-    // 2. 載入商品（is_active=true + retail_price > 0、暫不 filter shop_visible）
+    // 2. 載入商品 — 客戶售價用 suggest_price（retail_price 多數為 null）
     const { data: prods, error: prodErr } = await supabase
       .from('products')
-      .select('id, brand, name, spec, pack, retail_price, sale_price, sale_starts_at, sale_ends_at, sale_label, sections, image_url, stock_status, shop_featured, shop_visible, sale_stock_limit, sale_stock_sold')
+      .select('id, brand, name, spec, pack, retail_price, suggest_price, sale_price, sale_starts_at, sale_ends_at, sale_label, sections, image_url, stock_status, shop_featured, shop_visible, sale_stock_limit, sale_stock_sold')
       .eq('is_active', true)
-      .gt('retail_price', 0)
+      .eq('shop_visible', true)
       .order('shop_featured', { ascending: false, nullsFirst: false })
       .order('sort_order', { ascending: true, nullsFirst: false })
     if (prodErr) console.warn('load products error:', prodErr)
-    setProducts(prods || [])
+    // 客戶端售價 = retail_price ?? suggest_price，過濾掉無價品
+    const priced = (prods || []).map(p => ({ ...p, _price: (p.retail_price > 0 ? p.retail_price : p.suggest_price) || 0 })).filter(p => p._price > 0)
+    setProducts(priced)
     setLoading(false)
   }
 
@@ -347,10 +349,11 @@ export default function CustomerApp() {
 
 function currentPrice(p) {
   if (isOnSale(p) && p.sale_price > 0) return p.sale_price
-  return p.retail_price
+  return p._price || p.retail_price || p.suggest_price || 0
 }
 function isOnSale(p) {
-  if (!p.sale_price || p.sale_price <= 0 || p.sale_price >= p.retail_price) return false
+  const base = p._price || p.retail_price || p.suggest_price || 0
+  if (!p.sale_price || p.sale_price <= 0 || p.sale_price >= base) return false
   const now = new Date()
   if (p.sale_starts_at && new Date(p.sale_starts_at) > now) return false
   if (p.sale_ends_at && new Date(p.sale_ends_at) < now) return false
