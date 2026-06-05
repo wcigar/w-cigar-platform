@@ -136,25 +136,26 @@ export default function CustomerApp() {
   async function load() {
     setLoading(true); setError(null)
     // 1. 找推薦人（dealer.code = ambassador_code、dealer_type 可以是 ambassador / dealer 都接受）
-    const { data: dealer } = await supabase
+    const { data: dealer, error: dealerErr } = await supabase
       .from('dealers')
       .select('id, code, name, dealer_type, tier, is_active, blocked, paused_at, terminated_at')
       .ilike('code', ambassador_code)
       .maybeSingle()
-    if (!dealer) { setError('連結無效或已過期'); setLoading(false); return }
+    if (dealerErr) console.warn('load dealer error:', dealerErr)
+    if (!dealer) { setError('連結無效或已過期 (code=' + ambassador_code + ')'); setLoading(false); return }
     if (!dealer.is_active || dealer.blocked || dealer.terminated_at) {
       setError('連結已停用、請聯絡您的服務專員'); setLoading(false); return
     }
     setAmbassador(dealer)
-    // 2. 載入商品（shop_visible=true、retail_price > 0）
-    const { data: prods } = await supabase
+    // 2. 載入商品（is_active=true + retail_price > 0、暫不 filter shop_visible）
+    const { data: prods, error: prodErr } = await supabase
       .from('products')
-      .select('id, brand, name, spec, pack, retail_price, sale_price, sale_starts_at, sale_ends_at, sale_label, sections, image_url, stock_status, shop_featured, sale_stock_limit, sale_stock_sold')
-      .eq('shop_visible', true)
+      .select('id, brand, name, spec, pack, retail_price, sale_price, sale_starts_at, sale_ends_at, sale_label, sections, image_url, stock_status, shop_featured, shop_visible, sale_stock_limit, sale_stock_sold')
       .eq('is_active', true)
       .gt('retail_price', 0)
-      .order('shop_featured', { ascending: false })
+      .order('shop_featured', { ascending: false, nullsFirst: false })
       .order('sort_order', { ascending: true, nullsFirst: false })
+    if (prodErr) console.warn('load products error:', prodErr)
     setProducts(prods || [])
     setLoading(false)
   }
