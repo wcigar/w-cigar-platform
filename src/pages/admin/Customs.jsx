@@ -656,7 +656,7 @@ function ProductManager({ products, onChange }) {
 function CompanyDocsBanner() {
   const docs = [
     { label: '進出口許可證', filename: 'import-export-license.pdf', desc: 'W Cigar Bar 公司進出口許可證' },
-    { label: '公司登記證明文件', filename: 'business-registration.pdf', desc: '勝茄股份有限公司 公司登記核准函（14 頁）' },
+    { label: '公司變更登記核准函', filename: 'business-registration.pdf', desc: '勝茄股份有限公司（臺北市政府函，14 頁）' },
   ]
   return (
     <div style={{ background: 'rgba(212,175,55,0.08)', border: '1px solid rgba(212,175,55,0.3)', borderRadius: 10, padding: 12, marginBottom: 16 }}>
