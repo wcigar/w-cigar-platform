@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { logAudit } from '../../lib/audit'
 import { CigarRewardPayrollStatus } from '../../components/CigarRewardCard'
-import { calcLaborIns, calcHealthIns, calcLaborPension, calcLaborInsER, calcHealthInsER, findBracket, calcOvertimePay, calcOvertimePayByDayType, calcCompLeaveHours, inferDayType, LABOR_INS_BRACKETS, HEALTH_INS_BRACKETS, SHIFTS, LATE_GRACE_MIN, OT_GRACE_MIN } from '../../lib/constants'
+import { calcLaborIns, calcHealthIns, calcLaborPension, calcLaborInsER, calcHealthInsER, findBracket, calcOvertimePay, calcOvertimePayByDayType, calcCompLeaveHours, inferDayType, LABOR_INS_BRACKETS, HEALTH_INS_BRACKETS, LABOR_INS_RATE, HEALTH_INS_RATE, LABOR_PENSION_RATE, SHIFTS, LATE_GRACE_MIN, OT_GRACE_MIN } from '../../lib/constants'
 import { ChevronDown, ChevronUp, Plus, Trash2, Save, FileText, Printer, Edit3, Clock, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react'
 import { taipeiHM } from '../../lib/timezone'
 import { format, subMonths, endOfMonth } from 'date-fns'
@@ -363,16 +363,23 @@ export function calcSalaryToDate(emp, cfg, bonusDefs, att, isCurrentMonth, targe
   //    - 有值 = 強制此基數
   const laborOv = emp?.labor_ins_grade_override
   const healthOv = emp?.health_ins_grade_override
-  const laborBase  = laborOv === null || laborOv === undefined  ? monthlyBase : +laborOv
-  const healthBase = healthOv === null || healthOv === undefined ? monthlyBase : +healthOv
-  const li_full = calcLaborIns(laborBase), hi_full = calcHealthIns(healthBase)
-  const lp_full = calcLaborPension(laborBase), liER_full = calcLaborInsER(laborBase), hiER_full = calcHealthInsER(healthBase)
+  const laborHasOv  = laborOv  !== null && laborOv  !== undefined
+  const healthHasOv = healthOv !== null && healthOv !== undefined
+  const laborBase  = laborHasOv  ? +laborOv  : monthlyBase
+  const healthBase = healthHasOv ? +healthOv : monthlyBase
+  // 有投保級距 override → 直接以該基數算保費（不經級距表往上抓，尊重個人資料填的投保級距，如部分工時 11100）
+  // 無 override → 用月薪自動分級（calcXXX 內部 findBracket）；base=0（PT 不加保）→ 直接算得 0
+  const li_full   = laborHasOv  ? Math.round(laborBase  * LABOR_INS_RATE  * 0.2) : calcLaborIns(laborBase)
+  const liER_full = laborHasOv  ? Math.round(laborBase  * LABOR_INS_RATE  * 0.7) : calcLaborInsER(laborBase)
+  const lp_full   = laborHasOv  ? Math.round(laborBase  * LABOR_PENSION_RATE)    : calcLaborPension(laborBase)
+  const hi_full   = healthHasOv ? Math.round(healthBase * HEALTH_INS_RATE * 0.3) : calcHealthIns(healthBase)
+  const hiER_full = healthHasOv ? Math.round(healthBase * HEALTH_INS_RATE * 0.6) : calcHealthInsER(healthBase)
   const li   = prorateInsurance(li_full,   emp?.labor_ins_date,  emp?.labor_ins_end_date,  monthStartDt, monthEndDt)
   const liER = prorateInsurance(liER_full, emp?.labor_ins_date,  emp?.labor_ins_end_date,  monthStartDt, monthEndDt)
   const lp   = prorateInsurance(lp_full,   emp?.labor_ins_date,  emp?.labor_ins_end_date,  monthStartDt, monthEndDt)
   const hi   = prorateInsurance(hi_full,   emp?.health_ins_date, emp?.health_ins_end_date, monthStartDt, monthEndDt)
   const hiER = prorateInsurance(hiER_full, emp?.health_ins_date, emp?.health_ins_end_date, monthStartDt, monthEndDt)
-  const lb = findBracket(laborBase, LABOR_INS_BRACKETS)
+  const lb = laborHasOv ? laborBase : findBracket(laborBase, LABOR_INS_BRACKETS)
   const totalDeductions = li + hi + sickDeduct + personalDeduct + absentDeduct + sopPenaltyTotal
   const currentPayable = proratedBase + totalBonuses - totalDeductions
   const erCost = proratedBase + totalBonuses + liER + hiER + lp
