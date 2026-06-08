@@ -206,11 +206,13 @@ export default function StaffHome() {
       const R = 6371000, dLat = (25.0269184 - lat) * Math.PI / 180, dLng = (121.5419774 - lng) * Math.PI / 180
       const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat * Math.PI / 180) * Math.cos(25.0269184 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
       const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-      const valid = dist <= 100
       // 跨夜安全：punch_records.date 必須用 RPC 回傳的 active_date，避免晚班跨午夜後寫成隔天日期
       const punchDate = punchStatus?.active_date || ((type === '下班' && crossDayPunchDate) ? crossDayPunchDate : today)
       // 雙身份：punchAsEmp 不為 null 則打卡到該 paired identity（e.g. Daniel 主帳號打 Daniel_PT 卡）
       const targetEmp = punchAsEmp || { id: user.employee_id, name: user.name }
+      // 居家辦公員工（remote_work=true）跳過門市地點檢查；距離仍照記供稽核
+      const { data: _remoteRow } = await supabase.from('employees').select('remote_work').eq('id', targetEmp.id).maybeSingle()
+      const valid = _remoteRow?.remote_work === true ? true : dist <= 100
       // PT walkin：沒排班 PT 自助打卡 → 寫卡前自動補一筆「彈性班」schedule
       if (punchStatus?.virtual_pt_walkin && type === '上班' && !punchAsEmp) {
         const { error: schErr } = await supabase.from('schedules').upsert({ employee_id: user.employee_id, date: punchDate, shift: '彈性班' }, { onConflict: 'employee_id,date' })
