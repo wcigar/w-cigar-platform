@@ -51,7 +51,14 @@ export default function Layout({ children }) {
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#0a0a0a' }}>
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', borderBottom: '1px solid #2a2520', background: 'rgba(17,17,17,.95)', flexShrink: 0, zIndex: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700, color: '#c9a84c' }}>W</span>
+          <img
+            src="/logo.png"
+            srcSet="/logo.png 1x, /logo@2x.png 2x"
+            alt="W Cigar Bar"
+            width="32"
+            height="32"
+            style={{ display: 'block', flexShrink: 0 }}
+          />
           <span style={{ fontSize: 13, color: '#8a8278', letterSpacing: 2 }}>{isBoss ? '管理後台' : '員工系統'}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>

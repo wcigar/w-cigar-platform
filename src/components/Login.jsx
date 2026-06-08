@@ -26,11 +26,18 @@ export default function Login() {
       <div className="wcb-card" style={{ padding: 36, maxWidth: 380, width: '100%' }}>
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 36 }}>
-          <div style={{ width: 120, height: 1, margin: '0 auto 20px', background: 'linear-gradient(90deg,transparent,rgba(196,163,90,.4),transparent)', position: 'relative' }}>
+          <img
+            src="/logo.png"
+            srcSet="/logo.png 1x, /logo@2x.png 2x"
+            alt="W Cigar Bar"
+            width="120"
+            height="120"
+            style={{ display: 'block', margin: '0 auto 16px', filter: 'drop-shadow(0 4px 24px rgba(0,0,0,0.5))' }}
+          />
+          <div style={{ width: 120, height: 1, margin: '0 auto 14px', background: 'linear-gradient(90deg,transparent,rgba(196,163,90,.4),transparent)', position: 'relative' }}>
             <span style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', fontSize: 6, color: 'rgba(196,163,90,.5)', background: 'rgba(12,10,8,.96)', padding: '0 8px' }}>◆</span>
           </div>
-          <div style={{ fontFamily: 'Cormorant Garamond,serif', fontSize: 48, fontWeight: 300, background: 'linear-gradient(180deg,#f0e8d8 30%,rgba(196,163,90,.7))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', letterSpacing: 6 }}>W</div>
-          <div style={{ fontFamily: 'Noto Serif TC,serif', fontSize: 11, color: 'rgba(196,163,90,.5)', letterSpacing: 6, marginTop: 8, fontWeight: 300 }}>紳 士 雪 茄 館</div>
+          <div style={{ fontFamily: 'Noto Serif TC,serif', fontSize: 11, color: 'rgba(196,163,90,.5)', letterSpacing: 6, fontWeight: 300 }}>紳 士 雪 茄 館</div>
           <div style={{ fontFamily: 'Cormorant Garamond,serif', fontSize: 10, fontStyle: 'italic', color: 'rgba(196,163,90,.2)', letterSpacing: 3, marginTop: 12 }}>Employee Portal</div>
         </div>
 
