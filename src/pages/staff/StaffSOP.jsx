@@ -81,6 +81,20 @@ function SOPView() {
         if (!h.ht || !h.hr || !h.ct || !h.cr) return alert('溫濕度欄位皆須填寫')
       }
     }
+    // 盤點任務防呆：必須當天「真的盤完全部負責品項」才能打勾，杜絕「打勾沒盤點」
+    for (const taskId of checkedIds) {
+      const def = getDef(taskId)
+      const isInventoryTask = taskId.includes('inventory_count') || def.category === '盤點'
+      if (!isInventoryTask) continue
+      const [ownRes, doneRes] = await Promise.all([
+        supabase.from('inventory_master').select('id', { count: 'exact', head: true }).eq('owner', user.employee_id).eq('enabled', true),
+        supabase.from('inventory_tasks').select('item_id', { count: 'exact', head: true }).eq('employee_id', user.employee_id).eq('task_date', today),
+      ])
+      const ownCount = ownRes.count || 0, doneCount = doneRes.count || 0
+      if (doneCount < ownCount) {
+        return alert(`「${def.title || taskId}」尚未完成盤點\n\n今天只盤了 ${doneCount} / ${ownCount} 項。\n請先到「📦 我的盤點」逐項輸入實際數量、全部盤完才能打勾完成。`)
+      }
+    }
     setSubmitting(true)
     let success = 0
     const failed = []
