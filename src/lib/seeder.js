@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { format } from 'date-fns'
+import { format, startOfWeek } from 'date-fns'
 import { markNoticesRead } from './noticeUtils'
 
 export async function seedTodayTasks() {
@@ -11,11 +11,24 @@ export async function seedTodayTasks() {
   const { data: defs } = await supabase.from('sop_definitions').select('*')
   if (defs && defs.length) {
     const now = new Date(), dow = now.getDay(), dom = now.getDate()
+    const isoDow = dow === 0 ? 7 : dow // 週一=1 ... 週日=7
     const wm = {'每週一':1,'每週二':2,'每週三':3,'每週四':4,'每週五':5,'每週六':6,'每週日':0}
+    // 本週(週一起算)已 seed 過的 task — 供「每週X 遇休假往後延」判斷：
+    // 排定日休假漏了 → 下個上班日補 seed；且本週只 seed 一次（已 seed 就不再補）
+    const weekStartStr = format(startOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd')
+    const { data: weekSeeded } = await supabase.from('task_status').select('task_id, owner').gte('date', weekStartStr).lte('date', today)
+    const weekSeededSet = new Set((weekSeeded || []).map(r => `${r.task_id}|${r.owner}`))
     const todayDefs = defs.filter(d => {
       const f = (d.frequency || '每日').trim()
       if (!f || f === '每日') return true
-      if (wm[f] !== undefined) return dow === wm[f]
+      if (wm[f] !== undefined) {
+        const targetIso = wm[f] === 0 ? 7 : wm[f]
+        if (isoDow === targetIso) return true // 今天正是排定日
+        // 遇休假往後延：排定日已過(本週內)、且本週還沒 seed 過 → 今天補 seed
+        // （配合下方 leaveSet：今天若該 owner 休假則仍不 seed，自動再延到下一個上班日）
+        if (isoDow > targetIso && !weekSeededSet.has(`${d.task_id}|${d.owner}`)) return true
+        return false
+      }
       const mm = f.match(/每月(\d+)/); if (mm) return dom === Number(mm[1])
       return true
     })
