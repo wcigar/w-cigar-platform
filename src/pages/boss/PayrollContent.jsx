@@ -297,6 +297,17 @@ export function calcSalaryToDate(emp, cfg, bonusDefs, att, isCurrentMonth, targe
     const empBonuses = (bonusDefs || []).filter(b => b.employee_id === emp.id && b.enabled)
     const otherBonuses = empBonuses.map(b => ({ ...b, originalAmount: b.amount || 0, amount: b.amount || 0 }))
     const otherBonusTotal = otherBonuses.reduce((s, b) => s + (b.amount || 0), 0)
+    // PT 預設不加保；但若有投保級距 override（部分工時加保，如硯 11100/29500）則照算勞健保 + 按加保日 prorate
+    const ptLaborOv = emp?.labor_ins_grade_override, ptHealthOv = emp?.health_ins_grade_override
+    const ptLaborHasOv = ptLaborOv !== null && ptLaborOv !== undefined
+    const ptHealthHasOv = ptHealthOv !== null && ptHealthOv !== undefined
+    const ptLaborBase = ptLaborHasOv ? +ptLaborOv : 0
+    const ptHealthBase = ptHealthHasOv ? +ptHealthOv : 0
+    const ptLi   = prorateInsurance(ptLaborHasOv  ? Math.round(ptLaborBase  * LABOR_INS_RATE  * 0.2) : 0, emp?.labor_ins_date,  emp?.labor_ins_end_date,  monthStartDt, monthEndDt)
+    const ptLiER = prorateInsurance(ptLaborHasOv  ? Math.round(ptLaborBase  * LABOR_INS_RATE  * 0.7) : 0, emp?.labor_ins_date,  emp?.labor_ins_end_date,  monthStartDt, monthEndDt)
+    const ptLp   = prorateInsurance(ptLaborHasOv  ? Math.round(ptLaborBase  * LABOR_PENSION_RATE)    : 0, emp?.labor_ins_date,  emp?.labor_ins_end_date,  monthStartDt, monthEndDt)
+    const ptHi   = prorateInsurance(ptHealthHasOv ? Math.round(ptHealthBase * HEALTH_INS_RATE * 0.3) : 0, emp?.health_ins_date, emp?.health_ins_end_date, monthStartDt, monthEndDt)
+    const ptHiER = prorateInsurance(ptHealthHasOv ? Math.round(ptHealthBase * HEALTH_INS_RATE * 0.6) : 0, emp?.health_ins_date, emp?.health_ins_end_date, monthStartDt, monthEndDt)
     return {
       monthlyBase: 0, daysInMonth, dayOfMonth, dailyBase: 0, hourlyBase,
       actualWorkedDays: att.work, proratedBase,
@@ -304,11 +315,11 @@ export function calcSalaryToDate(emp, cfg, bonusDefs, att, isCurrentMonth, targe
       attendanceBonus: { def: null, amount: 0, status: 'na', effective: 0 },
       otPay: 0, otDetails: [],
       sickDeduct: 0, personalDeduct: 0, absentDeduct: 0,
-      li: 0, hi: 0, lp: 0, liER: 0, hiER: 0, lb: 0,
+      li: ptLi, hi: ptHi, lp: ptLp, liER: ptLiER, hiER: ptHiER, lb: ptLaborHasOv ? ptLaborBase : 0,
       sopPenalties: empPenalties || [], sopPenaltyTotal,
-      totalBonuses: otherBonusTotal, totalDeductions: sopPenaltyTotal,
-      currentPayable: proratedBase + otherBonusTotal - sopPenaltyTotal,
-      erCost: proratedBase + otherBonusTotal,
+      totalBonuses: otherBonusTotal, totalDeductions: sopPenaltyTotal + ptLi + ptHi,
+      currentPayable: proratedBase + otherBonusTotal - sopPenaltyTotal - ptLi - ptHi,
+      erCost: proratedBase + otherBonusTotal + ptLiER + ptHiER + ptLp,
       att, isPT: true,
     }
   }
