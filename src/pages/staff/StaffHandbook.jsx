@@ -8,6 +8,8 @@ import { Search, BookOpen, ChevronDown, ExternalLink, X, CheckCircle2, AlertTria
 const NATIVE_ACTIONS = {
   'sop-chapter-09': [{ label: '線上辦理離職交接', route: '/resign' }],
   'sop-chapter-10': [{ label: '新人入職建檔', route: '/onboarding' }, { label: '離職交接單', route: '/resign' }],
+  'sop-chapter-13': [{ label: '客戶存酒領取單（填寫列印）', route: '/liquor-pickup' }],
+  'sop-chapter-15': [{ label: '職災事故通報單', route: '/injury-report' }],
 }
 
 // 4 大分類（沿用 Legacy Elite 原系統）
