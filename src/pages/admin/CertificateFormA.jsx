@@ -17,7 +17,7 @@ const BG_SRC = "/customs/form-a-bg-clean.jpg";
 // 注意：出口商 / 收貨人 / 生產國 = 正本固定內容，保留在底圖（原版字體 1:1），不放輸入框。
 //       只有每批會變的欄位才做成可填。
 const FIELDS = [
-  ["certNo",    77.000,  2.300, 17.500, 3.300, false, 2.00, "#c00", "center"],
+  // certNo（Nº 154013）= 正本掃描紅字，保留在底圖（字體 1:1），不做可填欄位
   ["transport",  6.000, 30.400, 43.000, 2.600, false, 1.55, "#000", "left"],
   ["item5",      5.700, 44.500,  5.000, 2.800, false, 1.50, "#000", "center"],
   ["desc",      11.000, 43.000, 46.000, 4.500, true,  1.20, "#000", "left"],
@@ -29,7 +29,7 @@ const FIELDS = [
 ];
 
 const LABELS = {
-  certNo: "證明號 N°", transport: "運送/航班",
+  transport: "運送/航班",
   desc: "貨物說明", marks: "嘜頭", item5: "項次", crit8: "原產地標準",
   weight9: "毛重", inv10a: "發票號", inv10b: "發票日期",
 };
@@ -37,7 +37,6 @@ const LABELS = {
 // 正本變動欄位的預設值（可直接改成新一批的資料）。
 // 出口商/收貨人/生產國等固定欄位由底圖顯示（正本原字），不在此。
 const DEFAULTS = {
-  certNo: "154013",
   transport: "AMERIJET  AWB #810-43670255",
   desc: "1,250  UNIDADES DE CIGARROS DE LA FACTURA\nEMPACADOS EN TRS (3 ) CAJAS DE CARTON",
   marks: '"W" 2402',
@@ -137,7 +136,7 @@ function CertificateFormA({ bgSrc = BG_SRC }) {
       const pageH = pdf.internal.pageSize.getHeight();
       pdf.addImage(imgData, "JPEG", 0, 0, pageW, pageH);
       const today = new Date().toISOString().slice(0, 10);
-      pdf.save(`FormA_${vals.certNo || "COO"}_${today}.pdf`);
+      pdf.save(`FormA_154013_${today}.pdf`);
     } catch (e) {
       console.error("PDF 下載失敗:", e);
       alert("❌ PDF 下載失敗：" + (e.message || e));
@@ -169,10 +168,6 @@ function CertificateFormA({ bgSrc = BG_SRC }) {
       <div className="cfa-quick cfa-no-print">
         <div className="cfa-quick-title">⭐ 快速編輯（最常改的欄位）</div>
         <div className="cfa-quick-grid">
-          <label className="cfa-quick-fld">
-            <span>證明號 N°</span>
-            <input value={vals.certNo || ""} onChange={set("certNo")} placeholder="如：154013" />
-          </label>
           <label className="cfa-quick-fld">
             <span>發票號</span>
             <input value={vals.inv10a || ""} onChange={set("inv10a")} placeholder="如：67-006" />
