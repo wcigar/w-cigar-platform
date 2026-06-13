@@ -14,12 +14,24 @@ export default function StaffTraining() {
   const [answers, setAnswers] = useState({})
   const [result, setResult] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [trainer, setTrainer] = useState(null) // 教官待現場考核名單
 
   async function loadList() {
     const { data } = await supabase.rpc('training_list', { p_employee_id: user.employee_id })
     setMods(data || [])
+    if (user?.hr_token) {
+      const { data: tr } = await supabase.rpc('trainer_pending', { p_token: user.hr_token })
+      setTrainer(tr?.ok && tr.is_trainer ? tr : null)
+    }
   }
   useEffect(() => { if (user?.employee_id) loadList() }, [user?.employee_id])
+
+  async function fieldSignoff(traineeId, moduleId, traineeName) {
+    if (!confirm(`確認 ${traineeName} 已當面操作 SIMPOS 通過、由你現場考核簽核？`)) return
+    const note = prompt('現場考核備註（選填）') ?? ''
+    const { data } = await supabase.rpc('trainer_field_signoff', { p_token: user.hr_token, p_trainee_id: traineeId, p_module_id: moduleId, p_note: note })
+    if (data?.ok) loadList(); else alert('簽核失敗：' + (data?.error || ''))
+  }
 
   async function startQuiz(m) {
     setBusy(true)
@@ -123,18 +135,37 @@ export default function StaffTraining() {
         <div style={{ fontFamily: 'Cormorant Garamond,serif', fontSize: 11, fontStyle: 'italic', color: `${GOLD}77`, letterSpacing: 3, marginTop: 4 }}>TRAINING & ASSESSMENT</div>
       </div>
 
+      {/* 教官現場考核專區（Daniel/Ricky）*/}
+      {trainer?.is_trainer && (
+        <div style={{ marginBottom: 16, padding: 16, borderRadius: 14, background: 'rgba(100,140,170,.07)', border: '1px solid rgba(100,140,170,.3)' }}>
+          <div style={{ fontFamily: 'Noto Serif TC,serif', fontSize: 14, color: '#7fa0bd', marginBottom: 4 }}>🧑‍🏫 教官現場考核專區</div>
+          <div style={{ fontSize: 11, color: '#888078', marginBottom: 10 }}>下列同仁已通過線上測驗，請現場帶他操作 SIMPOS、確認無誤後簽核：</div>
+          {trainer.pending.length === 0
+            ? <div style={{ fontSize: 12, color: '#5a554e', padding: '6px 0' }}>目前沒有待現場考核的同仁。</div>
+            : trainer.pending.map(p => (
+              <div key={p.employee_id + p.module_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderTop: '1px solid rgba(201,168,76,.06)' }}>
+                <span style={{ fontSize: 13, color: '#e8e0d0' }}>{p.name}<span style={{ fontSize: 11, color: '#888078', marginLeft: 8 }}>{p.module}</span></span>
+                <button onClick={() => fieldSignoff(p.employee_id, p.module_id, p.name)} style={{ fontSize: 12, padding: '6px 14px', borderRadius: 8, border: '1px solid rgba(100,140,170,.5)', background: 'rgba(100,140,170,.12)', color: '#7fa0bd', cursor: 'pointer', fontFamily: 'Noto Serif TC,serif' }}>✍ 現場考核簽核</button>
+              </div>
+            ))}
+        </div>
+      )}
+
       {mods.length === 0 && <div style={{ textAlign: 'center', color: '#5a554e', padding: '40px 0', fontFamily: 'Noto Serif TC,serif' }}>目前尚無培訓課程</div>}
 
       {mods.map(m => (
         <div key={m.id} style={{ background: 'linear-gradient(160deg,rgba(22,18,14,.92),rgba(12,10,8,.96))', border: `1px solid ${m.passed ? 'rgba(100,170,100,.25)' : 'rgba(201,168,76,.12)'}`, borderRadius: 14, padding: 18, marginBottom: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 6 }}>
             <div style={{ fontFamily: 'Noto Serif TC,serif', fontSize: 16, fontWeight: 500, color: '#f0e8d8', flex: 1 }}>{m.title}</div>
-            {m.passed
-              ? <span style={{ fontSize: 11, color: '#7faa7f', whiteSpace: 'nowrap' }}><CheckCircle2 size={13} style={{ verticalAlign: -2 }} /> 已通過 {m.best_percent}分</span>
-              : m.attempts > 0
-                ? <span style={{ fontSize: 11, color: '#d68c46', whiteSpace: 'nowrap' }}>未通過（最高 {m.best_percent || 0}分）</span>
-                : <span style={{ fontSize: 11, color: '#8a8278', whiteSpace: 'nowrap' }}>未測驗</span>}
+            {m.passed && m.requires_field_exam && !m.signed_off
+              ? <span style={{ fontSize: 11, color: '#d68c46', whiteSpace: 'nowrap' }}>線上通過 · 待現場考核</span>
+              : m.passed
+                ? <span style={{ fontSize: 11, color: '#7faa7f', whiteSpace: 'nowrap' }}><CheckCircle2 size={13} style={{ verticalAlign: -2 }} /> 已通過 {m.best_percent}分</span>
+                : m.attempts > 0
+                  ? <span style={{ fontSize: 11, color: '#d68c46', whiteSpace: 'nowrap' }}>未通過（最高 {m.best_percent || 0}分）</span>
+                  : <span style={{ fontSize: 11, color: '#8a8278', whiteSpace: 'nowrap' }}>未測驗</span>}
           </div>
+          {m.requires_field_exam && <div style={{ fontSize: 10.5, color: '#7fa0bd', marginBottom: 8 }}>🧑‍🏫 此模組需線上測驗 + 教官（Daniel／Ricky）現場操作考核簽核</div>}
           {m.description && <div style={{ fontFamily: 'Noto Serif TC,serif', fontSize: 12, color: '#888078', lineHeight: 1.6, marginBottom: 10 }}>{m.description}</div>}
           <div style={{ display: 'flex', gap: 14, fontSize: 11, color: '#6a655c', marginBottom: 12, fontFamily: 'JetBrains Mono,monospace' }}>
             <span>{m.question_count} 題</span><span>及格 {m.pass_score} 分</span>{m.attempts > 0 && <span>已考 {m.attempts} 次</span>}{m.wrong_count > 0 && <span style={{ color: '#d68c46' }}>錯題 {m.wrong_count}</span>}
