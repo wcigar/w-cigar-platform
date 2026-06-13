@@ -14,32 +14,29 @@ import html2canvas from "html2canvas-pro";
 const BG_SRC = "/customs/form-a-bg-clean.jpg";
 
 // id, left%, top%, width%, height%, multiline, fontSize(cqw), color, align
+// 注意：出口商 / 收貨人 / 生產國 = 正本固定內容，保留在底圖（原版字體 1:1），不放輸入框。
+//       只有每批會變的欄位才做成可填。
 const FIELDS = [
-  ["certNo",    76.471,  1.000, 15.882, 3.000, false, 2.5, "#c00", "center"],
-  ["exporter",  11.471, 11.045, 38.529, 6.136, true,  1.85, "#000", "left"],
-  ["consignee", 11.471, 19.000, 38.529, 6.000, true,  1.85, "#000", "left"],
-  ["transport", 11.471, 29.909, 38.529, 2.636, false, 1.95, "#000", "left"],
-  ["desc",      11.471, 43.000, 40.706, 4.545, true,  1.90, "#000", "left"],
-  ["marks",     51.000, 48.545, 11.000, 2.455, false, 1.90, "#000", "center"],
-  ["item5",      5.700, 44.500,  5.300, 2.818, false, 1.90, "#000", "center"],
-  ["crit8",     62.500, 43.300,  7.000, 2.818, false, 1.90, "#000", "center"],
-  ["weight9",   70.000, 51.500,  7.100, 2.636, false, 1.90, "#000", "center"],
-  ["inv10a",    78.000, 43.300, 17.000, 2.545, false, 1.90, "#000", "center"],
-  ["inv10b",    78.000, 55.000, 17.000, 2.545, false, 1.90, "#000", "center"],
-  ["prod12",    63.000, 78.000, 19.000, 2.000, false, 1.90, "#000", "center"],
+  // certNo（Nº 154013）= 正本掃描紅字，保留在底圖（字體 1:1），不做可填欄位
+  ["transport",  6.000, 30.400, 43.000, 2.600, false, 1.55, "#000", "left"],
+  ["item5",      5.700, 44.500,  5.000, 2.800, false, 1.50, "#000", "center"],
+  ["desc",      11.000, 43.000, 46.000, 4.500, true,  1.20, "#000", "left"],
+  ["marks",     51.000, 48.545, 11.000, 2.400, false, 1.45, "#000", "center"],
+  ["crit8",     62.300, 43.200,  7.200, 2.600, false, 1.10, "#000", "center"],
+  ["weight9",   69.900, 52.000,  7.400, 2.600, false, 1.20, "#000", "center"],
+  ["inv10a",    78.000, 43.200, 17.000, 2.500, false, 1.50, "#000", "center"],
+  ["inv10b",    78.000, 55.500, 17.000, 2.500, false, 1.50, "#000", "center"],
 ];
 
 const LABELS = {
-  certNo: "證明號 N°", exporter: "出口商", consignee: "收貨人", transport: "運送/航班",
+  transport: "運送/航班",
   desc: "貨物說明", marks: "嘜頭", item5: "項次", crit8: "原產地標準",
-  weight9: "毛重", inv10a: "發票號", inv10b: "發票日期", prod12: "生產國",
+  weight9: "毛重", inv10a: "發票號", inv10b: "發票日期",
 };
 
-// 正本內容當預設值（可直接改成新一批的資料）
+// 正本變動欄位的預設值（可直接改成新一批的資料）。
+// 出口商/收貨人/生產國等固定欄位由底圖顯示（正本原字），不在此。
 const DEFAULTS = {
-  certNo: "154013",
-  exporter: "MANO TABACALERA, S.R.L\nC/2 ARTURO BISONO TORIBIO No.8 NAVE 21A\nVILLA BISONO NAVARRETE",
-  consignee: "CAPADURA Co. Ltd\nNo.79 Yongzhen Rd.,Yonghe Dist., New Taipei City 234027.,\nTaiwan (R.O.C)  TEL. 02773 08898\nConsigne name. Tsai Fu Chun",
   transport: "AMERIJET  AWB #810-43670255",
   desc: "1,250  UNIDADES DE CIGARROS DE LA FACTURA\nEMPACADOS EN TRS (3 ) CAJAS DE CARTON",
   marks: '"W" 2402',
@@ -48,7 +45,6 @@ const DEFAULTS = {
   weight9: "45 KGS",
   inv10a: "67-006",
   inv10b: "25.05.2026",
-  prod12: "SANTIAGO REP. DOM",
 };
 
 function CertificateFormA({ bgSrc = BG_SRC }) {
@@ -59,19 +55,31 @@ function CertificateFormA({ bgSrc = BG_SRC }) {
 
   const set = (id) => (e) => setVals((s) => ({ ...s, [id]: e.target.value }));
 
-  const centerSingles = useCallback(() => {
+  const applyFieldStyles = useCallback(() => {
     const root = sheetRef.current;
     if (!root) return;
+    // ⚠️ 平台 global.css 有 `input,select,textarea{font-size:16px!important;padding:12px 16px!important;min-height:48px}`
+    //    （行動版響應式），會蓋掉本元件的 cqw 字級與緊湊 padding → 長字（45 KGS / 67-006）被擠爆裁切。
+    //    React style prop 無法設 !important，改用 inline !important 搶回控制權。
+    root.querySelectorAll(".cfa-fld").forEach((el) => {
+      const fs = el.dataset.fs;
+      if (fs) el.style.setProperty("font-size", fs + "cqw", "important");
+      el.style.setProperty("padding", "0 2px", "important");
+      el.style.setProperty("min-height", "0", "important");
+      el.style.setProperty("border", "0", "important");
+      el.style.setProperty("background-color", "transparent", "important");
+      el.style.setProperty("border-radius", "0", "important");
+    });
     root.querySelectorAll("input.cfa-fld").forEach((el) => {
       el.style.lineHeight = el.clientHeight + "px";
     });
   }, []);
 
   useLayoutEffect(() => {
-    centerSingles();
-    window.addEventListener("resize", centerSingles);
-    return () => window.removeEventListener("resize", centerSingles);
-  }, [centerSingles]);
+    applyFieldStyles();
+    window.addEventListener("resize", applyFieldStyles);
+    return () => window.removeEventListener("resize", applyFieldStyles);
+  }, [applyFieldStyles, vals, showFields]);
 
   // ⬇ 下載 PDF（用 html2canvas-pro + jsPDF、Letter 直式）
   async function downloadPdf() {
@@ -128,7 +136,7 @@ function CertificateFormA({ bgSrc = BG_SRC }) {
       const pageH = pdf.internal.pageSize.getHeight();
       pdf.addImage(imgData, "JPEG", 0, 0, pageW, pageH);
       const today = new Date().toISOString().slice(0, 10);
-      pdf.save(`FormA_${vals.certNo || "COO"}_${today}.pdf`);
+      pdf.save(`FormA_154013_${today}.pdf`);
     } catch (e) {
       console.error("PDF 下載失敗:", e);
       alert("❌ PDF 下載失敗：" + (e.message || e));
@@ -161,10 +169,6 @@ function CertificateFormA({ bgSrc = BG_SRC }) {
         <div className="cfa-quick-title">⭐ 快速編輯（最常改的欄位）</div>
         <div className="cfa-quick-grid">
           <label className="cfa-quick-fld">
-            <span>證明號 N°</span>
-            <input value={vals.certNo || ""} onChange={set("certNo")} placeholder="如：154013" />
-          </label>
-          <label className="cfa-quick-fld">
             <span>發票號</span>
             <input value={vals.inv10a || ""} onChange={set("inv10a")} placeholder="如：67-006" />
           </label>
@@ -195,7 +199,7 @@ function CertificateFormA({ bgSrc = BG_SRC }) {
           </label>
         </div>
         <div className="cfa-hint">
-          💡 上方改完會立即同步到下方表單；其他欄位（出口商/收貨人/生產國）可直接在表單上點擊修改。預設帶入正本內容，按「↩ 還原正本內容」可復原。
+          💡 出口商 / 收貨人 / 生產國 = 正本固定內容，已保留正本原字（無需修改）。其餘每批會變的欄位（證明號 / 發票號 / 發票日期 / 品名數量 / 毛重 / 嘜頭 / 運送）可在上方或直接點下方表單修改。按「↩ 還原正本內容」可復原。
         </div>
       </div>
 
@@ -203,15 +207,17 @@ function CertificateFormA({ bgSrc = BG_SRC }) {
         <div ref={sheetRef} className={"cfa-sheet" + (showFields ? " show-fields" : "")}>
           <img src={bgSrc} alt="Form A 產地證明" draggable={false} crossOrigin="anonymous" />
           {FIELDS.map(([id, l, t, w, h, multi, fs, color, align]) => {
+            // fontSize 不放 style prop（會被 global.css 的 16px!important 蓋掉且 React 會清掉我們補的 important）
+            // → 改用 data-fs，由 applyFieldStyles 以 inline !important 套用。
             const style = {
               left: l + "%", top: t + "%", width: w + "%", height: h + "%",
-              fontSize: fs + "cqw", color, textAlign: align,
+              color, textAlign: align,
             };
             return multi ? (
-              <textarea key={id} className="cfa-fld ml" data-label={LABELS[id]}
+              <textarea key={id} className="cfa-fld ml" data-label={LABELS[id]} data-fs={fs}
                 placeholder=" " style={style} value={vals[id] || ""} onChange={set(id)} />
             ) : (
-              <input key={id} className="cfa-fld" data-label={LABELS[id]}
+              <input key={id} className="cfa-fld" data-label={LABELS[id]} data-fs={fs}
                 placeholder=" " style={style} value={vals[id] || ""} onChange={set(id)} />
             );
           })}
@@ -286,7 +292,7 @@ const CSS = `
 .cfa-sheet img{position:absolute;inset:0;width:100%;height:100%;display:block;
  user-select:none;pointer-events:none;}
 .cfa-fld{position:absolute;border:0;background:transparent;font-family:Arial,"Helvetica Neue",sans-serif;
- font-weight:700;line-height:1.12;padding:0 2px;outline:none;resize:none;overflow:hidden;
+ font-weight:400;line-height:1.12;padding:0 2px;outline:none;resize:none;overflow:hidden;
  -webkit-print-color-adjust:exact;print-color-adjust:exact;}
 .cfa-fld:not(.ml){line-height:1;white-space:nowrap;}
 .cfa-fld::placeholder{color:transparent;}
