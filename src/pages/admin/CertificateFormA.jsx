@@ -76,6 +76,35 @@ function CertificateFormA({ bgSrc = BG_SRC }) {
         useCORS: true,
         backgroundColor: "#ffffff",
         logging: false,
+        onclone: (clonedDoc) => {
+          // ⚠️ html2canvas 不會把 input/textarea 的「輸入值」畫進 PDF（只抓空框）→ 修改後下載仍空白。
+          // 在 clone 裡把每個欄位換成顯示「當前值」的 div（沿用定位/字型；cqw 字級轉成實際 px）。
+          const origs = sheet.querySelectorAll(".cfa-fld");
+          const clones = clonedDoc.querySelectorAll(".cfa-fld");
+          clones.forEach((el, i) => {
+            const orig = origs[i];
+            if (!orig) return;
+            const cs = window.getComputedStyle(orig);
+            const div = clonedDoc.createElement("div");
+            div.textContent = orig.value || "";
+            div.setAttribute("style", el.getAttribute("style") || "");
+            div.style.position = "absolute";
+            div.style.fontFamily = cs.fontFamily;
+            div.style.fontWeight = cs.fontWeight;
+            div.style.fontSize = cs.fontSize; // 實際 px，繞過 cqw 在 canvas 失準
+            div.style.color = el.style.color || cs.color;
+            div.style.padding = "0 2px";
+            div.style.boxSizing = "border-box";
+            div.style.display = "flex";
+            div.style.alignItems = "center";
+            const ta = el.style.textAlign || "left";
+            div.style.justifyContent = ta === "center" ? "center" : ta === "right" ? "flex-end" : "flex-start";
+            div.style.whiteSpace = el.tagName === "TEXTAREA" ? "pre-wrap" : "nowrap";
+            div.style.overflow = "hidden";
+            div.style.lineHeight = el.tagName === "TEXTAREA" ? "1.12" : "normal";
+            el.parentNode.replaceChild(div, el);
+          });
+        },
       });
       const imgData = canvas.toDataURL("image/jpeg", 0.92);
       const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
