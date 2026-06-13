@@ -20,6 +20,8 @@ import StaffOnboarding from './pages/staff/StaffOnboarding'
 import StaffTraining from './pages/staff/StaffTraining'
 import StaffResign from './pages/staff/StaffResign'
 import StaffSystemGuide from './pages/staff/StaffSystemGuide'
+import StaffLiquorPickup from './pages/staff/StaffLiquorPickup'
+import StaffInjuryReport from './pages/staff/StaffInjuryReport'
 import BossStaffVault from './pages/boss/BossStaffVault'
 import StaffPOS from './pages/staff/StaffPOS'
 import BossHome from './pages/boss/BossHome'
@@ -139,6 +141,9 @@ function AppInner() {
         )}
         {/* 員工手冊 / 規章中心 — boss 與 staff 共用 */}
         <Route path="/handbook" element={<StaffHandbook />} />
+        {/* 列印類表單：存酒領取 / 職災通報 */}
+        <Route path="/liquor-pickup" element={<StaffLiquorPickup />} />
+        <Route path="/injury-report" element={<StaffInjuryReport />} />
         {/* 新人入職流程（建檔/證件/簽署/規章）*/}
         <Route path="/onboarding" element={<StaffOnboarding />} />
         {/* 教育訓練與考核 */}

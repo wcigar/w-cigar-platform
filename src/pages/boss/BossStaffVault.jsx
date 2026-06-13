@@ -17,14 +17,17 @@ export default function BossStaffVault() {
   const [sel, setSel] = useState(null)      // 選中員工 detail
   const [busy, setBusy] = useState(false)
   const [resigns, setResigns] = useState([])
+  const [injuries, setInjuries] = useState([])
 
   async function loadList() {
-    const [ov, rs] = await Promise.all([
+    const [ov, rs, inj] = await Promise.all([
       supabase.rpc('hr_overview', { p_token: token }),
       supabase.rpc('hr_resignations', { p_token: token }),
+      supabase.rpc('hr_injury_reports', { p_token: token }),
     ])
     setList(ov.data?.ok ? ov.data.employees : [])
     setResigns(rs.data?.ok ? rs.data.list : [])
+    setInjuries(inj.data?.ok ? inj.data.list : [])
   }
   useEffect(() => { if (token) loadList(); else setList([]) }, [token])
 
@@ -32,6 +35,11 @@ export default function BossStaffVault() {
     if (status === 'rejected' && !confirm('確定駁回此離職交接單？')) return
     const note = status === 'approved' ? (prompt('核准備註（選填）') ?? '') : ''
     await supabase.rpc('hr_review_resignation', { p_token: token, p_id: id, p_status: status, p_note: note })
+    loadList()
+  }
+
+  async function reviewInjury(id, status) {
+    await supabase.rpc('hr_review_injury', { p_token: token, p_id: id, p_status: status })
     loadList()
   }
 
@@ -184,6 +192,27 @@ export default function BossStaffVault() {
                   <IconBtn onClick={() => reviewResign(r.id, 'rejected')} color="#d9534f"><XCircle size={13} /></IconBtn>
                 </>}
                 {r.status === 'approved' && <IconBtn onClick={() => reviewResign(r.id, 'completed')} color={GOLD} label="完成結案"><CheckCircle2 size={13} /></IconBtn>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 職災通報待處理 */}
+      {injuries.length > 0 && (
+        <div style={{ marginBottom: 14, padding: 14, borderRadius: 13, background: 'rgba(217,83,79,.06)', border: '1px solid rgba(217,83,79,.3)' }}>
+          <div style={{ fontSize: 13, color: '#d9534f', marginBottom: 10 }}>🚑 職災事故通報（{injuries.length}）</div>
+          {injuries.map(i => (
+            <div key={i.id} style={{ padding: '10px 0', borderTop: '1px solid rgba(201,168,76,.06)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 14, color: '#f0e8d8' }}>{i.employee_name}<span style={{ fontSize: 11, color: '#888078', marginLeft: 8 }}>{i.incident_at ? new Date(i.incident_at).toLocaleString('zh-TW') : ''}</span></span>
+                <span style={{ fontSize: 11, color: i.status === 'processing' ? '#d68c46' : '#d9534f' }}>{i.status === 'processing' ? '處理中' : '待處理'}</span>
+              </div>
+              <div style={{ fontSize: 12, color: '#cdc4b2', marginTop: 4 }}>{i.description}</div>
+              <div style={{ fontSize: 11, color: '#888078', marginTop: 4 }}>{i.injury_part ? `傷勢：${i.injury_part}　` : ''}{i.hospitalized ? `已送醫${i.hospital ? '（' + i.hospital + '）' : ''}` : '未送醫'}{i.witness ? `　證人：${i.witness}` : ''}</div>
+              <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                {i.status === 'reported' && <IconBtn onClick={() => reviewInjury(i.id, 'processing')} color="#d68c46" label="標記處理中"><CheckCircle2 size={13} /></IconBtn>}
+                <IconBtn onClick={() => reviewInjury(i.id, 'closed')} color={GOLD} label="結案"><CheckCircle2 size={13} /></IconBtn>
               </div>
             </div>
           ))}
