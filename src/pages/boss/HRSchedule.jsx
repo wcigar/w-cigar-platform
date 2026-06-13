@@ -1,5 +1,6 @@
 import LeaveApproval from './LeaveApproval'
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { SHIFTS, LEAVE_TYPES } from '../../lib/constants'
 import { isHoliday, getHolidayName, calcMonthRestDays, TW_HOLIDAYS_2026 } from '../../lib/holidays'
@@ -14,6 +15,7 @@ const ALL_SHIFTS = ['早班','晚班','單人班','彈性班',...LEAVE_TYPES,'']
 const WORK_SHIFTS = ['早班','晚班','單人班','彈性班']
 
 export default function HRSchedule() {
+  const navigate = useNavigate()
   const [month, setMonth] = useState(new Date())
   const [emps, setEmps] = useState([])
   const [scheds, setScheds] = useState([])
@@ -104,6 +106,14 @@ export default function HRSchedule() {
   return (
     <div className="page-container fade-in">
       <div className="section-title">人事排班</div>
+      <div onClick={() => navigate('/hr-vault')} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '13px 16px', marginBottom: 14, borderRadius: 12, cursor: 'pointer', background: 'linear-gradient(160deg,rgba(30,24,18,.96),rgba(14,12,10,.99))', border: '1px solid rgba(196,163,90,.25)' }}>
+        <span style={{ fontSize: 18 }}>🗂️</span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 14, fontWeight: 500, color: '#f0e8d8' }}>人事檔案庫</div>
+          <div style={{ fontSize: 11, color: 'rgba(196,163,90,.6)', marginTop: 1 }}>員工建檔 · 證件審核 · 簽署文件 · 培訓考核（報勞健保）</div>
+        </div>
+        <ChevronRight size={16} color="#5a554e" />
+      </div>
       <div style={{ display: 'flex', gap: 4, marginBottom: 16, overflowX: 'auto' }}>
         {tabs.map(t => <button key={t.id} onClick={() => setTab(t.id)} style={{ padding: '7px 12px', borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', background: tab === t.id ? 'var(--gold-glow)' : 'transparent', color: tab === t.id ? 'var(--gold)' : 'var(--text-dim)', border: tab === t.id ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>{t.l}</button>)}
       </div>
