@@ -35,6 +35,7 @@ export default function StaffHome() {
   const [crossDayPunchDate, setCrossDayPunchDate] = useState(null)
   const [punchStatus, setPunchStatus] = useState(null) // 跨夜安全的打卡狀態 (RPC)
   const [showPerformance, setShowPerformance] = useState(false)
+  const [hbUnread, setHbUnread] = useState(0) // 未確認規章章數
   // 國定假日轉補休同意彈窗
   const [pendingHolidays, setPendingHolidays] = useState([])
   // 雙身份：paired employee (e.g. Daniel 正職 + Daniel_PT)
@@ -55,6 +56,18 @@ export default function StaffHome() {
   const punchingRef = useRef(false) // 防連點打卡
 
   useEffect(() => { load() }, [today])
+  // 規章閱讀確認：算未確認章數（首頁入口卡紅徽章）
+  useEffect(() => {
+    if (!user?.employee_id) return
+    ;(async () => {
+      const [hb, rd] = await Promise.all([
+        supabase.from('staff_handbook').select('id').eq('enabled', true),
+        supabase.from('staff_handbook_reads').select('chapter_id').eq('employee_id', user.employee_id),
+      ])
+      const ackSet = new Set((rd.data || []).map(r => r.chapter_id))
+      setHbUnread((hb.data || []).filter(c => !ackSet.has(c.id)).length)
+    })()
+  }, [user?.employee_id])
   // 跨午夜 / 跨月：每 60 秒檢查、視窗回前景時也檢查；變動時 today/month state 更新 → load() 觸發 reload
   useEffect(() => {
     const tick = () => {
@@ -356,12 +369,15 @@ export default function StaffHome() {
       </div>
 
       {/* ══ 員工手冊入口 ══ */}
-      <div onClick={() => navigate('/handbook')} style={{display:'flex',alignItems:'center',gap:14,padding:'16px 18px',marginBottom:8,borderRadius:14,cursor:'pointer',background:'linear-gradient(160deg,rgba(30,24,18,.96),rgba(14,12,10,.99))',border:'1px solid rgba(196,163,90,.18)'}}>
+      <div onClick={() => navigate('/handbook')} style={{display:'flex',alignItems:'center',gap:14,padding:'16px 18px',marginBottom:8,borderRadius:14,cursor:'pointer',background:'linear-gradient(160deg,rgba(30,24,18,.96),rgba(14,12,10,.99))',border:`1px solid ${hbUnread>0?'rgba(214,140,70,.4)':'rgba(196,163,90,.18)'}`}}>
         <div style={{flexShrink:0,width:42,height:42,borderRadius:11,background:'rgba(196,163,90,.1)',border:'1px solid rgba(196,163,90,.2)',display:'flex',alignItems:'center',justifyContent:'center'}}><BookOpen size={20} color="#c9a84c"/></div>
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontFamily:'Noto Serif TC,serif',fontSize:15,fontWeight:500,color:'#f0e8d8'}}>員工手冊 · 規章中心</div>
-          <div style={{fontFamily:'Noto Serif TC,serif',fontSize:11,color:'rgba(196,163,90,.5)',marginTop:2}}>規章・福利・培訓・表單，一鍵查詢</div>
+          {hbUnread>0
+            ? <div style={{fontFamily:'Noto Serif TC,serif',fontSize:11,color:'#d68c46',marginTop:2}}>⚠ 還有 {hbUnread} 章未確認閱讀，上班前請完成</div>
+            : <div style={{fontFamily:'Noto Serif TC,serif',fontSize:11,color:'rgba(196,163,90,.5)',marginTop:2}}>規章・福利・培訓・表單，一鍵查詢</div>}
         </div>
+        {hbUnread>0 && <span style={{flexShrink:0,minWidth:20,height:20,padding:'0 6px',borderRadius:10,background:'#d68c46',color:'#0f0d0a',fontSize:11,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center'}}>{hbUnread}</span>}
         <ChevronRight size={18} color="#5a554e" style={{flexShrink:0}}/>
       </div>
 
