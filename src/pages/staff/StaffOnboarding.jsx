@@ -70,6 +70,10 @@ export default function StaffOnboarding() {
   if (!ob) return <div style={{ padding: 24 }}><div className="loading-shimmer" style={{ height: 120, borderRadius: 14 }} /></div>
 
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
+  const uploaded = ob.uploaded_docs || []
+  const signed = ob.signed_kinds || []
+  const isPT = String(user?.employee_type || '').toUpperCase() === 'PT'
+  const signKinds = isPT ? ['privacy_consent', 'part_time_addendum'] : ['privacy_consent', 'employment_contract']
 
   async function saveProfile() {
     setBusy(true)
@@ -120,7 +124,7 @@ export default function StaffOnboarding() {
   const steps = [
     { key: 'profile_done', icon: UserCog, label: '個人資料建檔', done: ob.profile_done },
     { key: 'docs_done', icon: IdCard, label: '證件上傳（身分證正反面・存摺）', done: ob.docs_done },
-    { key: 'sign_done', icon: PenLine, label: '電子簽署（保密個資・聘用合約）', done: ob.sign_done },
+    { key: 'sign_done', icon: PenLine, label: `電子簽署（保密個資・${isPT ? '兼職聘用契約' : '正職聘用契約'}）`, done: ob.sign_done },
     { key: 'handbook_done', icon: BookOpen, label: `規章研讀確認（${ob.handbook_acked}/${ob.handbook_total}）`, done: ob.handbook_done, nav: '/handbook' },
     { key: 'training_done', icon: GraduationCap, label: '教育訓練與考核', done: ob.training_done, nav: '/training' },
   ]
@@ -171,8 +175,9 @@ export default function StaffOnboarding() {
                   <div style={{ gridColumn: '1 / 3' }}><label style={labelStyle}>聯絡電話 *</label><input style={inputStyle} value={form.phone} onChange={e => set('phone', e.target.value)} /></div>
                   <div style={{ gridColumn: '1 / 3' }}><label style={labelStyle}>地址</label><input style={inputStyle} value={form.address} onChange={e => set('address', e.target.value)} /></div>
                   <div style={{ gridColumn: '1 / 3' }}><label style={labelStyle}>緊急聯絡人姓名及電話 *</label><input style={inputStyle} value={form.emergency_contact} onChange={e => set('emergency_contact', e.target.value)} /></div>
-                  <div><label style={labelStyle}>銀行代碼</label><input style={inputStyle} value={form.bank_code} onChange={e => set('bank_code', e.target.value)} placeholder="822" /></div>
+                  <div><label style={labelStyle}>銀行代碼</label><input style={inputStyle} value={form.bank_code} onChange={e => set('bank_code', e.target.value)} placeholder="007（第一銀行）" /></div>
                   <div><label style={labelStyle}>匯款帳號 * {ob.bank_account_masked && <span style={{ color: '#7faa7f' }}>（已存）</span>}</label><input style={inputStyle} value={form.bank_account} onChange={e => set('bank_account', e.target.value)} placeholder={ob.bank_account_masked || ''} /></div>
+                  <div style={{ gridColumn: '1 / 3', fontSize: 11, color: 'rgba(196,163,90,.7)', lineHeight: 1.6, background: 'rgba(201,168,76,.05)', border: '1px solid rgba(201,168,76,.15)', borderRadius: 8, padding: '8px 10px' }}>💡 建議使用<b style={{ color: GOLD }}>第一銀行（代碼 007）</b>，公司轉帳免手續費；其他銀行跨行匯款會被收 15 元手續費。</div>
                 </div>
                 <button onClick={saveProfile} disabled={busy} style={{ width: '100%', marginTop: 14, padding: 12, borderRadius: 9, border: 'none', background: `linear-gradient(135deg,${GOLD},#a8863a)`, color: '#0f0d0a', fontSize: 14, fontWeight: 700, cursor: 'pointer', opacity: busy ? 0.6 : 1 }}>{busy ? '儲存中…' : '儲存建檔資料'}</button>
               </div>
@@ -180,30 +185,46 @@ export default function StaffOnboarding() {
 
             {isOpen && !submitted && s.key === 'docs_done' && (
               <div style={{ padding: '0 16px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {[['id_front', '身分證正面'], ['id_back', '身分證反面'], ['bankbook', '存摺封面']].map(([t, label]) => (
-                  <label key={t} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '11px 13px', borderRadius: 9, background: 'rgba(201,168,76,.05)', border: '1px solid rgba(201,168,76,.18)', cursor: 'pointer' }}>
-                    <span style={{ fontSize: 13, color: '#e8e0d0' }}><Upload size={14} color={GOLD} style={{ verticalAlign: -2, marginRight: 7 }} />{label}</span>
-                    <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => uploadDoc(t, e.target.files[0])} />
-                    <span style={{ fontSize: 11, color: GOLD }}>選擇照片</span>
-                  </label>
-                ))}
+                {[['id_front', '身分證正面'], ['id_back', '身分證反面'], ['bankbook', '存摺封面']].map(([t, label]) => {
+                  const has = uploaded.includes(t)
+                  return (
+                    <div key={t} style={{ padding: '11px 13px', borderRadius: 9, background: 'rgba(201,168,76,.05)', border: `1px solid ${has ? 'rgba(100,170,100,.3)' : 'rgba(201,168,76,.18)'}` }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <span style={{ fontSize: 13, color: '#e8e0d0' }}><Upload size={14} color={GOLD} style={{ verticalAlign: -2, marginRight: 7 }} />{label}</span>
+                        {has && <span style={{ fontSize: 11, color: '#7faa7f' }}>✓ 已上傳</span>}
+                      </div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <label style={{ flex: 1, textAlign: 'center', padding: '9px', borderRadius: 8, background: 'rgba(201,168,76,.1)', border: '1px solid rgba(201,168,76,.25)', color: GOLD, fontSize: 12.5, cursor: 'pointer' }}>
+                          📷 拍照<input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={e => uploadDoc(t, e.target.files[0])} />
+                        </label>
+                        <label style={{ flex: 1, textAlign: 'center', padding: '9px', borderRadius: 8, background: 'rgba(255,255,255,.03)', border: '1px solid #2a2520', color: '#cdc4b2', fontSize: 12.5, cursor: 'pointer' }}>
+                          🖼 從相簿選<input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => uploadDoc(t, e.target.files[0])} />
+                        </label>
+                      </div>
+                    </div>
+                  )
+                })}
                 <div style={{ fontSize: 11, color: '#6a655c', lineHeight: 1.6 }}>🔒 證件存入私密保險庫，僅本人與 HR 主管可查，永不公開外流。</div>
               </div>
             )}
 
             {isOpen && !submitted && s.key === 'sign_done' && (
               <div style={{ padding: '0 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {legal.filter(d => ['privacy_consent', 'employment_contract'].includes(d.kind)).map(d => (
-                  <div key={d.kind} style={{ borderRadius: 9, border: '1px solid #2a2520', overflow: 'hidden' }}>
-                    <div style={{ padding: '10px 12px', background: 'rgba(201,168,76,.05)', fontSize: 13, fontWeight: 500, color: '#f0e8d8' }}>{d.title}</div>
+                {signKinds.map(k => legal.find(d => d.kind === k)).filter(Boolean).map(d => {
+                  const isSigned = signed.includes(d.kind)
+                  return (
+                  <div key={d.kind} style={{ borderRadius: 9, border: `1px solid ${isSigned ? 'rgba(100,170,100,.3)' : '#2a2520'}`, overflow: 'hidden' }}>
+                    <div style={{ padding: '10px 12px', background: 'rgba(201,168,76,.05)', fontSize: 13, fontWeight: 500, color: '#f0e8d8', display: 'flex', justifyContent: 'space-between' }}>{d.title}{isSigned && <span style={{ fontSize: 11, color: '#7faa7f' }}>✓ 已簽署</span>}</div>
                     <div style={{ maxHeight: 160, overflowY: 'auto', padding: 12, fontSize: 11.5, color: '#a89f90', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>{d.body}</div>
                     <div style={{ padding: 12 }}>
-                      {signing === d.kind
+                      {isSigned
+                        ? <div style={{ textAlign: 'center', fontSize: 12, color: '#7faa7f' }}>已親簽同意，存證完成</div>
+                        : signing === d.kind
                         ? <SignaturePad busy={busy} onDone={blob => doSign(d.kind, blob)} />
                         : <button onClick={() => setSigning(d.kind)} style={{ width: '100%', padding: 11, borderRadius: 8, border: `1px solid ${GOLD}`, background: 'rgba(201,168,76,.08)', color: GOLD, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>✍ 我已閱讀並親簽同意</button>}
                     </div>
                   </div>
-                ))}
+                )})}
               </div>
             )}
           </div>
