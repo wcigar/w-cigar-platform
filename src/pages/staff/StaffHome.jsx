@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { SHIFTS } from '../../lib/constants'
 import { useNavigate } from 'react-router-dom'
-import { Clock, CheckCircle2, Circle, AlertCircle, MapPin, AlertTriangle, Trophy, FileText } from 'lucide-react'
+import { Clock, CheckCircle2, Circle, AlertCircle, MapPin, AlertTriangle, Trophy, FileText, BookOpen, ChevronRight } from 'lucide-react'
 import { format, endOfMonth } from 'date-fns'
 import { zhTW } from 'date-fns/locale'
 import AbnormalReport from '../../components/AbnormalReport'
@@ -353,6 +353,16 @@ export default function StaffHome() {
           <div style={{fontFamily:'JetBrains Mono,monospace',fontSize:10,color:'rgba(196,163,90,.35)',letterSpacing:1}}>{format(new Date(), 'yyyy.MM.dd')}</div>
           <div style={{display:'inline-block',marginTop:4,fontFamily:'JetBrains Mono,monospace',fontSize:9,color:'rgba(196,163,90,.6)',padding:'3px 10px',borderRadius:20,border:'1px solid rgba(196,163,90,.12)',letterSpacing:2}}>{shiftLabel}</div>
         </div>
+      </div>
+
+      {/* ══ 員工手冊入口 ══ */}
+      <div onClick={() => navigate('/handbook')} style={{display:'flex',alignItems:'center',gap:14,padding:'16px 18px',marginBottom:8,borderRadius:14,cursor:'pointer',background:'linear-gradient(160deg,rgba(30,24,18,.96),rgba(14,12,10,.99))',border:'1px solid rgba(196,163,90,.18)'}}>
+        <div style={{flexShrink:0,width:42,height:42,borderRadius:11,background:'rgba(196,163,90,.1)',border:'1px solid rgba(196,163,90,.2)',display:'flex',alignItems:'center',justifyContent:'center'}}><BookOpen size={20} color="#c9a84c"/></div>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontFamily:'Noto Serif TC,serif',fontSize:15,fontWeight:500,color:'#f0e8d8'}}>員工手冊 · 規章中心</div>
+          <div style={{fontFamily:'Noto Serif TC,serif',fontSize:11,color:'rgba(196,163,90,.5)',marginTop:2}}>規章・福利・培訓・表單，一鍵查詢</div>
+        </div>
+        <ChevronRight size={18} color="#5a554e" style={{flexShrink:0}}/>
       </div>
 
       {/* ══════ Zone A：即時行動 ══════ */}
