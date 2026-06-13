@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
-import { Users, ShieldCheck, FileText, PenLine, GraduationCap, ChevronLeft, Eye, CheckCircle2, XCircle, AlertCircle } from 'lucide-react'
+import { Users, ShieldCheck, FileText, PenLine, GraduationCap, ChevronLeft, Eye, CheckCircle2, XCircle, AlertCircle, Download } from 'lucide-react'
+import { generateSignedPdf } from '../../lib/signedPdf'
 
 const GOLD = '#c9a84c'
 const DOC_LABEL = { id_front: '身分證正面', id_back: '身分證反面', bankbook: '存摺封面', other: '其他' }
@@ -47,6 +48,22 @@ export default function BossStaffVault() {
     setBusy(false)
     if (error || !data?.ok) return alert('無法開啟：' + (data?.error || error?.message || '未知'))
     window.open(data.url, '_blank')
+  }
+
+  async function downloadSig(sigId) {
+    setBusy(true)
+    try {
+      const { data } = await supabase.rpc('hr_signature_detail', { p_token: token, p_sig_id: sigId })
+      if (!data?.ok) return alert('讀取失敗：' + (data?.error || ''))
+      let sigDataUrl = null
+      const { data: u } = await supabase.functions.invoke('hr-doc-url', { body: { token, kind: 'signature', id: sigId } })
+      if (u?.ok) {
+        const blob = await (await fetch(u.url)).blob()
+        sigDataUrl = await new Promise(r => { const fr = new FileReader(); fr.onloadend = () => r(fr.result); fr.readAsDataURL(blob) })
+      }
+      await generateSignedPdf(data, sigDataUrl)
+    } catch (e) { alert('產生 PDF 失敗：' + e.message) }
+    finally { setBusy(false) }
   }
 
   async function verifyDoc(docId, status) {
@@ -110,7 +127,10 @@ export default function BossStaffVault() {
               <span style={{ color: '#e8e0d0', fontSize: 13 }}>{SIG_LABEL[sg.doc_kind] || sg.doc_kind}
                 <span style={{ marginLeft: 8, fontSize: 11, color: '#888078' }}>{sg.signed_at ? new Date(sg.signed_at).toLocaleDateString('zh-TW') : ''} · {sg.doc_version}</span>
               </span>
-              <IconBtn onClick={() => viewFile('signature', sg.id)} label="檢視簽名"><Eye size={13} /></IconBtn>
+              <span style={{ display: 'flex', gap: 6 }}>
+                <IconBtn onClick={() => viewFile('signature', sg.id)} label="簽名"><Eye size={13} /></IconBtn>
+                <IconBtn onClick={() => downloadSig(sg.id)} color={GOLD} label="簽署版PDF"><Download size={13} /></IconBtn>
+              </span>
             </div>
           ))}
         </Section>
