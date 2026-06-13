@@ -16,6 +16,7 @@ import StaffExpense from './pages/staff/StaffExpense'
 import StaffInventoryCount from './pages/staff/StaffInventoryCount'
 import StaffMeeting from './pages/staff/StaffMeeting'
 import StaffHandbook from './pages/staff/StaffHandbook'
+import StaffOnboarding from './pages/staff/StaffOnboarding'
 import StaffPOS from './pages/staff/StaffPOS'
 import BossHome from './pages/boss/BossHome'
 import BossAuditTasks from './pages/boss/AuditTasks'
@@ -133,6 +134,8 @@ function AppInner() {
         )}
         {/* 員工手冊 / 規章中心 — boss 與 staff 共用 */}
         <Route path="/handbook" element={<StaffHandbook />} />
+        {/* 新人入職流程（建檔/證件/簽署/規章）*/}
+        <Route path="/onboarding" element={<StaffOnboarding />} />
         <Route path="/admin/venue-sales" element={<AdminGuard scope="admin"><AdminVenueSales /></AdminGuard>} />
         <Route path="/admin/venue-sales/new" element={<AdminGuard scope="admin"><AdminVenueSalesNew /></AdminGuard>} />
         <Route path="/admin/venues" element={<AdminGuard scope="admin"><AdminVenues /></AdminGuard>} />
