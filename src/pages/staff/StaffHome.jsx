@@ -373,15 +373,15 @@ export default function StaffHome() {
 
       {/* ══ 新人入職流程入口（未送出才顯示）══ */}
       {onb && onb.status === 'in_progress' && (() => {
-        const obDone = [onb.profile_done, onb.docs_done, onb.sign_done, onb.handbook_done].filter(Boolean).length
+        const obDone = [onb.profile_done, onb.docs_done, onb.sign_done, onb.handbook_done, onb.training_done].filter(Boolean).length
         return (
           <div onClick={() => navigate('/onboarding')} style={{display:'flex',alignItems:'center',gap:14,padding:'16px 18px',marginBottom:8,borderRadius:14,cursor:'pointer',background:'linear-gradient(160deg,rgba(40,28,16,.96),rgba(16,12,9,.99))',border:'1px solid rgba(214,140,70,.4)'}}>
             <div style={{flexShrink:0,width:42,height:42,borderRadius:11,background:'rgba(214,140,70,.12)',border:'1px solid rgba(214,140,70,.3)',display:'flex',alignItems:'center',justifyContent:'center'}}><AlertCircle size={20} color="#d68c46"/></div>
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontFamily:'Noto Serif TC,serif',fontSize:15,fontWeight:500,color:'#f0e8d8'}}>完成新人入職流程</div>
-              <div style={{fontFamily:'Noto Serif TC,serif',fontSize:11,color:'#d68c46',marginTop:2}}>建檔・證件・簽署・規章 {obDone}/4，正式上班前請完成</div>
+              <div style={{fontFamily:'Noto Serif TC,serif',fontSize:11,color:'#d68c46',marginTop:2}}>建檔・證件・簽署・規章・培訓 {obDone}/5，正式上班前請完成</div>
             </div>
-            <span style={{flexShrink:0,minWidth:20,height:20,padding:'0 6px',borderRadius:10,background:'#d68c46',color:'#0f0d0a',fontSize:11,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center'}}>{4-obDone}</span>
+            <span style={{flexShrink:0,minWidth:20,height:20,padding:'0 6px',borderRadius:10,background:'#d68c46',color:'#0f0d0a',fontSize:11,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center'}}>{5-obDone}</span>
             <ChevronRight size={18} color="#5a554e" style={{flexShrink:0}}/>
           </div>
         )

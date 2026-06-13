@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { useNavigate } from 'react-router-dom'
-import { CheckCircle2, Circle, UserCog, IdCard, PenLine, BookOpen, Upload, ChevronRight } from 'lucide-react'
+import { CheckCircle2, Circle, UserCog, IdCard, PenLine, BookOpen, GraduationCap, Upload, ChevronRight } from 'lucide-react'
 
 const GOLD = '#c9a84c'
 const inputStyle = { width: '100%', padding: '11px 13px', background: '#1a1714', border: '1px solid #2a2520', borderRadius: 8, color: '#e8dcc8', fontSize: 14, boxSizing: 'border-box', outline: 'none', fontFamily: 'Noto Serif TC,serif' }
@@ -121,7 +121,8 @@ export default function StaffOnboarding() {
     { key: 'profile_done', icon: UserCog, label: '個人資料建檔', done: ob.profile_done },
     { key: 'docs_done', icon: IdCard, label: '證件上傳（身分證正反面・存摺）', done: ob.docs_done },
     { key: 'sign_done', icon: PenLine, label: '電子簽署（保密個資・聘用合約）', done: ob.sign_done },
-    { key: 'handbook_done', icon: BookOpen, label: `規章研讀確認（${ob.handbook_acked}/${ob.handbook_total}）`, done: ob.handbook_done },
+    { key: 'handbook_done', icon: BookOpen, label: `規章研讀確認（${ob.handbook_acked}/${ob.handbook_total}）`, done: ob.handbook_done, nav: '/handbook' },
+    { key: 'training_done', icon: GraduationCap, label: '教育訓練與考核', done: ob.training_done, nav: '/training' },
   ]
   const doneCount = steps.filter(s => s.done).length
   const allDone = doneCount === steps.length
@@ -151,7 +152,7 @@ export default function StaffOnboarding() {
         const isOpen = open === s.key
         return (
           <div key={s.key} style={{ marginBottom: 10, borderRadius: 13, background: 'linear-gradient(160deg,rgba(22,18,14,.92),rgba(12,10,8,.96))', border: `1px solid ${s.done ? 'rgba(100,170,100,.22)' : 'rgba(214,140,70,.3)'}` }}>
-            <div onClick={() => { if (s.key === 'handbook_done') return navigate('/handbook'); setOpen(isOpen ? null : s.key) }}
+            <div onClick={() => { if (s.nav) return navigate(s.nav); setOpen(isOpen ? null : s.key) }}
               style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 16, cursor: 'pointer' }}>
               {s.done ? <CheckCircle2 size={20} color="#7faa7f" /> : <Circle size={20} color="#d68c46" />}
               <Icon size={17} color={GOLD} style={{ flexShrink: 0 }} />
