@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Legacy Elite - 員工規章系統</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,900;1,400;1,900&display=swap');
+    body { background-color: #0f0d0c; margin: 0; }
+    .font-serif { font-family: 'Playfair Display', serif; }
+    .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #2a2522; border-radius: 10px; }
+    @keyframes marquee {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-33.33%); }
+    }
+    .animate-marquee {
+      display: inline-flex;
+      animation: marquee 30s linear infinite;
+    }
+    .animate-spin-slow {
+      animation: spin 8s linear infinite;
+    }
+  </style>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+    import { 
+      getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, query, updateDoc, arrayUnion 
+    } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+    
+    window.FirebaseAPI = {
+      initializeApp, getFirestore, collection, doc, setDoc, deleteDoc, 
+      onSnapshot, query, updateDoc, arrayUnion, getAuth, signInAnonymously, onAuthStateChanged
+    };
+  </script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" data-type="module">
+    const { useState, useEffect, useMemo } = React;
+
+    // ==========================================
+    // 1. 您的專屬 Firebase 金鑰
+    // ==========================================
+    const firebaseConfig = {
+      apiKey: "AIzaSyA5M4Wj6z_SL-2UnvtKFgrWOc82urRXpXw",
+      authDomain: "w-cigar.firebaseapp.com",
+      projectId: "w-cigar",
+      storageBucket: "w-cigar.firebasestorage.app",
+      messagingSenderId: "577947227465",
+      appId: "1:577947227465:web:4ff4d68e9452e2082a7698",
+      measurementId: "G-1W06W2P357"
+    };
+
+    // V19 升級：獨立欄位、業務人員專區、SOP完全體整合
+    const APP_ID = 'cigar-club-v19-structured-downloads';
+
+    // ==========================================
+    // 2. 規章內容 (1~20章)
+    // ==========================================
+    const INITIAL_DATA = [
+      {
+        id: "sop-chapter-01",
+        title: "第一章 總則 (第1-3條)",
+        category: "admin",
+        content: "【第一條 目的】\n為建立 W CIGAR BAR 門市之合法、明確且可執行之出勤、請假、加班、獎勵與福利管理制度，兼顧門市營運、人員排班、勞工休息權、請假權與薪資計算一致性，特訂定本辦法。\n\n【第二條 法源依據】\n本辦法主要依下列法令訂定：勞動基準法、勞工請假規則、性別平等工作法、菸害防制法及其相關子法、主管機關函釋與公告。\n\n【第三條 適用範圍與優先順序】\n• 本辦法適用於本店受僱之正職、月薪制、時薪制、排班制與其他實際受指揮監督提供勞務之人員。\n• 兼職、工讀或短期人員，如勞動契約另有較優約定者，從其約定；如內部規範低於法令標準者，以法令為準。\n• 本店目前以一般工時制度辦理；如日後有職務擬適用勞基法第84條之1等特殊制度，須另為書面約定並依法報核。",
+        viewCount: 0, comments: [], imageUrl: ""
+      },
+      {
+        id: "sop-chapter-02",
+        title: "第二章 工時、排班與休息 (第4-6條)",
+        category: "admin",
+        content: "【第四條 正常工作時間】\n• 本店採排班制，正常工作時間原則上每日不超過8小時、每週不超過40小時；實際班別以公司公告班表為準。\n• 如有依法採2週、8週或其他變形工時之必要，須於適用前完成工會同意或勞資會議同意等法定程序，並另行公告。\n• 雇主不得以工時調整為由減少勞工原有工資。\n\n【第五條 班表公告與調班】\n• 門市班表原則上應至少於3日前公告；遇臨時營運需求、突發事故或同仁依法請假時，公司得於符合法令前提下調整支援。\n• 員工需調班、換班時，應事前提出並取得主管核准，不得私下互換後未通知店方。\n• 公司排班與調班不得違反法定工時、例假、休息日及輪班間隔規定。\n\n【第六條 休息時間與輪班間隔】\n• 勞工繼續工作4小時，至少應有30分鐘休息；實際休息安排得依現場營運流量由主管調配。\n• 輪班制更換班次時，原則上應保有連續11小時休息時間；如依法適用例外，仍須符合公告行業、同意程序及必要之備查義務。\n• 女性夜間工作(22:00至翌日06:00) 須依勞基法第49條辦理；妊娠或哺乳期間不得排定該時段工作。",
+        viewCount: 0, comments: [], imageUrl: ""
+      },
+      {
+        id: "sop-chapter-03",
+        title: "第三章 考勤與出勤紀錄 (第7-10條)",
+        category: "admin",
+        content: "【第七條 出勤記錄方式】\n• 本店以考勤系統、門市打卡設備、簽到表或其他經公告之方式記錄出勤；員工應依規定親自辦理上下班打卡。\n• 出勤紀錄應逐日記載至分鐘，並由店方保存至少5年；員工得依法申請影本或副本。\n• 員工不得代打卡、冒名簽到、擅改紀錄或以任何方式虛偽登載；違者得依情節另行處理。\n\n【第八條 上班、下班、遲到與早退 (防漏鐵腕條款)】\n• 員工應於班表開始前完成到班準備。為體恤員工通勤狀況，每日上班設有「5 分鐘遲到緩衝時間」，超過緩衝時間始判定為遲到並依實際分鐘數計算扣薪。\n• 未經主管同意，於班表結束前擅自離開工作崗位者，即視為「早退」。針對早退之紀律要求，採【單月累計加重懲處制】：\n  1. 單月首次早退：扣除未出勤工資，並【直接取消當月全勤獎金】。\n  2. 單月累計第二次：除上述扣薪外，將【取消當月所有營運績效與抽成獎金】，並記嚴重警告一次。\n  3. 單月累計第三次(含)以上：視為無故曠職與違反勞動契約情節重大，公司得依《勞動基準法》第12條規定，【不經預告逕行終止勞動契約（直接開除）】，絕不寬貸。\n\n【第九條 漏打卡與補正】\n• 因設備異常、網路中斷或其他正當理由漏打卡者，員工應最遲於次一工作日中午12:00前提出補登申請並說明原因。\n• 主管得依監視紀錄、工作紀錄、交接紀錄、同班證明或其他客觀資料核實補正。\n• 無正當理由頻繁漏打卡者，得列入考核與管理改善。\n\n【第十條 曠職與未到班】\n• 員工未依規定請假、未事前通知且未到班者，原則上視為曠職。\n• 曠職時段之工資不予計給；若涉及勞動契約終止或重大懲處，應依勞基法與相關程序審慎辦理。",
+        viewCount: 0, comments: [], imageUrl: ""
+      },
+      {
+        id: "sop-chapter-04",
+        title: "第四章 加班管理 (第11-15條)",
+        category: "admin",
+        content: "【第十一條 加班之前提】\n• 加班係指經主管指示或核准，於正常工作時間以外提供勞務之情形；未經核准之自行逾時停留，不當然認列為加班。\n• 本店如有使員工延長工作時間之必要，應以已完成法定同意程序為前提。\n\n【第十二條 加班申請與核准流程】\n• 原則上應於加班開始前完成申請並經主管核准；如屬現場突發尖峰、重大客訴或設備異常，可由主管先口頭指示，並於當日下班前補登。\n• 加班紀錄應載明日期、起迄時間、事由、核准主管與補休或加班費之選擇。\n\n【第十三條 加班時數與補休】\n• 加班後之總工時每日不得超過12小時；延長工作時間原則上每月不得超過46小時。\n• 加班後，得依員工意願並經店方同意，以1比1方式安排補休；補休期限屆滿未補休者，應按法定加班費標準折算發給工資。\n\n【第十四條 加班費計算原則】\n• 加班時數起算：實際加班時間需「超過 15 分鐘」後，始開始計算加班費與時數；未達 15 分鐘之短暫停留，視為正常交接緩衝，不予計薪。\n• 平日延長工作2小時內：按平日每小時工資額加給 1/3 以上。\n• 平日再延長2小時內：按平日每小時工資額加給 2/3 以上。\n• 休息日出勤2小時內：按平日每小時工資額另再加給 1又1/3 以上。\n• 休息日出勤超過2小時：按平日每小時工資額另再加給 1又2/3 以上。\n\n【第十五條 例假、休息日與休假日出勤】\n• 員工每7日中應有2日休息，其中1日為例假、1日為休息日。\n• 例假原則上不得使勞工出勤；除天災、事變或突發事件外，不得要求例假工作。",
+        viewCount: 0, comments: [], imageUrl: ""
+      },
+      {
+        id: "sop-chapter-05",
+        title: "第五章 請假與休假 (第16-20條)",
+        category: "admin",
+        content: "【第十六條 請假一般程序】\n• 請假原則上應以系統、LINE、口頭或書面敘明事由、日期與時數；遇急病或緊急事故時，得由本人、家屬或同事代為通知。\n• 可預知之假別，應於事前提出；病假或突發事故應依規定時限通知主管並補件。\n• 店方得依法律要求提出就醫證明、訃聞、喜帖、通知單或其他必要文件，不得以不合理文件要求阻礙合法請假。\n\n【第十七條 特別休假 (特休)】\n• 法定特休日數：到職滿6個月未滿1年給3日；滿1年未滿2年給7日；滿2年未滿3年給10日；滿3年未滿5年給14日；滿5年未滿10年給15日；滿10年以上每年加1日(最高30日)。\n• 本店特休原則採到職週年制計算。\n• 特休日由員工排定；店方僅得因企業經營急迫需求或員工個人因素，與員工協商調整。\n• 年度終結未休完之特休應依法折發工資或協議遞延。\n\n【第十八條 事假、普通傷病假、公傷病假與公假】\n• 事假：1年內合計14日，不給薪。\n• 普通傷病假：未住院1年內合計30日(半薪)；住院2年內合計1年。\n• 公傷病假：治療、休養期間工資照給。\n• 公假：視實際需要，工資照給。\n\n【第十九條 婚假、喪假與家庭照顧假】\n• 婚假：8日 (工資照給)。\n• 喪假：依勞工請假規則核給。\n• 家庭照顧假：全年7日(併入事假計算)。\n\n【第二十條 其他依法令假別】\n• 生理假、產假、產檢假、陪產檢及陪產假等依性別平等工作法辦理。",
+        viewCount: 0, comments: [], imageUrl: ""
+      },
+      {
+        id: "sop-chapter-06",
+        title: "第六章 薪資、全勤與禁止違法扣罰 (第21-22條)",
+        category: "admin",
+        content: "【第二十一條 請假期間薪資與全勤獎金處理】\n• 工資之給付、加班費、未休特休折工資與各類假別薪資，均應依各該法令之最低標準計算。\n• 普通傷病假之全勤獎金，如依法得調整者，僅得按病假日數或病假時數比例計算，不得整筆直接扣除；建議以「全勤獎金月額 × 病假時數 ÷ 當月應出勤總時數」為上限公式。\n• 事假、曠職或其他無薪時段，得依法不計薪或按未提供勞務時間折算。\n\n【第二十二條 不得預扣工資或處以固定罰款】\n• 雇主不得預扣勞工工資作為違約金、賠償費用或固定金額罰款。\n• 員工若有遲到、早退、漏打卡、未依流程申請等情形，店方將依實際未出勤時間扣除薪資、取消獎金，並採教育訓練、考核改善或依法處理，但不會逕以固定金額從薪資中扣罰。\n• 涉及損害賠償者，應依實際損害、證據與法律程序個案處理，不得概括約定自薪資直接扣除。",
+        viewCount: 0, comments: [], imageUrl: ""
+      },
+      {
+        id: "sop-chapter-07",
+        title: "第七章 獎勵與福利制度 (第23-27條)",
+        category: "benefit",
+        content: "【第二十三條 會員開發與開櫃獎金】\n• 員工成功協助公司開立會員(開櫃)，且該會員完成建檔、申請資料無誤、會員費或應收款項全額入帳並正式生效者，每件發給新臺幣 5,000 元會員開發獎金。\n• 同一會員以首次成功成立且可歸責單一主辦員工者為限；如屬多人共同開發、轉介或歸屬不明，由主管依實際貢獻以書面認定分配比例。\n• 會員開發獎金原則於會員會籍生效且款項確認入帳後，隨次月薪資或最近一期獎金結算日發放。\n\n【第二十四條 門市營業額 3% 團隊績效獎勵】\n• 以每月門市有效營業額中「扣除老闆及老闆娘個人業績後」之金額作為計算基礎。\n• 當月計算基礎超過新臺幣 300,000 元者，就超過部分提撥 3% 作為團隊績效獎勵金。\n• 退款、折讓、作廢、未入帳、呆帳、非公司正式認列之收入，均不列入計算。\n• 團隊績效獎勵金之分配，由公司依當月實際出勤、職務責任、業績貢獻、會員開發、現場支援度及整體考核紀錄綜合核定，並於結算後公告或個別通知。\n\n【第二十五條 員工雪茄品鑑獎勵】\n• 公司原則上每月提供每位在職員工 1 支非古巴雪茄及 1 支古巴雪茄之品鑑獎勵標準。\n• 前項獎勵僅限年滿20歲且依法得接觸菸品之員工，並應完成內部領用、登記或公司指定之品鑑程序。\n• 本項福利不得折現、不得轉售，亦不得提供予未滿20歲之人。\n\n【第二十六條 晚餐、員工聚會與集團尾牙福利】\n• 公司每日晚間得提供員工晚餐食材、餐費額度或餐點，由員工於公司指定區域內自行烹飪或用餐。\n• 公司原則上每月辦理 1 次員工聚會，作為團隊交流、慰勞與凝聚向心力之福利活動。\n• 公司原則上每年辦理或安排員工參加集團尾牙；實際日期、地點、參與資格與活動形式，依公司公告為準。\n\n【第二十七條 獎勵與福利之法律性質】\n• 會員開發獎金、營業額績效獎勵等給付，如依法應認列為工資者，仍依勞動法令辦理相關計算與申報。\n• 晚餐、聚會、尾牙與雪茄品鑑福利，原則屬公司福利措施，除公司另有公告外，不得請求折現、補發或要求轉換為固定現金。",
+        viewCount: 0, comments: [], imageUrl: ""
+      },
+      {
+        id: "sop-chapter-08",
+        title: "第八章 申訴、附則與實施 (第28-30條)",
+        category: "admin",
+        content: "【第二十八條 申訴與查詢】\n• 員工對排班、出勤紀錄、請假核算、加班費、特休餘額、獎金分配或薪資明細有疑義者，得向直屬主管、店長或指定管理人員提出查詢。\n• 店方應於合理期間內查核並回覆，必要時更正出勤、薪資或獎金資料。\n• 如經內部溝通仍有爭議，得依勞動主管機關申訴、調解或其他法定程序處理。\n\n【第二十九條 30人以上工作規則報核提醒】\n• 本店如僱用勞工人數達30人以上，應依勞動基準法第70條於法定期間內訂立工作規則並報請當地主管機關核備；本辦法得作為工作規則考勤、請假、獎金與福利章節之基礎文本。\n\n【第三十條 施行與修正】\n• 本辦法經公告後施行，修正時亦同；如法令修正導致本辦法部分條文低於法令標準時，自法令生效日起，逕依法令較優規定辦理。",
+        viewCount: 0, comments: [], imageUrl: ""
+      },
+      {
+        id: "sop-chapter-09",
+        title: "第九章 離職預告與交接規範",
+        category: "admin",
+        content: "【第三十一條 離職預告期間】\n員工因個人因素自請離職，應依勞動基準法第15條及第16條規定，提前提出書面預告：\n1. 到職「未滿三個月」以內者，內部不需提前預告。\n2. 繼續工作三個月以上一年未滿者，於十日前預告。\n3. 繼續工作一年以上三年未滿者，於二十日前預告。\n4. 繼續工作三年以上者，於三十日前預告。\n\n【第三十二條 離職交接程序】\n• 員工離職前，應確實完成業務交接，包含：門禁鑰匙歸還、經手之會員與客源資料移交、制服與公司配發之設備歸還。\n• 交接清冊須經直屬主管或店長確認並簽名。未確實完成交接手續致生公司損害（如雪茄酒水庫存短少、設備毀損等），公司得循法律途徑要求賠償。\n• 離職當月工資及未休完之特休代金，將於完成交接手續後，於次月公司發薪日一併結算匯入原薪資帳戶。\n\n【第三十三條 營業秘密與競業禁止】\n員工任職期間所知悉之公司機密（如會員名單、VIP消費偏好、進貨成本、酒水調配配方等），離職後仍負有保密義務，不得洩漏或不當使用。若有違反致生公司損害者，公司將依法追究相關責任。",
+        viewCount: 0, comments: [], imageUrl: ""
+      },
+      {
+        id: "sop-chapter-10",
+        title: "第十章 線上人事申請與表單專區",
+        category: "download",
+        content: "各項非日常之人事異動申請，請點擊下方連結填寫：\n\n【請假與調班申請單】\n員工請假、病假、事假、特休或調班，一律點擊下方網址填寫。病假與婚喪假需於表單內上傳證明文件：\n👉 https://docs.google.com/forms/d/e/1FAIpQLSeAHrwtQSzyeUH-lANhu324K_Oqq5-0R_EP20vdnao96-uE5Q/viewform\n\n【新進員工入職登記表】\n新人報到前或當日，請備妥「身分證正反面」與「存摺封面」照片，點擊下方網址填寫並上傳資料：\n👉 https://docs.google.com/forms/d/e/1FAIpQLSfbNGSiqMXnNeJAqGe2h0o0XEyUpQX5DUsn_SQLKYGiEjcU1w/viewform\n\n【員工離職申請與交接單】\n員工自請離職時，需依本規章第九章預告期提出，並於最後工作日點擊下方網址填寫交接單：\n👉 https://docs.google.com/forms/d/e/1FAIpQLSd30OChS3_hy2dz_UlcV_k-yCpsvjf5XyplHAtrPfD4-JjEKw/viewform",
+        viewCount: 0, comments: [], imageUrl: ""
+      },
+      {
+        id: "sop-chapter-11",
+        title: "第十一章 人事合約與業務下載區",
+        category: "download",
+        content: "同仁可隨時點擊連結下載或列印相關人事合約備用：\n\n【新人入職必簽合約下載】\n1. 正職人員聘用契約書：\n👉 https://drive.google.com/file/d/1tB9bxLNdSA66coeTVwTRn05cfG9Wwjus/view?usp=drive_link\n2. 兼職員工聘用附加條款：\n👉 https://drive.google.com/file/d/19Od_OJf6owcKaYvp1M1w0rmOms6H50YN/view?usp=drive_link\n3. 員工保密與個資保護條款：\n👉 https://drive.google.com/file/d/1iJJycFM11Rf5b3729SBpFD05tEfaFUn7/view?usp=drive_link\n\n【業務人員專屬下載專區】\n1. 兼職外勤補貨與通路支援人員管理辦法暨簽收確認書：\n👉 https://drive.google.com/file/d/1Y7iMtOO1uVNr-6Bmoqf3mtZhX03yqsxK/view?usp=drive_link\n2. 業務人員保密、客戶資料保護及離職後競業禁止協議書：\n👉 https://drive.google.com/file/d/1Qp7UFf04Hg0e_bLZM4Q9YhTBf_Q37MMJ/view?usp=drive_link",
+        viewCount: 0, comments: [], imageUrl: ""
+      },
+      {
+        id: "sop-chapter-12",
+        title: "第十二章 兼職人員保險聲明書 (專區)",
+        category: "download",
+        content: "【兼職/部分工時人員專用】\n兼職同仁到職時，請務必列印並簽署此《勞工保險及全民健康保險投保狀況聲明書》以釐清投保責任：\n👉 https://drive.google.com/file/d/1Z_8MRhQVzuTozvYd5Z6THjtL6z4hLLyK/view?usp=drive_link",
+        viewCount: 0, comments: [], imageUrl: ""
+      },
+      {
+        id: "sop-chapter-13",
+        title: "第十三章 客戶存酒領取單 (專區)",
+        category: "download",
+        content: "【門市營運專用】\n為保障客戶權益與公司資產，客戶親自或委託領取存放之威士忌/酒水時，請務必列印此單請客戶簽收確認並歸檔：\n👉 https://drive.google.com/file/d/14H1JRczo-K3fbk8HBVQ38_HpiH5ApGHt/view?usp=drive_link",
+        viewCount: 0, comments: [], imageUrl: ""
+      },
+      {
+        id: "sop-chapter-14",
+        title: "第十四章 會員制度專業列印版 (專區)",
+        category: "download",
+        content: "【門市推廣專用】\nW CIGAR BAR 會員制度完整說明。門市幹部可列印此專業版 DM，放置於店內或於推廣時供VIP客戶參閱：\n👉 https://drive.google.com/file/d/10KC02_heCrQG8hdRllBQd6vA58AiTUEh/view?usp=drive_link",
+        viewCount: 0, comments: [], imageUrl: ""
+      },
+      {
+        id: "sop-chapter-15",
+        title: "第十五章 職災醫療與福利營運表單",
+        category: "download",
+        content: "【職災與醫療因應表單下載】\n⚠️ 發生職業災害或緊急送醫時，請店長/主管務必下載並填寫以下表單以維護勞資雙方權益：\n1. 員工職災事故通報單：\n👉 https://drive.google.com/file/d/19ub9XLaIiok9Ain3jUZrOODAV4qc3ri3/view?usp=drive_link\n2. 送醫與醫療文件追蹤表：\n👉 https://drive.google.com/file/d/1jdN_aTGaxSTVaUMIcxlBwmx0xl53mFWM/view?usp=drive_link\n3. 復工評估與工作調整確認單：\n👉 https://drive.google.com/file/d/1DnnIhpHE7ADqGT6Or3S2xxqD2Lw_GLvJ/view?usp=drive_link\n\n【員工福利營運表單下載】\n1. 員工福利雪茄領用紀錄表 (領用雪茄時列印填寫)：\n👉 https://docs.google.com/spreadsheets/d/1vebvGFvuoaH4qzK3EW9_NRBz333EjOeG/edit?usp=drive_link&ouid=114035606425274644543&rtpof=true&sd=true",
+        viewCount: 0, comments: [], imageUrl: ""
+      },
+      {
+        id: "sop-chapter-16",
+        title: "第十六章 門市日常 SOP 執行系統入口",
+        category: "admin",
+        content: "【日常營運與晚間關帳必填】\n⚠️ 這是正式版本的每日 SOP 系統，所有門市人員「每日關帳」務必點擊此連結進入填寫回報，主管將透過此系統進行追蹤考核：\n\n🎓 W CIGAR BAR 專屬 SOP 執行系統（正式版）：\n👉 https://script.google.com/macros/s/AKfycbzKBmkp6Y2GFARZdYAye0tkEiJf2_ANYbxayN-vmD87wQ1irnlb5pNHiPPxidmUlMfw/exec\n\n📄 Simpos 點單與關帳 SOP合約版下載：\n👉 https://drive.google.com/file/d/1KkugSJa7R-cZ8DQ3hTT5c9kQVorPZX01/view?usp=drive_link\n\n📄 Simpos 點單與關帳 圖文版下載：\n👉 https://drive.google.com/file/d/1BJPjPc2zDSCALUlj-RVlX8B5Fc53bHF1/view?usp=drive_link",
+        viewCount: 0, comments: [], imageUrl: ""
+      },
+      {
+        id: "sop-chapter-17",
+        title: "第十七章 Simpos 點單與晚間關帳規範",
+        category: "admin",
+        content: "【執行原則】\n先確認、再出單、後結帳、當日清結。\n\n【一、點單流程】\n1. 點入對應桌號後，先確認客人身分與來源。\n2. 熟客請使用「選取客戶」帶入；未建檔者先新增資料。\n3. 特殊情況於備註欄填寫 (老闆招待、折扣說明等)。\n4. 正確輸入餐點與雪茄，確認價格折扣無誤。\n5. 務必勾選「開立發票」與「明細」。\n6. 依型態選擇「立即結帳」或「稍後結帳」。\n7. 一旦點選後即不可任意更動，請做最終確認。\n8. 送單完成請出單；全上齊請點選「整單出餐」。\n\n【二、結帳流程】\n1. 確認該桌全品項皆已完整輸入。\n2. 確認付款方式並詢問是否需統一編號。\n3. 勾選正確付款方式與開立發票，點選確定。\n4. 若停留原頁面，再次檢查是否完成收款。\n5. 完成離場作業並提醒客戶五星好評。\n\n【三、晚間關帳流程】\n1. 後台 > 報表 > 金流日報表 > 表格記錄。\n2. 檢視有金額的訂單並點選放大鏡，執行列印/出單。\n3. 列印 A4 銷貨明細，來源須正確(珊珊/Wilson友須手寫備註)。\n4. 明細與付款簽單釘好；現金單無須附簽單。\n5. AC Pay 信用卡機：結帳作業 > 結帳。\n6. 台灣企銀刷卡機：選單 > 結帳 > 全部結帳。\n7. 填寫每日營業報表，核對刷卡機與 Simpos 金額相符；清機條釘於報表右上角。\n8. 明細放入指定資料夾。\n9. 盤點收銀機內零用金維持 10,000 元。\n10. 現金營收放黑色帳包，附紙條(日期、金額、負責人)收妥。",
+        viewCount: 0, comments: [], imageUrl: ""
+      },
+      {
+        id: "sop-chapter-18",
+        title: "第十八章 古巴雪茄評鑑指南與測驗",
+        category: "training",
+        content: "為維持 W CIGAR BAR 頂級侍茄服務水準，所有新進同仁與門市幹部皆須完成此【古巴雪茄評鑑】專業知識培訓。\n\n📄 培訓教材 PDF 下載 (請先熟讀)：\n👉 https://drive.google.com/file/d/1RfLr1G1JHt9zBlJkwbb99IL7yZsAcJNZ/view?usp=drive_link\n\n📝 課後線上測驗 (必考)：\n閱讀指南完畢後，請點擊下方連結進行線上考試測驗，您的測驗考核結果將列入後續獎金與升遷之績效評估：\n👉 https://gemini.google.com/share/820d5799dff5",
+        viewCount: 0, comments: [], imageUrl: ""
+      },
+      {
+        id: "sop-chapter-19",
+        title: "第十九章 Capadura 雪茄基礎培訓與測驗",
+        category: "training",
+        content: "本章節為 Capadura 品牌專屬培訓，請各位同仁務必熟讀品牌核心與基礎侍茄知識。\n\n📄 培訓教材 PDF 下載 (請先熟讀)：\n👉 https://drive.google.com/file/d/1Y7iMtOO1uVNr-6Bmoqf3mtZhX03yqsxK/view?usp=drive_link\n(註：此為暫代連結，請依實際檔案更新)\n\n📝 課後線上測驗 (必考)：\n閱讀完畢後，請點擊下方連結進行線上考試測驗，確認已完全吸收品牌知識：\n👉 https://gemini.google.com/share/6fdc559c5fb0",
+        viewCount: 0, comments: [], imageUrl: ""
+      },
+      {
+        id: "sop-chapter-20",
+        title: "第二十章 古巴雪茄進階—珍藏與限量版",
+        category: "training",
+        content: "針對高階客群服務，請門市幹部與進階侍茄師精準掌握古巴雪茄各類特殊版本（珍藏版、限量版、陳年版、年度限量）之差異。\n\n📄 培訓教材 PDF 下載 (請先熟讀)：\n👉 https://drive.google.com/file/d/10XgRfLC7930x9YHDsPQ8OD0UekWS9Aqn/view?usp=drive_link\n\n📝 課後線上測驗 (必考)：\n閱讀完畢後，請點擊下方連結進行進階線上考試測驗：\n👉 https://gemini.google.com/share/dec8e550b705",
+        viewCount: 0, comments: [], imageUrl: ""
+      }
+    ];
+
+    const CATEGORIES = [
+      { id: 'admin', name: '員工管理規章', icon: 'fa-book', color: 'from-stone-700 to-stone-900' },
+      { id: 'benefit', name: '員工激勵回饋', icon: 'fa-gift', color: 'from-amber-600 to-amber-900' },
+      { id: 'training', name: '教育訓練與考核', icon: 'fa-graduation-cap', color: 'from-emerald-700 to-emerald-900' },
+      { id: 'download', name: '表單與合約下載', icon: 'fa-download', color: 'from-blue-700 to-blue-900' }
+    ];
+
+    function App() {
+      const [appInited, setAppInited] = useState(false);
+      const [user, setUser] = useState(null);
+      const [regulations, setRegulations] = useState([]);
+      const [searchTerm, setSearchTerm] = useState('');
+      const [selectedCategory, setSelectedCategory] = useState('all');
+      const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+      const [activeReg, setActiveReg] = useState(null);
+      const [isAdmin, setIsAdmin] = useState(false);
+      const [showAdminPanel, setShowAdminPanel] = useState(false);
+      const [message, setMessage] = useState(null);
+      const [questionText, setQuestionText] = useState('');
+      const [dbInfo, setDbInfo] = useState({ db: null, auth: null });
+
+      const [form, setForm] = useState({ id: '', title: '', content: '', category: 'admin', imageUrl: '' });
+
+      useEffect(() => {
+        const timer = setInterval(() => {
+          if (window.FirebaseAPI) {
+            clearInterval(timer);
+            try {
+              const app = window.FirebaseAPI.initializeApp(firebaseConfig);
+              const db = window.FirebaseAPI.getFirestore(app);
+              const auth = window.FirebaseAPI.getAuth(app);
+              setDbInfo({ db, auth });
+              setAppInited(true);
+            } catch (e) {
+              console.error("Firebase 初始化失敗。請確認設定檔。", e);
+            }
+          }
+        }, 100);
+        return () => clearInterval(timer);
+      }, []);
+
+      useEffect(() => {
+        if (!appInited) return;
+        const { db, auth } = dbInfo;
+        const { signInAnonymously, onAuthStateChanged, collection, query, onSnapshot, doc, setDoc } = window.FirebaseAPI;
+
+        signInAnonymously(auth).catch(e => console.error(e));
+        
+        const unsubAuth = onAuthStateChanged(auth, (u) => u && setUser(u));
+
+        const path = `/artifacts/${APP_ID}/public/data/regulations`;
+        const q = query(collection(db, path));
+        
+        const unsubDb = onSnapshot(q, (snapshot) => {
+          if (snapshot.empty) {
+            console.log("偵測到空資料庫，正在初始化 V19 完全體版...");
+            INITIAL_DATA.forEach(async (item) => {
+              await setDoc(doc(db, path, item.id), {
+                ...item,
+                updatedAt: new Date().toISOString()
+              });
+            });
+          } else {
+            const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => {
+               const numA = parseInt(a.id.split('-').pop());
+               const numB = parseInt(b.id.split('-').pop());
+               return numA - numB;
+            });
+            setRegulations(data);
+          }
+        });
+
+        return () => { unsubAuth(); unsubDb(); };
+      }, [appInited]);
+
+      const filteredRegs = useMemo(() => {
+        return regulations.filter(reg => {
+          const matchesSearch = reg.title?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                              reg.content?.toLowerCase().includes(searchTerm.toLowerCase());
+          const matchesCategory = selectedCategory === 'all' || reg.category === selectedCategory;
+          return matchesSearch && matchesCategory;
+        });
+      }, [regulations, searchTerm, selectedCategory]);
+
+      const progress = useMemo(() => {
+        if (regulations.length === 0) return 0;
+        const readCount = regulations.filter(r => r.viewCount > 0).length;
+        return Math.round((readCount / regulations.length) * 100);
+      }, [regulations]);
+
+      const showToast = (txt) => {
+        setMessage(txt);
+        setTimeout(() => setMessage(null), 3000);
+      };
+
+      const handleSave = async (e) => {
+        e.preventDefault();
+        const { db } = dbInfo;
+        const { doc, setDoc } = window.FirebaseAPI;
+        const id = form.id || `sop-custom-${Date.now()}`;
+        const path = `/artifacts/${APP_ID}/public/data/regulations`;
+        try {
+          await setDoc(doc(db, path, id), {
+            ...form, id, updatedAt: new Date().toISOString(),
+            viewCount: form.viewCount || 0, comments: form.comments || []
+          }, { merge: true });
+          showToast("規章已同步至雲端");
+          setShowAdminPanel(false);
+          setForm({ id: '', title: '', content: '', category: 'admin', imageUrl: '' });
+        } catch (e) { showToast("權限不足或網路錯誤"); }
+      };
+
+      const handleDelete = async (id) => {
+        if(!confirm("確定要刪除這條規章嗎？")) return;
+        const { db } = dbInfo;
+        const { doc, deleteDoc } = window.FirebaseAPI;
+        const path = `/artifacts/${APP_ID}/public/data/regulations`;
+        try {
+          await deleteDoc(doc(db, path, id));
+          showToast("已刪除該制度");
+        } catch (e) { showToast("刪除失敗"); }
+      };
+
+      const handleAddComment = async () => {
+        if (!questionText.trim()) return;
+        const { db } = dbInfo;
+        const { doc, updateDoc, arrayUnion } = window.FirebaseAPI;
+        const path = `/artifacts/${APP_ID}/public/data/regulations`;
+        try {
+          await updateDoc(doc(db, path, activeReg.id), {
+            comments: arrayUnion({
+              user: user?.uid.substring(0, 6) || 'Guest',
+              text: questionText,
+              time: new Date().toISOString(),
+              isAdmin: isAdmin
+            })
+          });
+          setQuestionText('');
+          showToast("問題已送出，管理者將盡快回覆");
+        } catch (e) { showToast("傳送失敗"); }
+      };
+
+      const renderContentWithLinks = (text) => {
+        const urlRegex = /(https?:\/\/[^\s]+)/g;
+        return text.split(urlRegex).map((part, i) => {
+          if (part.match(urlRegex)) {
+            return (
+              <a key={i} href={part} target="_blank" rel="noopener noreferrer" 
+                 className="text-amber-500 underline hover:text-amber-300 break-all font-bold">
+                {part}
+              </a>
+            );
+          }
+          return <span key={i}>{part}</span>;
+        });
+      };
+
+      if (!appInited) return <div className="min-h-screen bg-[#0f0d0c] flex items-center justify-center text-amber-500 font-serif text-2xl animate-pulse">Initializing System...</div>;
+
+      return (
+        <div className="min-h-screen bg-[#0f0d0c] text-stone-300 font-sans selection:bg-amber-800/30">
+          
+          <div className="bg-[#1a1614] border-b border-amber-900/10 py-2 overflow-hidden shadow-sm">
+            <div className="flex items-center gap-12 animate-marquee whitespace-nowrap">
+              {[1,2,3].map(i => (
+                <span key={i} className="flex items-center gap-3 text-[10px] font-bold text-amber-600/80 uppercase tracking-[0.3em]">
+                  <i className="fas fa-sparkles text-xs"></i> W CIGAR BAR CAPADURA • 卓越是我們的唯一標準 • 尊重雪茄，尊重賓客
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <header className="sticky top-0 z-50 bg-[#0f0d0c]/90 backdrop-blur-2xl border-b border-white/5 px-6 py-4 flex items-center justify-between shadow-2xl">
+            <div className="flex items-center gap-5">
+              <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 lg:hidden text-stone-500 hover:text-amber-500 transition-colors">
+                <i className={`fas ${isSidebarOpen ? 'fa-times' : 'fa-bars'} text-xl`}></i>
+              </button>
+              <div className="flex flex-col">
+                <h1 className="text-xl md:text-2xl font-serif italic tracking-tighter text-amber-100">
+                  W CIGAR <span className="text-amber-500 not-italic font-sans font-black uppercase tracking-widest ml-1">Elite</span>
+                </h1>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                  <p className="text-[8px] text-stone-500 tracking-[0.4em] font-bold uppercase">System Online • 獨立下載與合約整合版</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <div className="hidden md:flex flex-col items-end mr-4">
+                <span className="text-[10px] font-bold text-stone-500 uppercase tracking-widest">我的學習進度</span>
+                <div className="w-32 h-1 bg-stone-800 rounded-full mt-1 overflow-hidden">
+                  <div className="h-full bg-amber-500 transition-all duration-1000" style={{ width: `${progress}%` }}></div>
+                </div>
+              </div>
+              <button 
+                onClick={() => {
+                  if (isAdmin) {
+                    setIsAdmin(false);
+                    showToast("已登出管理員模式");
+                  } else {
+                    const pwd = prompt("【權限驗證】\n請輸入店長專屬密碼：");
+                    if (pwd === "w168") {
+                      setIsAdmin(true);
+                      showToast("管理員身分驗證成功");
+                    } else if (pwd !== null) {
+                      alert("密碼錯誤！這不是您可以亂按的地方喔 🚬");
+                    }
+                  }
+                }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-full border text-[10px] font-bold transition-all ${isAdmin ? 'bg-amber-600 border-amber-500 text-white shadow-lg shadow-amber-900/40' : 'border-stone-800 text-stone-500 hover:border-amber-900/50 hover:text-stone-300'}`}
+              >
+                <i className={`fas fa-cog ${isAdmin ? 'animate-spin-slow' : ''}`}></i>
+                {isAdmin ? 'ADMIN ACTIVE' : 'MANAGER LOGIN'}
+              </button>
+            </div>
+          </header>
+
+          <div className="max-w-[1800px] mx-auto flex h-[calc(100vh-84px)]">
+            
+            <aside className={`
+              fixed lg:relative inset-y-0 left-0 z-40 w-80 bg-[#0a0908] border-r border-white/5 
+              transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} 
+              lg:translate-x-0 transition-transform duration-700 p-8 flex flex-col
+            `}>
+              <div className="mb-12">
+                <div className="flex items-center gap-4 mb-8 p-4 bg-stone-900/30 rounded-2xl border border-white/5">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-500 to-amber-900 flex items-center justify-center shadow-inner">
+                    <i className="fas fa-user text-white text-xl"></i>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-amber-500 uppercase tracking-widest">Staff Portal</p>
+                    <p className="text-[10px] text-stone-500 font-mono mt-0.5">UID: {user?.uid.substring(0,8) || 'Wait'}</p>
+                  </div>
+                </div>
+
+                <h2 className="text-[9px] font-black text-stone-600 uppercase tracking-[0.5em] mb-6 px-2 italic">Essential Navigation</h2>
+                <nav className="space-y-2">
+                  <button 
+                    onClick={() => { setSelectedCategory('all'); setIsSidebarOpen(false); }}
+                    className={`w-full flex items-center justify-between px-4 py-3.5 rounded-xl text-sm transition-all group ${selectedCategory === 'all' ? 'bg-[#1a1614] text-amber-500 border border-amber-900/20' : 'text-stone-500 hover:text-stone-200'}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <i className="fas fa-file-alt"></i>
+                      <span className="font-bold">全部規章</span>
+                    </div>
+                    <span className="text-[10px] bg-stone-800 px-2 py-0.5 rounded text-stone-400">{regulations.length}</span>
+                  </button>
+                </nav>
+              </div>
+
+              <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
+                <h2 className="text-[9px] font-black text-stone-600 uppercase tracking-[0.5em] mb-6 px-2 italic">Policy Categories</h2>
+                <nav className="space-y-1.5">
+                  {CATEGORIES.map(cat => (
+                    <button 
+                      key={cat.id}
+                      onClick={() => { setSelectedCategory(cat.id); setIsSidebarOpen(false); }}
+                      className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm transition-all group relative overflow-hidden ${selectedCategory === cat.id ? 'text-amber-100' : 'text-stone-500 hover:text-stone-300'}`}
+                    >
+                      {selectedCategory === cat.id && <div className={`absolute inset-0 bg-gradient-to-r ${cat.color} opacity-20`}></div>}
+                      <div className={`p-2 rounded-lg w-8 h-8 flex items-center justify-center bg-stone-900 group-hover:bg-stone-800 transition-colors ${selectedCategory === cat.id ? 'text-amber-500' : ''}`}>
+                        <i className={`fas ${cat.icon}`}></i>
+                      </div>
+                      <span className="font-bold tracking-wide relative z-10">{cat.name}</span>
+                    </button>
+                  ))}
+                </nav>
+              </div>
+            </aside>
+
+            <main className="flex-1 overflow-y-auto bg-[#0f0d0c] p-6 lg:p-16 custom-scrollbar relative">
+              <div className="max-w-5xl mx-auto relative z-10">
+                <div className="flex flex-col md:flex-row gap-6 mb-16 items-center">
+                  <div className="relative flex-1 w-full">
+                    <div className="absolute left-6 top-1/2 -translate-y-1/2 text-amber-900/50">
+                      <i className="fas fa-search text-lg"></i>
+                    </div>
+                    <input 
+                      type="text"
+                      placeholder="搜尋規章條文、表單連結或教育訓練..."
+                      className="w-full bg-[#161311] border border-white/5 rounded-3xl py-6 pl-16 pr-8 text-stone-200 focus:outline-none focus:border-amber-900/30 focus:ring-8 focus:ring-amber-900/5 transition-all shadow-2xl placeholder:text-stone-700 text-lg"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+                  
+                  {isAdmin && (
+                    <button 
+                      onClick={() => { setForm({ id: '', title: '', content: '', category: 'admin', imageUrl: '' }); setShowAdminPanel(true); }}
+                      className="w-full md:w-auto flex items-center justify-center gap-3 bg-gradient-to-br from-amber-500 to-amber-700 hover:from-amber-400 hover:to-amber-600 text-white px-10 py-6 rounded-3xl font-black uppercase text-xs tracking-widest transition-all shadow-2xl shadow-amber-900/30 active:scale-95"
+                    >
+                      <i className="fas fa-plus"></i> 撰寫新制度
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {filteredRegs.length > 0 ? (
+                    filteredRegs.map(reg => (
+                      <div 
+                        key={reg.id}
+                        onClick={() => setActiveReg(reg)}
+                        className="group bg-gradient-to-b from-[#1a1614] to-[#120f0e] border border-white/5 rounded-[2.5rem] p-8 hover:border-amber-900/30 transition-all cursor-pointer relative overflow-hidden shadow-xl"
+                      >
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-amber-900/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        
+                        <div className="flex items-center justify-between mb-8">
+                          <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest bg-gradient-to-r ${CATEGORIES.find(c => c.id === reg.category)?.color} text-white shadow-lg`}>
+                            {CATEGORIES.find(c => c.id === reg.category)?.name}
+                          </span>
+                          {reg.viewCount > 0 && <i className="fas fa-check-circle text-green-800/50 text-lg"></i>}
+                        </div>
+
+                        <h3 className="text-2xl font-serif text-amber-100 mb-4 group-hover:text-amber-400 transition-colors leading-tight">{reg.title}</h3>
+                        <p className="text-stone-500 leading-relaxed line-clamp-2 text-sm font-light italic whitespace-pre-line">
+                          {reg.content}
+                        </p>
+
+                        <div className="mt-8 flex items-center justify-between pt-6 border-t border-white/5">
+                          <div className="flex items-center gap-4">
+                            <span className="text-[10px] text-stone-600 font-bold uppercase"><i className="fas fa-eye mr-1"></i> {reg.viewCount || 0} 已閱</span>
+                            <span className="text-[10px] text-stone-600 font-bold uppercase"><i className="fas fa-comment mr-1"></i> {reg.comments?.length || 0} 討論</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-amber-600 group-hover:translate-x-1 transition-transform">
+                            <span className="text-[10px] font-black uppercase tracking-tighter">閱讀全文</span>
+                            <i className="fas fa-chevron-right text-xs"></i>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="col-span-full py-32 text-center bg-[#161311] rounded-[3rem] border border-dashed border-white/5">
+                      <div className="w-20 h-20 bg-stone-900 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <i className="fas fa-search text-3xl text-stone-700"></i>
+                      </div>
+                      <h4 className="text-stone-400 font-serif italic text-xl">「在這片煙霧中，尚未尋得您所求」</h4>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </main>
+          </div>
+
+          {showAdminPanel && (
+            <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+              <div className="absolute inset-0 bg-black/95 backdrop-blur-md" onClick={() => setShowAdminPanel(false)}></div>
+              <div className="relative w-full max-w-2xl bg-[#161311] border border-amber-900/20 rounded-[3rem] shadow-2xl overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-1 bg-amber-500"></div>
+                <form onSubmit={handleSave} className="p-10">
+                  <div className="flex justify-between items-center mb-10">
+                    <h2 className="text-3xl font-serif italic text-white tracking-tight">策劃規章內容</h2>
+                    <button type="button" onClick={() => setShowAdminPanel(false)} className="p-2 text-stone-600 hover:text-white"><i className="fas fa-times text-2xl"></i></button>
+                  </div>
+
+                  <div className="space-y-8">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="col-span-2">
+                        <label className="text-[10px] font-black text-amber-600 uppercase tracking-widest block mb-3 px-1">規章標題</label>
+                        <input required className="w-full bg-[#0a0908] border border-white/5 rounded-2xl p-5 text-stone-100 focus:outline-none focus:border-amber-900/50 transition-all" value={form.title} onChange={(e) => setForm({...form, title: e.target.value})} placeholder="標題需簡潔有力..."/>
+                      </div>
+                      {CATEGORIES.map(c => (
+                        <button key={c.id} type="button" onClick={() => setForm({...form, category: c.id})} className={`py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border ${form.category === c.id ? 'bg-amber-600 text-white border-amber-500 shadow-xl' : 'bg-[#0a0908] text-stone-600 border-white/5 hover:border-stone-700'}`}>
+                          {c.name}
+                        </button>
+                      ))}
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-black text-amber-600 uppercase tracking-widest block mb-3 px-1">圖鑑 URL (可選)</label>
+                      <div className="relative">
+                        <i className="fas fa-image absolute left-4 top-1/2 -translate-y-1/2 text-stone-700"></i>
+                        <input className="w-full bg-[#0a0908] border border-white/5 rounded-2xl p-5 pl-12 text-stone-100 focus:outline-none focus:border-amber-900/50 transition-all" value={form.imageUrl} onChange={(e) => setForm({...form, imageUrl: e.target.value})} placeholder="https://..."/>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-black text-amber-600 uppercase tracking-widest block mb-3 px-1">詳細條文</label>
+                      <textarea required rows={6} className="w-full bg-[#0a0908] border border-white/5 rounded-2xl p-5 text-stone-300 focus:outline-none focus:border-amber-900/50 transition-all resize-none leading-relaxed" value={form.content} onChange={(e) => setForm({...form, content: e.target.value})} placeholder="請輸入制度細節，貼上網址會自動變成連結..."/>
+                    </div>
+                  </div>
+
+                  <div className="mt-12 flex gap-4">
+                    <button type="submit" className="flex-1 py-6 rounded-3xl bg-white text-black font-black uppercase text-xs tracking-[0.2em] shadow-2xl hover:bg-amber-500 hover:text-white transition-all">確認發佈制度</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {activeReg && (
+            <div className="fixed inset-0 z-[65] flex items-center justify-center p-4">
+              <div className="absolute inset-0 bg-black/98 backdrop-blur-xl" onClick={() => setActiveReg(null)}></div>
+              <div className="relative w-full max-w-4xl max-h-[90vh] flex flex-col bg-[#0f0d0c] border border-white/5 rounded-[4rem] overflow-hidden shadow-2xl">
+                <div className={`h-2 bg-gradient-to-r ${CATEGORIES.find(c => c.id === activeReg.category)?.color}`}></div>
+                
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-10 md:p-20">
+                  <div className="flex justify-between items-start mb-12">
+                    <div>
+                      <span className="text-[10px] font-black text-amber-500 uppercase tracking-[0.6em] block mb-4">W CIGAR SOP</span>
+                      <h2 className="text-4xl md:text-5xl font-serif italic text-amber-50 tracking-tight leading-tight">{activeReg.title}</h2>
+                    </div>
+                    <button onClick={() => setActiveReg(null)} className="p-4 text-stone-700 hover:text-white"><i className="fas fa-times text-2xl"></i></button>
+                  </div>
+
+                  {activeReg.imageUrl && (
+                    <div className="mb-12 rounded-[2rem] overflow-hidden border border-white/5 shadow-2xl">
+                      <img src={activeReg.imageUrl} alt="SOP Visual" className="w-full h-auto object-cover max-h-[400px]" onError={(e) => e.target.style.display = 'none'} />
+                    </div>
+                  )}
+
+                  <div className="prose prose-invert max-w-none mb-16">
+                    <div className="bg-[#161311] border border-white/5 p-10 md:p-14 rounded-[3rem] whitespace-pre-wrap text-stone-300 text-xl leading-relaxed font-light shadow-inner relative overflow-hidden">
+                       <i className="fas fa-crown absolute top-10 right-10 text-6xl text-amber-500 opacity-5"></i>
+                       {renderContentWithLinks(activeReg.content)}
+                    </div>
+                  </div>
+
+                  <div className="border-t border-white/5 pt-16">
+                    <div className="flex items-center gap-3 mb-10">
+                      <i className="fas fa-comments text-amber-600 text-2xl"></i>
+                      <h3 className="text-xl font-bold text-white uppercase tracking-widest">實務問答 Clarification</h3>
+                    </div>
+
+                    <div className="space-y-6 mb-10">
+                      {activeReg.comments && activeReg.comments.length > 0 ? activeReg.comments.map((c, i) => (
+                        <div key={i} className={`flex gap-4 p-6 rounded-3xl ${c.isAdmin ? 'bg-amber-900/10 border border-amber-900/20 ml-12' : 'bg-stone-900/50 border border-white/5 mr-12'}`}>
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${c.isAdmin ? 'bg-amber-600 text-white' : 'bg-stone-800 text-stone-500'}`}>
+                            <i className="fas fa-user"></i>
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">{c.isAdmin ? 'Manager Answer' : `Staff #${c.user}`}</span>
+                              <span className="text-[9px] text-stone-600">{new Date(c.time).toLocaleTimeString()}</span>
+                            </div>
+                            <p className="text-stone-300 text-sm leading-relaxed">{c.text}</p>
+                          </div>
+                        </div>
+                      )) : <div className="text-center py-10 text-stone-600 text-sm italic">尚無提問。</div>}
+                    </div>
+
+                    <div className="relative group">
+                      <input type="text" placeholder="對此規章有疑問？請在此輸入..." className="w-full bg-[#0a0908] border border-white/5 rounded-2xl py-5 pl-6 pr-20 text-stone-200 focus:outline-none focus:border-amber-900/50" value={questionText} onChange={(e) => setQuestionText(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleAddComment()}/>
+                      <button onClick={handleAddComment} className="absolute right-3 top-1/2 -translate-y-1/2 p-3 bg-amber-600 text-white rounded-xl hover:bg-amber-500"><i className="fas fa-paper-plane"></i></button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-[#120f0e] border-t border-white/5 p-8 md:px-20 flex justify-between items-center">
+                   <div className="text-stone-600 text-[10px] font-bold uppercase tracking-[0.2em]">最後審訂：{new Date(activeReg.updatedAt).toLocaleDateString()}</div>
+                   <div className="flex gap-4">
+                     {isAdmin && <button onClick={() => { handleDelete(activeReg.id); setActiveReg(null); }} className="px-10 py-5 text-red-800 text-[10px] tracking-widest hover:bg-red-900/20 rounded-xl transition-colors">刪除此制度</button>}
+                     <button onClick={async () => {
+                        const { db } = dbInfo;
+                        await window.FirebaseAPI.updateDoc(window.FirebaseAPI.doc(db, `/artifacts/${APP_ID}/public/data/regulations`, activeReg.id), { viewCount: (activeReg.viewCount || 0) + 1 });
+                        setActiveReg(null);
+                        showToast("您已簽署確認閱讀");
+                      }} className="bg-white text-black px-16 py-5 rounded-2xl text-xs font-black tracking-[0.2em] hover:bg-amber-500 hover:text-white">
+                        <i className="fas fa-check-circle mr-2"></i>確認閱讀並遵守
+                      </button>
+                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {message && <div className="fixed bottom-12 left-1/2 -translate-x-1/2 z-[100] px-8 py-4 bg-amber-600 text-white rounded-full text-[10px] tracking-[0.2em] font-black uppercase"><i className="fas fa-bell mr-2"></i>{message}</div>}
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>

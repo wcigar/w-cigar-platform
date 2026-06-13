@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { SHIFTS } from '../../lib/constants'
 import { useNavigate } from 'react-router-dom'
-import { Clock, CheckCircle2, Circle, AlertCircle, MapPin, AlertTriangle, Trophy, FileText } from 'lucide-react'
+import { Clock, CheckCircle2, Circle, AlertCircle, MapPin, AlertTriangle, Trophy, FileText, BookOpen, ChevronRight, GraduationCap } from 'lucide-react'
 import { format, endOfMonth } from 'date-fns'
 import { zhTW } from 'date-fns/locale'
 import AbnormalReport from '../../components/AbnormalReport'
@@ -35,6 +35,8 @@ export default function StaffHome() {
   const [crossDayPunchDate, setCrossDayPunchDate] = useState(null)
   const [punchStatus, setPunchStatus] = useState(null) // 跨夜安全的打卡狀態 (RPC)
   const [showPerformance, setShowPerformance] = useState(false)
+  const [hbUnread, setHbUnread] = useState(0) // 未確認規章章數
+  const [onb, setOnb] = useState(null) // 入職進度
   // 國定假日轉補休同意彈窗
   const [pendingHolidays, setPendingHolidays] = useState([])
   // 雙身份：paired employee (e.g. Daniel 正職 + Daniel_PT)
@@ -55,6 +57,20 @@ export default function StaffHome() {
   const punchingRef = useRef(false) // 防連點打卡
 
   useEffect(() => { load() }, [today])
+  // 規章閱讀確認 + 入職進度（首頁入口卡）
+  useEffect(() => {
+    if (!user?.employee_id) return
+    ;(async () => {
+      const [hb, rd, ob] = await Promise.all([
+        supabase.from('staff_handbook').select('id').eq('enabled', true),
+        supabase.from('staff_handbook_reads').select('chapter_id').eq('employee_id', user.employee_id),
+        supabase.rpc('onboarding_get', { p_employee_id: user.employee_id }),
+      ])
+      const ackSet = new Set((rd.data || []).map(r => r.chapter_id))
+      setHbUnread((hb.data || []).filter(c => !ackSet.has(c.id)).length)
+      setOnb(ob.data || null)
+    })()
+  }, [user?.employee_id])
   // 跨午夜 / 跨月：每 60 秒檢查、視窗回前景時也檢查；變動時 today/month state 更新 → load() 觸發 reload
   useEffect(() => {
     const tick = () => {
@@ -353,6 +369,55 @@ export default function StaffHome() {
           <div style={{fontFamily:'JetBrains Mono,monospace',fontSize:10,color:'rgba(196,163,90,.35)',letterSpacing:1}}>{format(new Date(), 'yyyy.MM.dd')}</div>
           <div style={{display:'inline-block',marginTop:4,fontFamily:'JetBrains Mono,monospace',fontSize:9,color:'rgba(196,163,90,.6)',padding:'3px 10px',borderRadius:20,border:'1px solid rgba(196,163,90,.12)',letterSpacing:2}}>{shiftLabel}</div>
         </div>
+      </div>
+
+      {/* ══ 新人系統操作指南入口 ══ */}
+      <div onClick={() => navigate('/system-guide')} style={{display:'flex',alignItems:'center',gap:14,padding:'16px 18px',marginBottom:8,borderRadius:14,cursor:'pointer',background:'linear-gradient(160deg,rgba(30,24,18,.96),rgba(14,12,10,.99))',border:'1px solid rgba(196,163,90,.18)'}}>
+        <div style={{flexShrink:0,width:42,height:42,borderRadius:11,background:'rgba(196,163,90,.1)',border:'1px solid rgba(196,163,90,.2)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:20}}>📱</div>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontFamily:'Noto Serif TC,serif',fontSize:15,fontWeight:500,color:'#f0e8d8'}}>新人系統操作指南</div>
+          <div style={{fontFamily:'Noto Serif TC,serif',fontSize:11,color:'rgba(196,163,90,.5)',marginTop:2}}>開帳號後怎麼用系統：打卡・任務・盤點・規章一次看懂</div>
+        </div>
+        <ChevronRight size={18} color="#5a554e" style={{flexShrink:0}}/>
+      </div>
+
+      {/* ══ 新人入職流程入口（未送出才顯示）══ */}
+      {onb && onb.status === 'in_progress' && (() => {
+        const obDone = [onb.profile_done, onb.docs_done, onb.sign_done, onb.handbook_done, onb.training_done].filter(Boolean).length
+        return (
+          <div onClick={() => navigate('/onboarding')} style={{display:'flex',alignItems:'center',gap:14,padding:'16px 18px',marginBottom:8,borderRadius:14,cursor:'pointer',background:'linear-gradient(160deg,rgba(40,28,16,.96),rgba(16,12,9,.99))',border:'1px solid rgba(214,140,70,.4)'}}>
+            <div style={{flexShrink:0,width:42,height:42,borderRadius:11,background:'rgba(214,140,70,.12)',border:'1px solid rgba(214,140,70,.3)',display:'flex',alignItems:'center',justifyContent:'center'}}><AlertCircle size={20} color="#d68c46"/></div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontFamily:'Noto Serif TC,serif',fontSize:15,fontWeight:500,color:'#f0e8d8'}}>完成新人入職流程</div>
+              <div style={{fontFamily:'Noto Serif TC,serif',fontSize:11,color:'#d68c46',marginTop:2}}>建檔・證件・簽署・規章・培訓 {obDone}/5，正式上班前請完成</div>
+            </div>
+            <span style={{flexShrink:0,minWidth:20,height:20,padding:'0 6px',borderRadius:10,background:'#d68c46',color:'#0f0d0a',fontSize:11,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center'}}>{5-obDone}</span>
+            <ChevronRight size={18} color="#5a554e" style={{flexShrink:0}}/>
+          </div>
+        )
+      })()}
+
+      {/* ══ 員工手冊入口 ══ */}
+      <div onClick={() => navigate('/handbook')} style={{display:'flex',alignItems:'center',gap:14,padding:'16px 18px',marginBottom:8,borderRadius:14,cursor:'pointer',background:'linear-gradient(160deg,rgba(30,24,18,.96),rgba(14,12,10,.99))',border:`1px solid ${hbUnread>0?'rgba(214,140,70,.4)':'rgba(196,163,90,.18)'}`}}>
+        <div style={{flexShrink:0,width:42,height:42,borderRadius:11,background:'rgba(196,163,90,.1)',border:'1px solid rgba(196,163,90,.2)',display:'flex',alignItems:'center',justifyContent:'center'}}><BookOpen size={20} color="#c9a84c"/></div>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontFamily:'Noto Serif TC,serif',fontSize:15,fontWeight:500,color:'#f0e8d8'}}>員工手冊 · 規章中心</div>
+          {hbUnread>0
+            ? <div style={{fontFamily:'Noto Serif TC,serif',fontSize:11,color:'#d68c46',marginTop:2}}>⚠ 還有 {hbUnread} 章未確認閱讀，上班前請完成</div>
+            : <div style={{fontFamily:'Noto Serif TC,serif',fontSize:11,color:'rgba(196,163,90,.5)',marginTop:2}}>規章・福利・培訓・表單，一鍵查詢</div>}
+        </div>
+        {hbUnread>0 && <span style={{flexShrink:0,minWidth:20,height:20,padding:'0 6px',borderRadius:10,background:'#d68c46',color:'#0f0d0a',fontSize:11,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center'}}>{hbUnread}</span>}
+        <ChevronRight size={18} color="#5a554e" style={{flexShrink:0}}/>
+      </div>
+
+      {/* ══ 培訓中心入口 ══ */}
+      <div onClick={() => navigate('/training')} style={{display:'flex',alignItems:'center',gap:14,padding:'16px 18px',marginBottom:8,borderRadius:14,cursor:'pointer',background:'linear-gradient(160deg,rgba(20,30,20,.96),rgba(12,16,12,.99))',border:'1px solid rgba(100,170,100,.2)'}}>
+        <div style={{flexShrink:0,width:42,height:42,borderRadius:11,background:'rgba(100,170,100,.1)',border:'1px solid rgba(100,170,100,.25)',display:'flex',alignItems:'center',justifyContent:'center'}}><GraduationCap size={20} color="#7faa7f"/></div>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontFamily:'Noto Serif TC,serif',fontSize:15,fontWeight:500,color:'#f0e8d8'}}>教育訓練與考核</div>
+          <div style={{fontFamily:'Noto Serif TC,serif',fontSize:11,color:'rgba(127,170,127,.75)',marginTop:2}}>古巴雪茄・CAPADURA・進階　3 大專業培訓測驗</div>
+        </div>
+        <ChevronRight size={18} color="#5a554e" style={{flexShrink:0}}/>
       </div>
 
       {/* ══════ Zone A：即時行動 ══════ */}

@@ -50,10 +50,17 @@ export function AuthProvider({ children }) {
     if (error) throw new Error(error.message)
     if (!data?.success) throw new Error(data?.error || '帳號或密碼錯誤')
     if (data.id !== employeeId) throw new Error('帳號或密碼錯誤')
+    // 發 HR session token（後台 PII/證件存取用；失敗不擋登入）
+    let hrToken = null
+    try {
+      const { data: sess } = await supabase.rpc('staff_session_start', { p_code: pin })
+      if (sess?.success) hrToken = sess.token
+    } catch (e) { /* 不擋登入 */ }
     const userData = {
       employee_id: data.id, name: data.name, position: data.title,
       is_active: data.enabled, employee_type: data.emp_type,
       is_admin: data.is_admin, role: data.is_admin ? 'boss' : 'staff',
+      hr_token: hrToken,
       _raw: data, _ts: Date.now()
     }
     setUser(userData)

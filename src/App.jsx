@@ -15,6 +15,12 @@ import StaffInventory from './pages/staff/StaffInventory'
 import StaffExpense from './pages/staff/StaffExpense'
 import StaffInventoryCount from './pages/staff/StaffInventoryCount'
 import StaffMeeting from './pages/staff/StaffMeeting'
+import StaffHandbook from './pages/staff/StaffHandbook'
+import StaffOnboarding from './pages/staff/StaffOnboarding'
+import StaffTraining from './pages/staff/StaffTraining'
+import StaffResign from './pages/staff/StaffResign'
+import StaffSystemGuide from './pages/staff/StaffSystemGuide'
+import BossStaffVault from './pages/boss/BossStaffVault'
 import StaffPOS from './pages/staff/StaffPOS'
 import BossHome from './pages/boss/BossHome'
 import BossAuditTasks from './pages/boss/AuditTasks'
@@ -102,6 +108,7 @@ function AppInner() {
             <Route path="/operations" element={<BossOperations />} />
             <Route path="/audit-tasks" element={<BossAuditTasks />} />
             <Route path="/hr" element={<BossHR />} />
+            <Route path="/hr-vault" element={<BossStaffVault />} />
             <Route path="/payroll" element={<BossPayroll />} />
             <Route path="/boss-inventory" element={<BossInventory />} />
             <Route path="/commission" element={<Commission />} />
@@ -130,6 +137,16 @@ function AppInner() {
             <Route path="/meeting" element={<StaffMeeting />} />
           </>
         )}
+        {/* 員工手冊 / 規章中心 — boss 與 staff 共用 */}
+        <Route path="/handbook" element={<StaffHandbook />} />
+        {/* 新人入職流程（建檔/證件/簽署/規章）*/}
+        <Route path="/onboarding" element={<StaffOnboarding />} />
+        {/* 教育訓練與考核 */}
+        <Route path="/training" element={<StaffTraining />} />
+        {/* 離職申請與交接 */}
+        <Route path="/resign" element={<StaffResign />} />
+        {/* 新人系統操作指南 */}
+        <Route path="/system-guide" element={<StaffSystemGuide />} />
         <Route path="/admin/venue-sales" element={<AdminGuard scope="admin"><AdminVenueSales /></AdminGuard>} />
         <Route path="/admin/venue-sales/new" element={<AdminGuard scope="admin"><AdminVenueSalesNew /></AdminGuard>} />
         <Route path="/admin/venues" element={<AdminGuard scope="admin"><AdminVenues /></AdminGuard>} />
