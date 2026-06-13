@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { SHIFTS } from '../../lib/constants'
 import { useNavigate } from 'react-router-dom'
-import { Clock, CheckCircle2, Circle, AlertCircle, MapPin, AlertTriangle, Trophy, FileText, BookOpen, ChevronRight } from 'lucide-react'
+import { Clock, CheckCircle2, Circle, AlertCircle, MapPin, AlertTriangle, Trophy, FileText, BookOpen, ChevronRight, GraduationCap } from 'lucide-react'
 import { format, endOfMonth } from 'date-fns'
 import { zhTW } from 'date-fns/locale'
 import AbnormalReport from '../../components/AbnormalReport'
@@ -397,6 +397,16 @@ export default function StaffHome() {
             : <div style={{fontFamily:'Noto Serif TC,serif',fontSize:11,color:'rgba(196,163,90,.5)',marginTop:2}}>規章・福利・培訓・表單，一鍵查詢</div>}
         </div>
         {hbUnread>0 && <span style={{flexShrink:0,minWidth:20,height:20,padding:'0 6px',borderRadius:10,background:'#d68c46',color:'#0f0d0a',fontSize:11,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center'}}>{hbUnread}</span>}
+        <ChevronRight size={18} color="#5a554e" style={{flexShrink:0}}/>
+      </div>
+
+      {/* ══ 培訓中心入口 ══ */}
+      <div onClick={() => navigate('/training')} style={{display:'flex',alignItems:'center',gap:14,padding:'16px 18px',marginBottom:8,borderRadius:14,cursor:'pointer',background:'linear-gradient(160deg,rgba(20,30,20,.96),rgba(12,16,12,.99))',border:'1px solid rgba(100,170,100,.2)'}}>
+        <div style={{flexShrink:0,width:42,height:42,borderRadius:11,background:'rgba(100,170,100,.1)',border:'1px solid rgba(100,170,100,.25)',display:'flex',alignItems:'center',justifyContent:'center'}}><GraduationCap size={20} color="#7faa7f"/></div>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontFamily:'Noto Serif TC,serif',fontSize:15,fontWeight:500,color:'#f0e8d8'}}>教育訓練與考核</div>
+          <div style={{fontFamily:'Noto Serif TC,serif',fontSize:11,color:'rgba(127,170,127,.75)',marginTop:2}}>古巴雪茄・CAPADURA・進階　3 大專業培訓測驗</div>
+        </div>
         <ChevronRight size={18} color="#5a554e" style={{flexShrink:0}}/>
       </div>
 

@@ -15,7 +15,7 @@ const CATS = [
   { id: 'all',      name: '全部',         color: '#c9a84c' },
   { id: 'admin',    name: '管理規章',     color: '#c9a84c' },
   { id: 'benefit',  name: '激勵回饋',     color: '#c89b5a' },
-  { id: 'training', name: '教育訓練',     color: '#7faa7f' },
+  { id: 'training', name: '教育訓練 ↗',   color: '#7faa7f' },
   { id: 'download', name: '表單合約',     color: '#7fa0bd' },
 ]
 const CAT_MAP = Object.fromEntries(CATS.map(c => [c.id, c]))
@@ -136,7 +136,7 @@ export default function StaffHandbook() {
         {CATS.map(c => {
           const active = cat === c.id
           return (
-            <button key={c.id} onClick={() => setCat(c.id)}
+            <button key={c.id} onClick={() => c.id === 'training' ? navigate('/training') : setCat(c.id)}
               style={{ fontSize: 11.5, padding: '6px 14px', borderRadius: 20, cursor: 'pointer', fontWeight: active ? 600 : 400, transition: 'all .2s',
                 background: active ? c.color : 'rgba(201,168,76,.06)',
                 color: active ? '#0f0d0a' : c.color,
