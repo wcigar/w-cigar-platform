@@ -1,15 +1,57 @@
-import { useState, useRef } from "react";
+import { useState, useLayoutEffect, useRef, useCallback } from "react";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas-pro";
 
 /**
- * GSP Form A 產地證明 — 程式排版乾淨版（無掃描底圖、零殘留）
- * 表格框線 + 制式文字全程式畫，欄位直接在格內填，下載 PDF 用 onclone 把欄位值畫出。
+ * GSP Form A 產地證明 — 正本掃描底圖（資料區已清空）+ 可填欄位 + 列印 + PDF 下載
+ * W Cigar Bar 老闆後台「報關」模組
+ * 底圖：public/customs/form-a-bg-clean.jpg
+ *   = 正本掃描，但用程式精準把 12 個「資料填寫區」塗白清空，
+ *     完整保留 DGA logo / 海關認證圓章 / 出口商簽名章 / 格線 / 制式英文。
+ *   → 改任何欄位都乾淨、列印/下載不會跟舊字重疊。
  */
 
-const DEFAULTS = { certNo: "" };
+const BG_SRC = "/customs/form-a-bg-clean.jpg";
 
-function CertificateFormA() {
+// id, left%, top%, width%, height%, multiline, fontSize(cqw), color, align
+const FIELDS = [
+  ["certNo",    76.471,  1.000, 15.882, 3.000, false, 2.5, "#c00", "center"],
+  ["exporter",  11.471, 11.045, 38.529, 6.136, true,  1.85, "#000", "left"],
+  ["consignee", 11.471, 19.000, 38.529, 6.000, true,  1.85, "#000", "left"],
+  ["transport", 11.471, 29.909, 38.529, 2.636, false, 1.95, "#000", "left"],
+  ["desc",      11.471, 43.000, 40.706, 4.545, true,  1.90, "#000", "left"],
+  ["marks",     51.000, 48.545, 11.000, 2.455, false, 1.90, "#000", "center"],
+  ["item5",      5.700, 44.500,  5.300, 2.818, false, 1.90, "#000", "center"],
+  ["crit8",     62.500, 43.300,  7.000, 2.818, false, 1.90, "#000", "center"],
+  ["weight9",   70.000, 51.500,  7.100, 2.636, false, 1.90, "#000", "center"],
+  ["inv10a",    78.000, 43.300, 17.000, 2.545, false, 1.90, "#000", "center"],
+  ["inv10b",    78.000, 55.000, 17.000, 2.545, false, 1.90, "#000", "center"],
+  ["prod12",    63.000, 78.000, 19.000, 2.000, false, 1.90, "#000", "center"],
+];
+
+const LABELS = {
+  certNo: "證明號 N°", exporter: "出口商", consignee: "收貨人", transport: "運送/航班",
+  desc: "貨物說明", marks: "嘜頭", item5: "項次", crit8: "原產地標準",
+  weight9: "毛重", inv10a: "發票號", inv10b: "發票日期", prod12: "生產國",
+};
+
+// 正本內容當預設值（可直接改成新一批的資料）
+const DEFAULTS = {
+  certNo: "154013",
+  exporter: "MANO TABACALERA, S.R.L\nC/2 ARTURO BISONO TORIBIO No.8 NAVE 21A\nVILLA BISONO NAVARRETE",
+  consignee: "CAPADURA Co. Ltd\nNo.79 Yongzhen Rd.,Yonghe Dist., New Taipei City 234027.,\nTaiwan (R.O.C)  TEL. 02773 08898\nConsigne name. Tsai Fu Chun",
+  transport: "AMERIJET  AWB #810-43670255",
+  desc: "1,250  UNIDADES DE CIGARROS DE LA FACTURA\nEMPACADOS EN TRS (3 ) CAJAS DE CARTON",
+  marks: '"W" 2402',
+  item5: "",
+  crit8: "67-006",
+  weight9: "45 KGS",
+  inv10a: "67-006",
+  inv10b: "25.05.2026",
+  prod12: "SANTIAGO REP. DOM",
+};
+
+function CertificateFormA({ bgSrc = BG_SRC }) {
   const [vals, setVals] = useState(DEFAULTS);
   const [showFields, setShowFields] = useState(true);
   const [downloading, setDownloading] = useState(false);
@@ -17,61 +59,84 @@ function CertificateFormA() {
 
   const set = (id) => (e) => setVals((s) => ({ ...s, [id]: e.target.value }));
 
+  const centerSingles = useCallback(() => {
+    const root = sheetRef.current;
+    if (!root) return;
+    root.querySelectorAll("input.cfa-fld").forEach((el) => {
+      el.style.lineHeight = el.clientHeight + "px";
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    centerSingles();
+    window.addEventListener("resize", centerSingles);
+    return () => window.removeEventListener("resize", centerSingles);
+  }, [centerSingles]);
+
+  // ⬇ 下載 PDF（用 html2canvas-pro + jsPDF、Letter 直式）
   async function downloadPdf() {
     const sheet = sheetRef.current;
     if (!sheet) return;
     setDownloading(true);
-    const prev = showFields;
-    setShowFields(false);
-    await new Promise((r) => setTimeout(r, 200));
+    const prevShowFields = showFields;
+    setShowFields(false); // 隱藏藍框
+    await new Promise((r) => setTimeout(r, 250));
     try {
+      const img = sheet.querySelector("img");
+      if (img && !img.complete) {
+        await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
+      }
       const canvas = await html2canvas(sheet, {
         scale: 2,
         useCORS: true,
         backgroundColor: "#ffffff",
         logging: false,
         onclone: (clonedDoc) => {
-          // html2canvas 不畫 input/textarea 的輸入值 → clone 裡換成顯示當前值的 div
-          const origs = sheet.querySelectorAll(".cfa-in, .cfa-line");
-          const clones = clonedDoc.querySelectorAll(".cfa-in, .cfa-line");
+          // ⚠️ html2canvas 不會把 input/textarea 的「輸入值」畫進 PDF（只抓空框）→ 修改後下載仍空白。
+          // 在 clone 裡把每個欄位換成顯示「當前值」的 div（沿用定位/字型；cqw 字級轉成實際 px）。
+          const origs = sheet.querySelectorAll(".cfa-fld");
+          const clones = clonedDoc.querySelectorAll(".cfa-fld");
           clones.forEach((el, i) => {
             const orig = origs[i];
             if (!orig) return;
             const cs = window.getComputedStyle(orig);
             const div = clonedDoc.createElement("div");
             div.textContent = orig.value || "";
+            div.setAttribute("style", el.getAttribute("style") || "");
+            div.style.position = "absolute";
             div.style.fontFamily = cs.fontFamily;
             div.style.fontWeight = cs.fontWeight;
-            div.style.fontSize = cs.fontSize;
-            div.style.color = "#000";
-            div.style.whiteSpace = orig.tagName === "TEXTAREA" ? "pre-wrap" : "nowrap";
-            div.style.textAlign = cs.textAlign;
-            div.style.lineHeight = "1.25";
-            div.style.width = "100%";
-            div.style.minHeight = cs.height;
-            div.style.padding = cs.padding;
+            div.style.fontSize = cs.fontSize; // 實際 px，繞過 cqw 在 canvas 失準
+            div.style.color = el.style.color || cs.color;
+            div.style.background = "transparent"; // 乾淨無米色塊
+            div.style.padding = "0 2px";
             div.style.boxSizing = "border-box";
+            div.style.display = "flex";
+            div.style.alignItems = "center";
+            const ta = el.style.textAlign || "left";
+            div.style.justifyContent = ta === "center" ? "center" : ta === "right" ? "flex-end" : "flex-start";
+            div.style.whiteSpace = el.tagName === "TEXTAREA" ? "pre-wrap" : "nowrap";
+            div.style.overflow = "hidden";
+            div.style.lineHeight = el.tagName === "TEXTAREA" ? "1.12" : "normal";
             el.parentNode.replaceChild(div, el);
           });
         },
       });
       const imgData = canvas.toDataURL("image/jpeg", 0.92);
-      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
       const pageW = pdf.internal.pageSize.getWidth();
-      const ratio = canvas.height / canvas.width;
-      pdf.addImage(imgData, "JPEG", 0, 0, pageW, pageW * ratio);
+      const pageH = pdf.internal.pageSize.getHeight();
+      pdf.addImage(imgData, "JPEG", 0, 0, pageW, pageH);
       const today = new Date().toISOString().slice(0, 10);
       pdf.save(`FormA_${vals.certNo || "COO"}_${today}.pdf`);
     } catch (e) {
       console.error("PDF 下載失敗:", e);
       alert("❌ PDF 下載失敗：" + (e.message || e));
     } finally {
-      setShowFields(prev);
+      setShowFields(prevShowFields);
       setDownloading(false);
     }
   }
-
-  const sheetCls = "cfa-sheet" + (showFields ? " show-fields" : "");
 
   return (
     <div className="cfa-wrap">
@@ -83,113 +148,80 @@ function CertificateFormA() {
           {downloading ? "⏳ 產生中..." : "⬇ 下載 PDF"}
         </button>
         <button className="cfa-btn print" onClick={() => window.print()}>🖨️ 列印</button>
-        <button className="cfa-btn reset" onClick={() => { if (window.confirm("清空所有欄位？")) setVals({}); }}>↺ 清空</button>
+        <button className="cfa-btn reset" onClick={() => { if (window.confirm("清空所有填寫欄位？")) setVals({}); }}>↺ 清空</button>
+        <button className="cfa-btn reset" onClick={() => setVals(DEFAULTS)}>↩ 還原正本內容</button>
         <label className="cfa-toggle">
           <input type="checkbox" checked={showFields} onChange={(e) => setShowFields(e.target.checked)} />
           標示欄位
         </label>
       </div>
 
-      {/* 快速編輯區 */}
+      {/* ⭐ 頂端快速編輯區 — 最常改的項目放這裡 */}
       <div className="cfa-quick cfa-no-print">
-        <div className="cfa-quick-title">⭐ 快速編輯</div>
+        <div className="cfa-quick-title">⭐ 快速編輯（最常改的欄位）</div>
         <div className="cfa-quick-grid">
-          <label><span>證明號 N°</span><input value={vals.certNo || ""} onChange={set("certNo")} placeholder="如 154013" /></label>
-          <label><span>出口商</span><input value={vals.exporter || ""} onChange={set("exporter")} placeholder="公司名 / 地址 / 國別" /></label>
-          <label><span>收貨人</span><input value={vals.consignee || ""} onChange={set("consignee")} placeholder="進口商 / 地址 / 國別" /></label>
-          <label><span>運送/航班</span><input value={vals.transport || ""} onChange={set("transport")} placeholder="BY AIR / AWB..." /></label>
-          <label className="wide"><span>貨物說明</span><textarea rows={2} value={vals.desc || ""} onChange={set("desc")} placeholder="CIGARS, HANDMADE..." /></label>
-          <label><span>毛重</span><input value={vals.weight9 || ""} onChange={set("weight9")} placeholder="17.2 KGS" /></label>
-          <label><span>發票號/日期</span><input value={vals.inv10 || ""} onChange={set("inv10")} placeholder="INV-xxx / 日期" /></label>
-          <label><span>原產地標準</span><input value={vals.crit8 || ""} onChange={set("crit8")} placeholder="P" /></label>
-          <label><span>生產國</span><input value={vals.prod12 || ""} onChange={set("prod12")} placeholder="NICARAGUA" /></label>
+          <label className="cfa-quick-fld">
+            <span>證明號 N°</span>
+            <input value={vals.certNo || ""} onChange={set("certNo")} placeholder="如：154013" />
+          </label>
+          <label className="cfa-quick-fld">
+            <span>發票號</span>
+            <input value={vals.inv10a || ""} onChange={set("inv10a")} placeholder="如：67-006" />
+          </label>
+          <label className="cfa-quick-fld">
+            <span>發票日期</span>
+            <input value={vals.inv10b || ""} onChange={set("inv10b")} placeholder="如：25.05.2026" />
+          </label>
+          <label className="cfa-quick-fld">
+            <span>運送/航班</span>
+            <input value={vals.transport || ""} onChange={set("transport")} placeholder="如：AMERIJET AWB #..." />
+          </label>
+          <label className="cfa-quick-fld cfa-quick-wide">
+            <span>貨物說明 / 品項</span>
+            <textarea rows={3} value={vals.desc || ""} onChange={set("desc")}
+              placeholder="UNIDADES DE CIGARROS..." />
+          </label>
+          <label className="cfa-quick-fld">
+            <span>毛重</span>
+            <input value={vals.weight9 || ""} onChange={set("weight9")} placeholder="如：45 KGS" />
+          </label>
+          <label className="cfa-quick-fld">
+            <span>原產地標準</span>
+            <input value={vals.crit8 || ""} onChange={set("crit8")} placeholder="如：67-006 / P" />
+          </label>
+          <label className="cfa-quick-fld">
+            <span>嘜頭</span>
+            <input value={vals.marks || ""} onChange={set("marks")} placeholder='如："W" 2402' />
+          </label>
+        </div>
+        <div className="cfa-hint">
+          💡 上方改完會立即同步到下方表單；其他欄位（出口商/收貨人/生產國）可直接在表單上點擊修改。預設帶入正本內容，按「↩ 還原正本內容」可復原。
         </div>
       </div>
 
-      {/* Form A 本體 */}
       <div className="cfa-center">
-        <div ref={sheetRef} className={sheetCls}>
-          <div className="cfa-topbar">
-            <div className="cfa-dga">D<span>G</span>A · ADUANAS</div>
-            <div className="cfa-nobox">N° <input className="cfa-line cfa-certno" value={vals.certNo || ""} onChange={set("certNo")} /></div>
-          </div>
-
-          <table className="cfa-tbl"><tbody>
-            <tr>
-              <td colSpan={3} className="cfa-cell">
-                <div className="cfa-lbl">1. Goods consigned from (Exporter's business name, address, country)</div>
-                <textarea className="cfa-in" rows={3} value={vals.exporter || ""} onChange={set("exporter")} />
-              </td>
-              <td colSpan={3} rowSpan={2} className="cfa-cell cfa-title">
-                <div className="cfa-ref">Reference No. <input className="cfa-line" value={vals.refNo || ""} onChange={set("refNo")} /></div>
-                <div className="cfa-gsp">GENERALIZED SYSTEM OF PREFERENCES</div>
-                <div className="cfa-coo">CERTIFICATE OF ORIGIN</div>
-                <div className="cfa-subt">(Combined declaration and certificate)</div>
-                <div className="cfa-forma">FORM A</div>
-                <div className="cfa-issued">Issued in <input className="cfa-line" value={vals.issuedIn || ""} onChange={set("issuedIn")} /></div>
-                <div className="cfa-cty">(country)</div>
-                <div className="cfa-notes">See notes overleaf</div>
-              </td>
-            </tr>
-            <tr>
-              <td colSpan={3} className="cfa-cell">
-                <div className="cfa-lbl">2. Goods consigned to (Consignee's name, address, country)</div>
-                <textarea className="cfa-in" rows={3} value={vals.consignee || ""} onChange={set("consignee")} />
-              </td>
-            </tr>
-            <tr>
-              <td colSpan={3} className="cfa-cell">
-                <div className="cfa-lbl">3. Means of transport and route (as far as known)</div>
-                <input className="cfa-in" value={vals.transport || ""} onChange={set("transport")} />
-              </td>
-              <td colSpan={3} className="cfa-cell">
-                <div className="cfa-lbl">4. For official use</div>
-                <textarea className="cfa-in" rows={2} value={vals.official || ""} onChange={set("official")} />
-              </td>
-            </tr>
-            <tr className="cfa-colhead">
-              <td className="cfa-cell"><div className="cfa-lbl">5. Item number</div></td>
-              <td className="cfa-cell"><div className="cfa-lbl">6. Marks and numbers of packages</div></td>
-              <td className="cfa-cell"><div className="cfa-lbl">7. Number and kind of packages; description of goods</div></td>
-              <td className="cfa-cell"><div className="cfa-lbl">8. Origin criterion (see Notes overleaf)</div></td>
-              <td className="cfa-cell"><div className="cfa-lbl">9. Gross weight or other quantity</div></td>
-              <td className="cfa-cell"><div className="cfa-lbl">10. Number and date of invoices</div></td>
-            </tr>
-            <tr className="cfa-databody">
-              <td className="cfa-cell"><textarea className="cfa-in" rows={8} value={vals.item5 || ""} onChange={set("item5")} /></td>
-              <td className="cfa-cell"><textarea className="cfa-in" rows={8} value={vals.marks || ""} onChange={set("marks")} /></td>
-              <td className="cfa-cell"><textarea className="cfa-in" rows={8} value={vals.desc || ""} onChange={set("desc")} /></td>
-              <td className="cfa-cell"><textarea className="cfa-in" rows={8} value={vals.crit8 || ""} onChange={set("crit8")} /></td>
-              <td className="cfa-cell"><textarea className="cfa-in" rows={8} value={vals.weight9 || ""} onChange={set("weight9")} /></td>
-              <td className="cfa-cell"><textarea className="cfa-in" rows={8} value={vals.inv10 || ""} onChange={set("inv10")} /></td>
-            </tr>
-            <tr>
-              <td colSpan={3} className="cfa-cell cfa-decl">
-                <div className="cfa-lbl">11. Certification</div>
-                <div className="cfa-dtext">It is hereby certified, on the basis of control carried out, that the declaration by the exporter is correct.</div>
-                <div className="cfa-signline">..................................................................</div>
-                <div className="cfa-signsub">Place and date, signature and stamp of certifying authority</div>
-              </td>
-              <td colSpan={3} className="cfa-cell cfa-decl">
-                <div className="cfa-lbl">12. Declaration by the exporter</div>
-                <div className="cfa-dtext">
-                  The undersigned hereby declares that the above details and statements are correct; that all the goods were produced in
-                  <input className="cfa-line" value={vals.prod12 || ""} onChange={set("prod12")} /> (country)
-                  and that they comply with the origin requirements specified for those goods in the Generalized System of Preferences for goods exported to
-                  <input className="cfa-line" value={vals.importTo || ""} onChange={set("importTo")} /> (importing country).
-                </div>
-                <div className="cfa-signline">..................................................................</div>
-                <div className="cfa-signsub">Place and date, signature of authorized signatory</div>
-              </td>
-            </tr>
-          </tbody></table>
+        <div ref={sheetRef} className={"cfa-sheet" + (showFields ? " show-fields" : "")}>
+          <img src={bgSrc} alt="Form A 產地證明" draggable={false} crossOrigin="anonymous" />
+          {FIELDS.map(([id, l, t, w, h, multi, fs, color, align]) => {
+            const style = {
+              left: l + "%", top: t + "%", width: w + "%", height: h + "%",
+              fontSize: fs + "cqw", color, textAlign: align,
+            };
+            return multi ? (
+              <textarea key={id} className="cfa-fld ml" data-label={LABELS[id]}
+                placeholder=" " style={style} value={vals[id] || ""} onChange={set(id)} />
+            ) : (
+              <input key={id} className="cfa-fld" data-label={LABELS[id]}
+                placeholder=" " style={style} value={vals[id] || ""} onChange={set(id)} />
+            );
+          })}
         </div>
       </div>
     </div>
   );
 }
 
-export default function CertificateFormAButton({ label = "📋 產地證明生成", className = "" }) {
+export default function CertificateFormAButton({ label = "📋 產地證明生成", bgSrc = BG_SRC, className = "" }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -201,7 +233,7 @@ export default function CertificateFormAButton({ label = "📋 產地證明生�
         <div className="cfa-modal" role="dialog" aria-modal="true">
           <style>{MODAL_CSS}</style>
           <button className="cfa-close cfa-no-print" onClick={() => setOpen(false)} aria-label="關閉">✕</button>
-          <CertificateFormA />
+          <CertificateFormA bgSrc={bgSrc} />
         </div>
       )}
     </>
@@ -217,71 +249,54 @@ const OPEN_BTN_CSS = `
 `;
 
 const MODAL_CSS = `
-.cfa-modal{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.6);overflow:auto;padding:20px 0;}
-.cfa-close{position:fixed;top:14px;right:16px;z-index:10000;width:40px;height:40px;border-radius:50%;
- border:0;background:#222;color:#fff;font-size:18px;cursor:pointer;}
-@media print{.cfa-modal{position:static;background:#fff;overflow:visible;padding:0;}.cfa-close{display:none!important;}}
+.cfa-modal{position:fixed;inset:0;z-index:9999;background:#3a3a3a;overflow:auto;}
+.cfa-close{position:fixed;top:12px;right:16px;z-index:10001;width:38px;height:38px;border:0;
+ border-radius:50%;background:#000;color:#fff;font-size:18px;cursor:pointer;}
+@media print{.cfa-modal{position:static;background:#fff;overflow:visible;}.cfa-close{display:none!important;}}
 `;
 
 const CSS = `
-.cfa-wrap{background:#f4f4f4;min-height:100%;}
-.cfa-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:14px 18px;background:#1a1a1a;color:#fff;}
-.cfa-bar strong{font-size:15px;}
-.cfa-btn{padding:9px 16px;border:0;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;}
-.cfa-btn.dl{background:#c9a227;color:#111;}
-.cfa-btn.print{background:#4da86c;color:#fff;}
-.cfa-btn.reset{background:#444;color:#ddd;}
-.cfa-toggle{display:flex;align-items:center;gap:5px;font-size:12px;color:#ccc;cursor:pointer;}
-.cfa-quick{background:#2a2520;padding:12px 18px;}
-.cfa-quick-title{font-size:12px;color:#c9a227;font-weight:700;margin-bottom:8px;}
-.cfa-quick-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
-.cfa-quick label{display:flex;flex-direction:column;gap:3px;font-size:11px;color:#aaa;}
-.cfa-quick label.wide{grid-column:span 2;}
-.cfa-quick input,.cfa-quick textarea{padding:7px 9px;border:1px solid #444;border-radius:5px;background:#1a1714;color:#fff;font-size:13px;outline:none;}
-@media (max-width:720px){.cfa-quick-grid{grid-template-columns:1fr 1fr;}.cfa-quick label.wide{grid-column:span 2;}}
+.cfa-wrap{font-family:"Helvetica Neue",Arial,"PingFang TC","Microsoft JhengHei",sans-serif;}
+.cfa-bar{position:sticky;top:0;z-index:50;background:#111;color:#fff;display:flex;gap:10px;
+ align-items:center;flex-wrap:wrap;padding:12px 16px 12px 60px;}
+.cfa-bar strong{font-size:15px;margin-right:6px;}
+.cfa-btn{font-size:14px;font-weight:600;border:0;border-radius:6px;padding:8px 14px;cursor:pointer;}
+.cfa-btn:disabled{opacity:.55;cursor:wait;}
+.cfa-btn.dl{background:#4d8ac4;color:#fff;font-weight:700;}
+.cfa-btn.print{background:#c9a227;color:#111;}
+.cfa-btn.reset{background:#444;color:#fff;}
+.cfa-toggle{font-size:13px;color:#ddd;display:flex;align-items:center;gap:5px;cursor:pointer;}
+
+.cfa-quick{background:#1a1a1a;color:#fff;padding:16px 24px 12px;border-bottom:1px solid #2a2a2a;}
+.cfa-quick-title{font-size:13px;font-weight:700;color:#c9a227;letter-spacing:1px;margin-bottom:10px;}
+.cfa-quick-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+.cfa-quick-wide{grid-column:span 2;}
+.cfa-quick-fld{display:flex;flex-direction:column;gap:4px;}
+.cfa-quick-fld span{font-size:11px;color:#888;font-weight:600;letter-spacing:.5px;}
+.cfa-quick-fld input,.cfa-quick-fld textarea{background:#0f0f0f;border:1px solid #333;border-radius:6px;
+ color:#fff;font-size:13px;padding:8px 10px;font-family:inherit;outline:none;}
+.cfa-quick-fld input:focus,.cfa-quick-fld textarea:focus{border-color:#c9a227;background:#181818;}
+.cfa-quick-fld textarea{resize:vertical;min-height:60px;}
+.cfa-hint{margin-top:10px;font-size:11px;color:#888;}
+@media (max-width:720px){.cfa-quick-grid{grid-template-columns:1fr 1fr;}.cfa-quick-wide{grid-column:span 2;}}
 
 .cfa-center{display:flex;justify-content:center;padding:18px;}
-.cfa-sheet{width:850px;max-width:100%;background:#fff;box-shadow:0 4px 20px rgba(0,0,0,.5);padding:14px 16px;color:#000;font-family:Arial,"Helvetica Neue",sans-serif;}
-.cfa-topbar{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;}
-.cfa-dga{font-size:24px;font-weight:800;letter-spacing:1px;}
-.cfa-dga span{color:#c00;}
-.cfa-nobox{font-size:13px;font-weight:700;display:flex;align-items:center;gap:4px;}
-.cfa-certno{color:#c00 !important;font-size:18px !important;font-weight:800 !important;width:120px;text-align:center;}
-
-.cfa-tbl{width:100%;border-collapse:collapse;table-layout:fixed;}
-.cfa-cell{border:1px solid #000;padding:4px 5px;vertical-align:top;}
-.cfa-lbl{font-size:8.5px;font-weight:400;line-height:1.15;margin-bottom:2px;}
-.cfa-in{width:100%;border:0;outline:none;background:transparent;resize:none;
- font-family:inherit;font-size:12px;font-weight:700;line-height:1.25;color:#000;padding:0;}
-.cfa-line{border:0;border-bottom:1px dotted #888;outline:none;background:transparent;
- font-family:inherit;font-size:12px;font-weight:700;color:#000;min-width:70px;padding:0 3px;}
-.show-fields .cfa-in,.show-fields .cfa-line{background:rgba(0,120,255,.06);box-shadow:inset 0 0 0 1px rgba(0,120,255,.4);}
-
-.cfa-title{text-align:center;line-height:1.3;}
-.cfa-ref{font-size:9px;text-align:left;margin-bottom:6px;display:flex;align-items:center;gap:4px;}
-.cfa-gsp{font-size:11px;font-weight:700;margin-top:2px;}
-.cfa-coo{font-size:12px;font-weight:700;margin-top:3px;}
-.cfa-subt{font-size:9px;font-style:italic;}
-.cfa-forma{font-size:15px;font-weight:800;margin:4px 0;}
-.cfa-issued{font-size:9px;display:flex;align-items:center;justify-content:center;gap:4px;}
-.cfa-cty{font-size:8px;color:#444;}
-.cfa-notes{font-size:8px;text-align:right;margin-top:6px;font-style:italic;}
-
-.cfa-colhead .cfa-cell{height:auto;background:#fafafa;}
-.cfa-databody .cfa-cell{height:200px;}
-.cfa-databody .cfa-in{height:100%;}
-
-.cfa-decl{vertical-align:top;}
-.cfa-dtext{font-size:8.5px;line-height:1.3;margin:3px 0;}
-.cfa-signline{margin-top:26px;font-size:11px;letter-spacing:1px;}
-.cfa-signsub{font-size:8px;color:#333;margin-top:2px;}
-
+.cfa-sheet{position:relative;width:850px;max-width:100%;aspect-ratio:1700/2200;background:#fff;
+ box-shadow:0 4px 20px rgba(0,0,0,.5);container-type:inline-size;}
+.cfa-sheet img{position:absolute;inset:0;width:100%;height:100%;display:block;
+ user-select:none;pointer-events:none;}
+.cfa-fld{position:absolute;border:0;background:transparent;font-family:Arial,"Helvetica Neue",sans-serif;
+ font-weight:700;line-height:1.12;padding:0 2px;outline:none;resize:none;overflow:hidden;
+ -webkit-print-color-adjust:exact;print-color-adjust:exact;}
+.cfa-fld:not(.ml){line-height:1;white-space:nowrap;}
+.cfa-fld::placeholder{color:transparent;}
+.show-fields .cfa-fld{box-shadow:inset 0 0 0 1px rgba(0,120,255,.55);background:rgba(0,120,255,.06);}
 @media print{
- @page{size:A4 portrait;margin:8mm;}
+ @page{size:letter portrait;margin:0;}
  .cfa-wrap{background:#fff;}
  .cfa-bar,.cfa-quick{display:none!important;}
  .cfa-center{padding:0;}
- .cfa-sheet{width:100%;box-shadow:none;padding:0;}
- .show-fields .cfa-in,.show-fields .cfa-line{background:transparent;box-shadow:none;}
+ .cfa-sheet{width:100%;box-shadow:none;}
+ .cfa-fld{background:transparent!important;box-shadow:none!important;}
 }
 `;
