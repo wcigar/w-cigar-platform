@@ -18,6 +18,7 @@ import StaffMeeting from './pages/staff/StaffMeeting'
 import StaffHandbook from './pages/staff/StaffHandbook'
 import StaffOnboarding from './pages/staff/StaffOnboarding'
 import StaffTraining from './pages/staff/StaffTraining'
+import StaffResign from './pages/staff/StaffResign'
 import BossStaffVault from './pages/boss/BossStaffVault'
 import StaffPOS from './pages/staff/StaffPOS'
 import BossHome from './pages/boss/BossHome'
@@ -141,6 +142,8 @@ function AppInner() {
         <Route path="/onboarding" element={<StaffOnboarding />} />
         {/* 教育訓練與考核 */}
         <Route path="/training" element={<StaffTraining />} />
+        {/* 離職申請與交接 */}
+        <Route path="/resign" element={<StaffResign />} />
         <Route path="/admin/venue-sales" element={<AdminGuard scope="admin"><AdminVenueSales /></AdminGuard>} />
         <Route path="/admin/venue-sales/new" element={<AdminGuard scope="admin"><AdminVenueSalesNew /></AdminGuard>} />
         <Route path="/admin/venues" element={<AdminGuard scope="admin"><AdminVenues /></AdminGuard>} />

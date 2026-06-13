@@ -15,13 +15,24 @@ export default function BossStaffVault() {
   const [list, setList] = useState(null)
   const [sel, setSel] = useState(null)      // 選中員工 detail
   const [busy, setBusy] = useState(false)
+  const [resigns, setResigns] = useState([])
 
   async function loadList() {
-    const { data } = await supabase.rpc('hr_overview', { p_token: token })
-    if (!data?.ok) { setList([]); return }
-    setList(data.employees)
+    const [ov, rs] = await Promise.all([
+      supabase.rpc('hr_overview', { p_token: token }),
+      supabase.rpc('hr_resignations', { p_token: token }),
+    ])
+    setList(ov.data?.ok ? ov.data.employees : [])
+    setResigns(rs.data?.ok ? rs.data.list : [])
   }
   useEffect(() => { if (token) loadList(); else setList([]) }, [token])
+
+  async function reviewResign(id, status) {
+    if (status === 'rejected' && !confirm('確定駁回此離職交接單？')) return
+    const note = status === 'approved' ? (prompt('核准備註（選填）') ?? '') : ''
+    await supabase.rpc('hr_review_resignation', { p_token: token, p_id: id, p_status: status, p_note: note })
+    loadList()
+  }
 
   async function openDetail(empId) {
     setBusy(true)
@@ -133,6 +144,31 @@ export default function BossStaffVault() {
         <div style={{ fontFamily: 'Noto Serif TC,serif', fontSize: 22, fontWeight: 500, color: '#f0e8d8' }}>人事檔案庫</div>
         <div style={{ fontFamily: 'Cormorant Garamond,serif', fontSize: 11, fontStyle: 'italic', color: `${GOLD}77`, letterSpacing: 3, marginTop: 4 }}>STAFF VAULT · HR</div>
       </div>
+
+      {/* 離職交接待審 */}
+      {resigns.length > 0 && (
+        <div style={{ marginBottom: 14, padding: 14, borderRadius: 13, background: 'rgba(214,140,70,.06)', border: '1px solid rgba(214,140,70,.3)' }}>
+          <div style={{ fontSize: 13, color: '#d68c46', marginBottom: 10 }}>📤 離職交接待審（{resigns.length}）</div>
+          {resigns.map(r => (
+            <div key={r.id} style={{ padding: '10px 0', borderTop: '1px solid rgba(201,168,76,.06)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 14, color: '#f0e8d8' }}>{r.name || r.employee_id}<span style={{ fontSize: 11, color: '#888078', marginLeft: 8 }}>最後工作日 {r.last_work_day || '—'}</span></span>
+                <span style={{ fontSize: 11, color: r.status === 'approved' ? '#7faa7f' : '#d68c46' }}>{r.status === 'approved' ? '已核准' : '待審'}</span>
+              </div>
+              {r.reason && <div style={{ fontSize: 12, color: '#a89f90', marginTop: 4 }}>原因：{r.reason}</div>}
+              <div style={{ fontSize: 11, color: '#888078', marginTop: 4 }}>鑰匙 {r.key_returned ? '✅' : '❌'}　制服 {r.uniform_returned ? '✅' : '❌'}　業務移交 {r.handover_done ? '✅' : '❌'}</div>
+              <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+                {r.has_file && <IconBtn onClick={() => viewFile('resignation', r.id)} label="交接檔"><Eye size={13} /></IconBtn>}
+                {r.status === 'submitted' && <>
+                  <IconBtn onClick={() => reviewResign(r.id, 'approved')} color="#7faa7f"><CheckCircle2 size={13} /></IconBtn>
+                  <IconBtn onClick={() => reviewResign(r.id, 'rejected')} color="#d9534f"><XCircle size={13} /></IconBtn>
+                </>}
+                {r.status === 'approved' && <IconBtn onClick={() => reviewResign(r.id, 'completed')} color={GOLD} label="完成結案"><CheckCircle2 size={13} /></IconBtn>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {list.map(e => {
         const o = e.onboarding

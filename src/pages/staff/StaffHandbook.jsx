@@ -1,7 +1,14 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
-import { Search, BookOpen, ChevronDown, ExternalLink, X, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { Search, BookOpen, ChevronDown, ExternalLink, X, CheckCircle2, AlertTriangle, ArrowRight } from 'lucide-react'
+
+// 章節 → 系統內原生流程（取代 Google 表單）
+const NATIVE_ACTIONS = {
+  'sop-chapter-09': [{ label: '線上辦理離職交接', route: '/resign' }],
+  'sop-chapter-10': [{ label: '新人入職建檔', route: '/onboarding' }, { label: '離職交接單', route: '/resign' }],
+}
 
 // 4 大分類（沿用 Legacy Elite 原系統）
 const CATS = [
@@ -12,6 +19,7 @@ const CATS = [
   { id: 'download', name: '表單合約',     color: '#7fa0bd' },
 ]
 const CAT_MAP = Object.fromEntries(CATS.map(c => [c.id, c]))
+const GOLD = '#c9a84c'
 
 // 把內文的 https 連結轉成可點按鈕
 function renderContent(text) {
@@ -31,6 +39,7 @@ function renderContent(text) {
 
 export default function StaffHandbook() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [rows, setRows] = useState([])
   const [reads, setReads] = useState({})   // { chapter_id: ack_at }
   const [loading, setLoading] = useState(true)
@@ -153,7 +162,7 @@ export default function StaffHandbook() {
               onClick={() => setOpenId(open ? null : r.id)}
               style={{ background: 'linear-gradient(160deg,rgba(22,18,14,.92),rgba(12,10,8,.96))', borderRadius: 13, padding: 16, marginBottom: 10, cursor: 'pointer', transition: 'border-color .3s',
                 border: `1px solid ${open ? 'rgba(201,168,76,.28)' : acked ? 'rgba(201,168,76,.1)' : 'rgba(214,140,70,.32)'}`,
-                borderLeft: acked ? '1px solid rgba(201,168,76,.1)' : '3px solid rgba(214,140,70,.55)' }}>
+                boxShadow: acked ? 'none' : 'inset 3px 0 0 rgba(214,140,70,.55)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 7, gap: 8 }}>
                 <span style={{ fontSize: 9, padding: '3px 9px', borderRadius: 14, background: `${c.color}1a`, color: c.color, border: `1px solid ${c.color}33`, letterSpacing: 1, flexShrink: 0 }}>{c.name}</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
@@ -171,6 +180,17 @@ export default function StaffHandbook() {
               )}
               {open && (
                 <div onClick={e => e.stopPropagation()}>
+                  {NATIVE_ACTIONS[r.id] && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid rgba(201,168,76,.1)', marginTop: 11, paddingTop: 12 }}>
+                      <div style={{ fontSize: 11, color: '#7faa7f' }}>✅ 已可在系統內直接辦理（免 Google 表單）：</div>
+                      {NATIVE_ACTIONS[r.id].map(a => (
+                        <button key={a.route} onClick={() => navigate(a.route)}
+                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 13px', borderRadius: 9, border: `1px solid ${GOLD}`, background: 'rgba(201,168,76,.1)', color: GOLD, fontSize: 13.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'Noto Serif TC,serif' }}>
+                          {a.label}<ArrowRight size={15} />
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <div style={{ borderTop: '1px solid rgba(201,168,76,.1)', marginTop: 11, paddingTop: 12, fontFamily: 'Noto Serif TC,serif', fontSize: 13, color: '#cdc4b2', lineHeight: 1.9, whiteSpace: 'pre-wrap' }}>
                     {renderContent(r.content)}
                   </div>
