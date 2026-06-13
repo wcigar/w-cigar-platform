@@ -371,6 +371,16 @@ export default function StaffHome() {
         </div>
       </div>
 
+      {/* ══ 新人系統操作指南入口 ══ */}
+      <div onClick={() => navigate('/system-guide')} style={{display:'flex',alignItems:'center',gap:14,padding:'16px 18px',marginBottom:8,borderRadius:14,cursor:'pointer',background:'linear-gradient(160deg,rgba(30,24,18,.96),rgba(14,12,10,.99))',border:'1px solid rgba(196,163,90,.18)'}}>
+        <div style={{flexShrink:0,width:42,height:42,borderRadius:11,background:'rgba(196,163,90,.1)',border:'1px solid rgba(196,163,90,.2)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:20}}>📱</div>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontFamily:'Noto Serif TC,serif',fontSize:15,fontWeight:500,color:'#f0e8d8'}}>新人系統操作指南</div>
+          <div style={{fontFamily:'Noto Serif TC,serif',fontSize:11,color:'rgba(196,163,90,.5)',marginTop:2}}>開帳號後怎麼用系統：打卡・任務・盤點・規章一次看懂</div>
+        </div>
+        <ChevronRight size={18} color="#5a554e" style={{flexShrink:0}}/>
+      </div>
+
       {/* ══ 新人入職流程入口（未送出才顯示）══ */}
       {onb && onb.status === 'in_progress' && (() => {
         const obDone = [onb.profile_done, onb.docs_done, onb.sign_done, onb.handbook_done, onb.training_done].filter(Boolean).length

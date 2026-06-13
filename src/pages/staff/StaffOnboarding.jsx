@@ -138,6 +138,7 @@ export default function StaffOnboarding() {
         <div style={{ fontFamily: 'Noto Serif TC,serif', fontSize: 22, fontWeight: 500, color: '#f0e8d8' }}>新人入職流程</div>
         <div style={{ fontFamily: 'Cormorant Garamond,serif', fontSize: 11, fontStyle: 'italic', color: `${GOLD}77`, letterSpacing: 3, marginTop: 4 }}>STAFF ONBOARDING</div>
       </div>
+      <div onClick={() => navigate('/system-guide')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px', marginBottom: 14, borderRadius: 9, background: 'rgba(201,168,76,.06)', border: '1px solid rgba(201,168,76,.2)', cursor: 'pointer', fontFamily: 'Noto Serif TC,serif', fontSize: 12.5, color: GOLD }}>📱 第一次用？先看「新人系統操作指南」→</div>
 
       {/* 總進度 */}
       <div style={{ marginBottom: 16, padding: '14px 16px', borderRadius: 12, background: allDone ? 'rgba(100,170,100,.07)' : 'rgba(201,168,76,.05)', border: `1px solid ${allDone ? 'rgba(100,170,100,.25)' : 'rgba(201,168,76,.18)'}` }}>
