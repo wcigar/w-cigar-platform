@@ -351,7 +351,10 @@ export default function StaffExpense() {
 
       {showCashForm && (
         <div className="card" style={{ padding: 16, marginBottom: 14, borderColor: 'rgba(77,168,108,.3)' }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--green)', marginBottom: 12 }}>💰 申請零用金</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--green)', marginBottom: 8 }}>💰 申請零用金</div>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.7, marginBottom: 12, padding: '8px 10px', background: 'rgba(77,168,108,.06)', border: '1px solid rgba(77,168,108,.2)', borderRadius: 8 }}>
+            零用金＝公司預付的營運週轉金（採買備品、雜支等）。請填<b>實際收到的金額</b>：<b>現金</b>需老闆在此畫面當場簽名確認、<b>匯款</b>需確認收到。金額／額度不確定時，先問老闆再申請。
+          </div>
           <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 4 }}>金額</div>
           <div style={{ position: 'relative', marginBottom: 10 }}>
             <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 20, color: 'var(--gold)', fontWeight: 700 }}>$</span>
@@ -385,7 +388,6 @@ export default function StaffExpense() {
         {[['new','登記支出'],['history','支出紀錄'],['cash','零用金明細']].map(([v,l]) => (
           <button key={v} onClick={() => setTab(v)} style={{ padding: '7px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: tab === v ? 'var(--gold-glow)' : 'transparent', color: tab === v ? 'var(--gold)' : 'var(--text-dim)', border: tab === v ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>{l}</button>
         ))}
-        <button onClick={exportExcel} style={{ marginLeft: 'auto', padding: '7px 14px', borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: 'pointer', background: 'rgba(77,168,108,.12)', color: 'var(--green)', border: '1px solid rgba(77,168,108,.3)', whiteSpace: 'nowrap' }}>📊 匯出 Excel</button>
       </div>
 
       {tab === 'new' && (
@@ -396,7 +398,8 @@ export default function StaffExpense() {
               <button key={c.id} onClick={() => setForm(p => ({ ...p, category: c.name }))} style={{ padding: '8px 14px', borderRadius: 14, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: form.category === c.name ? 'var(--gold-glow)' : 'transparent', color: form.category === c.name ? 'var(--gold)' : 'var(--text-dim)', border: form.category === c.name ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>{c.icon} {c.name}</button>
             ))}
           </div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 6 }}>廠商（選填）</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 2 }}>廠商（選填）</div>
+          <div style={{ fontSize: 10.5, color: 'var(--text-muted)', marginBottom: 6 }}>找不到廠商？可直接「手動輸入」單次使用，或按下方「+ 新增廠商到清單」永久加入（你就能新增、不用等主管）。</div>
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8, maxHeight: 80, overflowY: 'auto' }}>
             {vendors.filter(v => !form.category || v.category === form.category || !v.category).map(v => (
               <button key={v.id} onClick={() => { setForm(p => ({ ...p, vendor: v.name })); if (v.category && !form.category) setForm(p => ({ ...p, category: v.category })) }} style={{ padding: '5px 10px', borderRadius: 12, fontSize: 11, cursor: 'pointer', background: form.vendor === v.name ? 'rgba(77,168,108,.1)' : 'transparent', color: form.vendor === v.name ? 'var(--green)' : 'var(--text-muted)', border: form.vendor === v.name ? '1px solid rgba(77,168,108,.3)' : '1px solid var(--border)' }}>{v.name}</button>
@@ -457,7 +460,8 @@ export default function StaffExpense() {
             </div>
             <select value={form.payment} onChange={e => setForm(p => ({ ...p, payment: e.target.value }))} style={{ width: 100, fontSize: 13, padding: 12 }}><option>現金</option><option>刷卡</option><option>轉帳</option><option>LINE Pay</option></select>
           </div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 6 }}>收據照片</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 2 }}>收據照片</div>
+          <div style={{ fontSize: 10.5, color: 'var(--text-muted)', marginBottom: 6, lineHeight: 1.6 }}>「📷 拍照」與「🖼️ 相簿」都可用、可混合多張（最多 5）。確實拿不到收據才勾「無收據」並選原因；無收據仍可送出，但主管審核時會看到、可能要求補充。</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
             <input type="checkbox" checked={noReceipt} onChange={e => { setNoReceipt(e.target.checked); if (e.target.checked) { setPhotos([]); setPreviews([]) } }} style={{ width: 22, height: 22, accentColor: '#f59e0b' }} />
             <span style={{ fontSize: 13, color: noReceipt ? '#f59e0b' : 'var(--text-dim)' }}>無收據</span>
@@ -522,6 +526,9 @@ export default function StaffExpense() {
         const filtered = filterHandler === 'all' ? expenses : expenses.filter(r => (r.handler || '未知') === filterHandler)
         return (
         <div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+            <button onClick={exportExcel} style={{ padding: '7px 14px', borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: 'pointer', background: 'rgba(77,168,108,.12)', color: 'var(--green)', border: '1px solid rgba(77,168,108,.3)', whiteSpace: 'nowrap' }}>📊 匯出本月 Excel</button>
+          </div>
           {/* 員工支出小計區塊 */}
           {handlerList.length > 0 && (
             <div className="card" style={{ padding: 12, marginBottom: 10, borderColor: 'var(--border-gold)' }}>

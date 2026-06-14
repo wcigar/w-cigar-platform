@@ -85,7 +85,7 @@ export default function Layout({ children }) {
           )
         })}
       </nav>
-      <style>{`@media(max-width:767px){.nav-label{font-size:8px !important;}}`}</style>
+      <style>{`.nav-label{font-size:10px;white-space:nowrap;line-height:1.15;}@media(max-width:767px){.nav-label{font-size:9.5px !important;}}`}</style>
     </div>
   )
 }
