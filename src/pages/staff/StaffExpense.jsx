@@ -3,7 +3,9 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { compressImage } from '../../lib/imageUtils'
 import { safeFileId } from '../../lib/safeFileId'
-import { DollarSign, Camera, Send, History, Wallet, Pen, RotateCcw } from 'lucide-react'
+import { canViewSensitive } from '../../lib/access'
+import { logAudit } from '../../lib/audit'
+import { DollarSign, Camera, Send, History, Wallet, Pen, RotateCcw, Lock } from 'lucide-react'
 import { format, endOfMonth } from 'date-fns'
 
 function SignaturePad({ title, onSave, onCancel }) {
@@ -289,6 +291,7 @@ export default function StaffExpense() {
   }
 
   function exportExcel() {
+    logAudit('export_expense', `匯出支出/零用金報表 ${month}（支出 ${expenses.length} 筆、零用金 ${cashRecords.length} 筆）`, user?.name || user?.employee_id || 'UNKNOWN')
     const esc = v => { const s = String(v ?? ''); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s }
     const photoCount = url => { if (!url) return 0; try { const p = JSON.parse(url); return Array.isArray(p) ? p.length : 1 } catch { return 1 } }
     const lines = []
@@ -313,6 +316,17 @@ export default function StaffExpense() {
     a.href = url; a.download = `支出報表_${month}.csv`; a.click()
     URL.revokeObjectURL(url)
   }
+
+  // 重點資料（廠商成本）：僅正職與主管可見
+  if (!canViewSensitive(user)) return (
+    <div className="page-container fade-in">
+      <div className="card" style={{ textAlign: 'center', padding: '48px 24px', marginTop: 40 }}>
+        <Lock size={40} color="var(--text-muted)" style={{ marginBottom: 14 }} />
+        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>此頁僅限正職人員</div>
+        <div style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.7 }}>支出與廠商資訊屬公司重點資料、僅開放正職同仁查看。<br />如需登記支出，請洽正職同事或主管協助。</div>
+      </div>
+    </div>
+  )
 
   if (loading) return <div className="page-container">{[1,2,3].map(i => <div key={i} className="loading-shimmer" style={{ height: 60, marginBottom: 8 }} />)}</div>
 

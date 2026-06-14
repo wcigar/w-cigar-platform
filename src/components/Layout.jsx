@@ -33,8 +33,13 @@ export default function Layout({ children }) {
   const location = useLocation()
   const isBoss = user?.role === 'boss'
   const isPT = user?.employee_type === 'PT'
-  // PT 員工不顯示「酒店」（管理用功能，PT 不需要）
-  const nav = isBoss ? BOSS_NAV : (isPT ? STAFF_NAV.filter(n => n.path !== '/admin/venue-hub') : STAFF_NAV)
+  // 重點資料（廠商成本/VIP）只開放正職與主管
+  const canSensitive = !!(user?.is_admin || user?.role === 'boss' || user?.employee_id === 'ADMIN' || user?.employee_type === '正職')
+  // PT 員工不顯示「酒店」（管理用功能）；非正職不顯示「支出」（含廠商與成本）
+  let staffNav = STAFF_NAV
+  if (isPT) staffNav = staffNav.filter(n => n.path !== '/admin/venue-hub')
+  if (!canSensitive) staffNav = staffNav.filter(n => n.path !== '/expense')
+  const nav = isBoss ? BOSS_NAV : staffNav
 
   // POS uses its own fullscreen layout — skip header, nav, and bottom padding
   const isFullscreen = location.pathname === '/pos' || location.pathname.startsWith('/vip-cellar')
