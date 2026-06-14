@@ -15,6 +15,7 @@ export default function StaffTraining() {
   const [result, setResult] = useState(null)
   const [busy, setBusy] = useState(false)
   const [trainer, setTrainer] = useState(null) // 教官待現場考核名單
+  const [material, setMaterial] = useState(null) // 目前閱讀中的教材
 
   async function loadList() {
     const { data } = await supabase.rpc('training_list', { p_employee_id: user.employee_id })
@@ -31,6 +32,14 @@ export default function StaffTraining() {
     const note = prompt('現場考核備註（選填）') ?? ''
     const { data } = await supabase.rpc('trainer_field_signoff', { p_token: user.hr_token, p_trainee_id: traineeId, p_module_id: moduleId, p_note: note })
     if (data?.ok) loadList(); else alert('簽核失敗：' + (data?.error || ''))
+  }
+
+  async function openMaterial(m) {
+    setBusy(true)
+    const { data } = await supabase.rpc('training_get_material', { p_module_id: m.id })
+    setBusy(false)
+    if (!data?.ok) return alert('教材整理中，請稍候或洽主管')
+    setActive(m); setMaterial(data); setView('material'); window.scrollTo(0, 0)
   }
 
   async function startQuiz(m) {
@@ -83,6 +92,40 @@ export default function StaffTraining() {
           <button onClick={() => { setView('list'); loadList() }} style={{ flex: 1, padding: 13, borderRadius: 10, background: 'transparent', border: '1px solid #2a2520', color: '#a89f90', fontSize: 14, cursor: 'pointer' }}>返回列表</button>
           {!result.passed && <button onClick={() => startQuiz(active)} style={{ flex: 1, padding: 13, borderRadius: 10, border: 'none', background: `linear-gradient(135deg,${GOLD},#a8863a)`, color: '#0f0d0a', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}><RotateCcw size={14} style={{ verticalAlign: -2, marginRight: 6 }} />立即重考</button>}
         </div>
+      </div>
+    )
+  }
+
+  // ── 教材閱讀頁 ──
+  if (view === 'material' && material && active) {
+    return (
+      <div style={{ padding: '0 20px 100px', maxWidth: 480, margin: '0 auto' }}>
+        <div style={{ position: 'sticky', top: 0, zIndex: 5, background: 'rgba(10,9,8,.96)', padding: '16px 0 10px' }}>
+          <button onClick={() => setView('list')} style={{ background: 'none', border: 'none', color: '#8a8278', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}><ChevronLeft size={16} />返回列表</button>
+          <div style={{ fontFamily: 'Noto Serif TC,serif', fontSize: 18, fontWeight: 500, color: '#f0e8d8', marginTop: 6 }}>{material.title}</div>
+          <div style={{ fontFamily: 'Cormorant Garamond,serif', fontSize: 11, fontStyle: 'italic', color: `${GOLD}77`, letterSpacing: 2, marginTop: 2 }}>STUDY MATERIAL · 培訓教材</div>
+        </div>
+
+        <div style={{ background: 'rgba(201,168,76,.05)', border: '1px solid rgba(201,168,76,.18)', borderRadius: 10, padding: '10px 13px', margin: '4px 0 16px', fontSize: 12, color: 'rgba(201,168,76,.85)', lineHeight: 1.7 }}>📖 請仔細研讀以下重點，測驗題目皆出自此教材。研讀完成後點下方按鈕開始測驗。</div>
+
+        {(material.material || []).map((sec, i) => (
+          <div key={i} style={{ background: 'linear-gradient(160deg,rgba(22,18,14,.92),rgba(12,10,8,.96))', border: '1px solid rgba(201,168,76,.1)', borderRadius: 13, padding: 16, marginBottom: 12 }}>
+            <div style={{ fontFamily: 'Noto Serif TC,serif', fontSize: 15, fontWeight: 600, color: GOLD, marginBottom: sec.p ? 6 : 10, paddingLeft: 10, borderLeft: `3px solid ${GOLD}` }}>{sec.h}</div>
+            {sec.p && <div style={{ fontFamily: 'Noto Serif TC,serif', fontSize: 12.5, color: '#a89f90', lineHeight: 1.7, marginBottom: 10, paddingLeft: 10 }}>{sec.p}</div>}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {(sec.items || []).map((it, j) => (
+                <div key={j} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                  <span style={{ color: GOLD, fontSize: 13, lineHeight: 1.7, flexShrink: 0 }}>·</span>
+                  <span style={{ fontFamily: 'Noto Serif TC,serif', fontSize: 13.5, color: '#e0d8c8', lineHeight: 1.75 }}>{it}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+
+        {material.pdf_url && <a href={material.pdf_url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', textAlign: 'center', padding: 11, borderRadius: 9, background: 'transparent', border: '1px solid #2a2520', color: '#a89f90', fontSize: 13, textDecoration: 'none', fontFamily: 'Noto Serif TC,serif', marginBottom: 12 }}><FileText size={13} style={{ verticalAlign: -2, marginRight: 5 }} />延伸閱讀：完整教材 PDF</a>}
+
+        <button onClick={() => startQuiz(active)} disabled={busy} style={{ width: '100%', padding: 15, borderRadius: 11, border: 'none', background: `linear-gradient(135deg,${GOLD},#a8863a)`, color: '#0f0d0a', fontSize: 15, fontWeight: 700, letterSpacing: 1, cursor: 'pointer', opacity: busy ? 0.6 : 1 }}>{busy ? '載入中…' : '我已研讀 · 開始測驗'}</button>
       </div>
     )
   }
@@ -172,7 +215,7 @@ export default function StaffTraining() {
           </div>
           {m.signed_off && <div style={{ fontSize: 11, color: '#7faa7f', marginBottom: 10 }}>✍ 現場考核已簽核{m.last_trainer ? `（${m.last_trainer}）` : ''}</div>}
           <div style={{ display: 'flex', gap: 8 }}>
-            {m.pdf_url && <a href={m.pdf_url} target="_blank" rel="noopener noreferrer" style={{ flex: 1, textAlign: 'center', padding: 11, borderRadius: 9, background: 'transparent', border: '1px solid #2a2520', color: '#a89f90', fontSize: 13, textDecoration: 'none', fontFamily: 'Noto Serif TC,serif' }}><FileText size={13} style={{ verticalAlign: -2, marginRight: 5 }} />培訓教材</a>}
+            {(m.has_material || m.pdf_url) && <button onClick={() => openMaterial(m)} disabled={busy} style={{ flex: 1, padding: 11, borderRadius: 9, background: 'transparent', border: '1px solid #2a2520', color: '#a89f90', fontSize: 13, cursor: 'pointer', fontFamily: 'Noto Serif TC,serif' }}><FileText size={13} style={{ verticalAlign: -2, marginRight: 5 }} />培訓教材</button>}
             <button onClick={() => startQuiz(m)} disabled={busy} style={{ flex: 1.4, padding: 11, borderRadius: 9, border: 'none', background: m.passed ? 'rgba(201,168,76,.1)' : `linear-gradient(135deg,${GOLD},#a8863a)`, color: m.passed ? GOLD : '#0f0d0a', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'Noto Serif TC,serif' }}>{m.attempts > 0 ? '重新測驗' : '開始測驗'}</button>
           </div>
         </div>
