@@ -22,6 +22,8 @@ export function AuthProvider({ children }) {
             .eq('id', parsed.employee_id).maybeSingle()
             .then(({ data }) => {
               if (!data) return
+              // 帳號已停用（離職結案/被停權）→ 強制登出，斷掉殘留 session
+              if (data.enabled === false) { localStorage.removeItem('w_cigar_user'); setUser(null); return }
               const refreshed = {
                 ...parsed,
                 name: data.name, position: data.title, is_active: data.enabled,
