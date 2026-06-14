@@ -114,6 +114,14 @@ export default function HRSchedule() {
         </div>
         <ChevronRight size={16} color="#5a554e" />
       </div>
+      <div onClick={() => navigate('/audit-log')} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '13px 16px', marginBottom: 14, borderRadius: 12, cursor: 'pointer', background: 'linear-gradient(160deg,rgba(40,20,18,.96),rgba(16,10,9,.99))', border: '1px solid rgba(231,76,60,.3)' }}>
+        <span style={{ fontSize: 18 }}>🛡️</span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 14, fontWeight: 500, color: '#f0e8d8' }}>智能監控 · 稽核日誌</div>
+          <div style={{ fontSize: 11, color: 'rgba(231,76,60,.7)', marginTop: 1 }}>誰看了/匯出會員·成本、誰嘗試開被鎖的頁（防臥底撈資料）</div>
+        </div>
+        <ChevronRight size={16} color="#5a554e" />
+      </div>
       <div style={{ display: 'flex', gap: 4, marginBottom: 16, overflowX: 'auto' }}>
         {tabs.map(t => <button key={t.id} onClick={() => setTab(t.id)} style={{ padding: '7px 12px', borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', background: tab === t.id ? 'var(--gold-glow)' : 'transparent', color: tab === t.id ? 'var(--gold)' : 'var(--text-dim)', border: tab === t.id ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>{t.l}</button>)}
       </div>
