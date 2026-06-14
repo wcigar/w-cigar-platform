@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { logAudit } from '../../lib/audit'
+import { canViewSensitive } from '../../lib/access'
 import { todayTw } from '../../lib/timezone'
 import { Search, ShoppingCart, X, Plus, Minus, Trash2, CreditCard, DollarSign, ChevronLeft, ChevronUp, ChevronDown, CheckCircle2, LogIn, LogOut as LogOutIcon, Clock, User, Edit2 } from 'lucide-react'
 
@@ -127,6 +128,7 @@ export default function StaffPOS() {
   const [editPriceVal, setEditPriceVal] = useState('')
   const [editPriceReason, setEditPriceReason] = useState('')
   const canOverridePrice = user?.is_admin === true
+  const canSeeMembers = canViewSensitive(user) // VIP/客戶名單僅正職與主管
   const [heldOrders, setHeldOrders] = useState([])
   const [showHeldModal, setShowHeldModal] = useState(false)
   const [todayOrders, setTodayOrders] = useState([])
@@ -217,13 +219,14 @@ export default function StaffPOS() {
   }
 
   async function searchCustomers(q) {
+    if (!canSeeMembers) { setCustomerResults([]); return } // VIP 名單僅正職
     setCustomerSearching(true)
     let query = supabase.from('customers').select('id, name, phone, customer_type, membership_tier, total_spent, belongs_to').eq('enabled', true).order('total_spent', { ascending: false }).limit(50)
     if (q?.trim()) { const sq = q.trim().replace(/[,()\\]/g, ' '); query = query.or(`name.ilike.%${sq}%,phone.ilike.%${sq}%`) }
     const { data } = await query; setCustomerResults(data || []); setCustomerSearching(false)
   }
   useEffect(() => { if (showCustomerSearch) searchCustomers(customerQuery) }, [showCustomerSearch])
-  function selectCustomer(c) { setCustomer(c); setCustomerTier(tiers.find(t => t.id === c.membership_tier) || null); setAttributedTo(c.belongs_to || '店內'); setShowCustomerSearch(false) }
+  function selectCustomer(c) { logAudit('view_customer', `POS 選取會員 ${c.name}（${c.phone || ''}）`, user?.name || user?.employee_id || 'UNKNOWN'); setCustomer(c); setCustomerTier(tiers.find(t => t.id === c.membership_tier) || null); setAttributedTo(c.belongs_to || '店內'); setShowCustomerSearch(false) }
   function clearCustomer() { setCustomer(null); setCustomerTier(null); setAttributedTo('店內') }
 
   const filtered = useMemo(() => {
@@ -468,7 +471,9 @@ export default function StaffPOS() {
             <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
               {!customer ? <>
                 <button onClick={() => {}} style={{ flex: 1, padding: '4px 0', borderRadius: 6, fontSize: 10, fontWeight: 700, background: 'rgba(201,168,76,.15)', color: '#c9a84c', border: '1px solid rgba(201,168,76,.3)', cursor: 'default' }}>散客</button>
-                <button onClick={() => { setShowCustomerSearch(true); setCustomerQuery('') }} style={{ flex: 1, padding: '4px 0', borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: 'pointer', background: '#1a1714', color: '#8a7e6e', border: '1px solid #2a2520', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}><User size={11} /> 選取會員</button>
+                {canSeeMembers
+                  ? <button onClick={() => { setShowCustomerSearch(true); setCustomerQuery('') }} style={{ flex: 1, padding: '4px 0', borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: 'pointer', background: '#1a1714', color: '#8a7e6e', border: '1px solid #2a2520', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}><User size={11} /> 選取會員</button>
+                  : <div style={{ flex: 1, padding: '4px 0', borderRadius: 6, fontSize: 9.5, fontWeight: 600, background: '#15120f', color: '#5a544a', border: '1px dashed #2a2520', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }} title="會員資料僅限正職">🔒 會員·限正職</div>}
               </> : <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, background: ts?.bg, border: `1px solid ${ts?.border}`, borderRadius: 8, padding: '3px 8px' }}>
                 <User size={13} color={ts?.color} />
                 <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 11, fontWeight: 700, color: '#e8dcc8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{customer.name}</div><div style={{ fontSize: 9, color: ts?.color }}>{ts?.label}</div></div>
