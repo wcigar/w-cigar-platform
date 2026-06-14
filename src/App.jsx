@@ -23,6 +23,7 @@ import StaffSystemGuide from './pages/staff/StaffSystemGuide'
 import StaffLiquorPickup from './pages/staff/StaffLiquorPickup'
 import StaffInjuryReport from './pages/staff/StaffInjuryReport'
 import BossStaffVault from './pages/boss/BossStaffVault'
+import BossAuditLog from './pages/boss/BossAuditLog'
 import StaffPOS from './pages/staff/StaffPOS'
 import BossHome from './pages/boss/BossHome'
 import BossAuditTasks from './pages/boss/AuditTasks'
@@ -111,6 +112,7 @@ function AppInner() {
             <Route path="/audit-tasks" element={<BossAuditTasks />} />
             <Route path="/hr" element={<BossHR />} />
             <Route path="/hr-vault" element={<BossStaffVault />} />
+            <Route path="/audit-log" element={<BossAuditLog />} />
             <Route path="/payroll" element={<BossPayroll />} />
             <Route path="/boss-inventory" element={<BossInventory />} />
             <Route path="/commission" element={<Commission />} />

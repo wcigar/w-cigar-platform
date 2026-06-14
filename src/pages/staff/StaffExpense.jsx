@@ -92,6 +92,12 @@ export default function StaffExpense() {
   const isBoss = user.role === 'boss' || user.employee_id === 'ADMIN' || user.is_admin
 
   useEffect(() => { load() }, [today, selectedMonth])
+  // 智能監控：非正職嘗試開啟支出/廠商頁 → 記錄（被擋）
+  useEffect(() => {
+    if (user?.employee_id && !canViewSensitive(user)) {
+      logAudit('blocked_access', '嘗試開啟支出/廠商頁（已擋下）', user?.name || user?.employee_id || 'UNKNOWN')
+    }
+  }, [user?.employee_id])
   useEffect(() => {
     // 只 tick today（跨午夜 / 跨日 reload）— selectedMonth 由使用者控制、不自動 reset
     const tick = () => {
