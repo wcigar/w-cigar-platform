@@ -129,6 +129,13 @@ export default function StaffInventory() {
         <span className="section-title" style={{ marginBottom: 0 }}>庫存盤點</span>
       </div>
 
+      {tab === 'count' && (
+        <div style={{ fontSize: 11.5, color: 'var(--text-dim)', lineHeight: 1.7, marginBottom: 12, padding: '10px 12px', background: 'rgba(201,168,76,.05)', border: '1px solid var(--border-gold)', borderRadius: 8 }}>
+          📋 <b style={{ color: 'var(--gold)' }}>「我的品項」</b>是主管在系統指派給你負責盤點的品項。請填入<b>實際盤到的數量</b>，與系統不符時選原因碼。<br />
+          🔴 <b style={{ color: 'var(--red)' }}>低庫存</b>＝低於安全量；盤點後若確實不足，請在備註寫「需補貨」並口頭知會主管，主管會在後台看到。
+        </div>
+      )}
+
       {/* Tab switcher */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
         <button onClick={() => setTab('count')} style={{ flex: 1, padding: '8px 0', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', background: tab === 'count' ? 'var(--gold-glow)' : 'transparent', color: tab === 'count' ? 'var(--gold)' : 'var(--text-dim)', border: tab === 'count' ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>盤點作業</button>
@@ -176,6 +183,9 @@ export default function StaffInventory() {
           <button key={v} onClick={() => setFilter(v)} style={{ padding: '6px 12px', borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', background: filter === v ? 'var(--gold-glow)' : 'transparent', color: filter === v ? 'var(--gold)' : 'var(--text-dim)', border: filter === v ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>{l}</button>
         ))}
       </div>
+      {(filter === 'mon' || filter === 'tue') && (
+        <div style={{ fontSize: 10.5, color: 'var(--text-muted)', marginBottom: 8 }}>💡「週一／週二」= 該品項<b>排定的盤點日</b>（本週要盤的），方便你分天盤完。</div>
+      )}
       <input placeholder="🔍 搜尋品項" value={keyword} onChange={e => setKeyword(e.target.value)} style={{ marginBottom: 14, fontSize: 13, padding: 10 }} />
 
       {Object.entries(byCat).map(([cat, catItems]) => (
@@ -237,7 +247,7 @@ export default function StaffInventory() {
 
       <button className="btn-gold" style={{ width: '100%', fontSize: 18, marginTop: 16, padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: submitting || !filledCount ? .5 : 1 }}
         onClick={handleSubmit} disabled={submitting || !filledCount}>
-        <Send size={18} /> {submitting ? '上傳中...' : '批次上傳 ' + filledCount + ' 筆'}
+        <Send size={18} /> {submitting ? '上傳中...' : '提交本次盤點（' + filledCount + ' 筆）'}
       </button>
 
       {items.length === 0 && !error && <div className="card" style={{ textAlign: 'center', padding: 30, color: 'var(--text-dim)', marginTop: 12 }}>你沒有負責的盤點品項</div>}

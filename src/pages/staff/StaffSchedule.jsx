@@ -152,6 +152,11 @@ function ScheduleContent() {
       <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
         <ST label="早班" value={dc} color="var(--green)" /><ST label="晚班" value={nc} color="var(--blue)" /><ST label="已休" value={oc + '/' + restQuota} color="var(--text)" />
       </div>
+      {schedules.length === 0 && (
+        <div style={{ padding: 12, marginBottom: 12, borderRadius: 10, background: 'rgba(201,168,76,.05)', border: '1px solid var(--border-gold)', fontSize: 12.5, color: 'var(--text-dim)', lineHeight: 1.7, textAlign: 'center' }}>
+          📭 <b style={{ color: 'var(--gold)' }}>本月班表尚未公布</b><br />老闆排定後會顯示於此。可先到上方「📝 填寫希望」提交你的班別意願。
+        </div>
+      )}
       <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>🔴 = 國定假日 · 點班別可申請休假</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, marginBottom: 16 }}>
         {WEEKDAYS.map(w => <div key={w} style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-muted)', padding: 4 }}>{w}</div>)}
@@ -349,6 +354,9 @@ function PreferenceContent() {
   return (
     <div className="fade-in">
       <div className="section-title">📝 填寫希望班表</div>
+      <div style={{ fontSize: 11.5, color: 'var(--text-dim)', lineHeight: 1.7, marginBottom: 12, padding: '10px 12px', background: 'rgba(201,168,76,.05)', border: '1px solid var(--border-gold)', borderRadius: 8 }}>
+        💡 這裡填的是<b style={{ color: 'var(--gold)' }}>「希望班別」（意願，非保證）</b>。請在老闆開始排班前完成提交；老闆會盡量參考大家的意願安排，<b>最終以「排班表」公布為準</b>。提交後會鎖定；當頁面顯示「✅ 已發布」即為正式班表。
+      </div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 12 }}>
         <button onClick={() => setMonth(subMonths(month, 1))} style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid var(--border-gold)', borderRadius: 10, padding: '10px 16px', color: '#c9a84c', cursor: 'pointer', minWidth: 48, minHeight: 48, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ChevronLeft size={20} /></button>
         <div style={{ fontSize: 20, color: '#c9a84c', fontWeight: 700, minWidth: 140, textAlign: 'center' }}>{format(month, 'yyyy年M月')}</div>

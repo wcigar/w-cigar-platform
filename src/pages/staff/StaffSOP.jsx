@@ -179,7 +179,10 @@ function SOPView() {
       ))}
 
       {grabTasks.length > 0 && (<>
-        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--green)', marginTop: 20, marginBottom: 8 }}>🏆 搶單任務 ({grabTasks.filter(t => t.completed).length}/{grabTasks.length})</div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--green)', marginTop: 20, marginBottom: 4 }}>🏆 搶單任務 ({grabTasks.filter(t => t.completed).length}/{grabTasks.length})</div>
+        <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.6, marginBottom: 8, padding: '8px 10px', background: 'rgba(77,168,108,.06)', border: '1px solid rgba(77,168,108,.2)', borderRadius: 8 }}>
+          這些是公共任務、沒有指定誰做。想做就<b style={{ color: 'var(--green)' }}>勾選認領</b> →（需要時拍照）→ 按底部「批次送出」才算完成；<b>先送出的人得分</b>。沒勾選不會自動分給你。
+        </div>
         {grabTasks.map(t => <TaskCard key={t.id} task={t} def={getDef(t.task_id)} user={user} isGrab
           checked={checked[t.task_id]} onCheck={v => setChecked(p => ({ ...p, [t.task_id]: v }))}
           photo={photos[t.task_id]} preview={previews[t.task_id]} onPhoto={f => handlePhoto(t.task_id, f)}
@@ -189,10 +192,20 @@ function SOPView() {
           onRecall={() => recallTask(t)} />)}
       </>)}
 
-      <button onClick={handleSubmit} disabled={submitting} style={{ width: '100%', fontSize: 18, marginTop: 20, padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: submitting ? .6 : 1, background: 'linear-gradient(135deg, #c9a84c, #8b7a3e)', color: '#0a0a0a', fontWeight: 700, border: 'none', borderRadius: 10, cursor: 'pointer', letterSpacing: 2 }}>
-        <Send size={18} /> {submitting ? '上傳中...' : '批次送出已勾選任務'}
-      </button>
       {tasks.length === 0 && <div className="card" style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)', marginTop: 20 }}>今日尚無 SOP 任務</div>}
+      {tasks.length > 0 && (() => {
+        const checkedCount = Object.values(checked).filter(Boolean).length
+        return (
+          <div style={{ position: 'sticky', bottom: 0, paddingTop: 12, paddingBottom: 8, marginTop: 20, background: 'linear-gradient(to top, #0a0a0a 68%, transparent)' }}>
+            <div style={{ fontSize: 11, color: checkedCount ? 'var(--gold)' : 'var(--text-dim)', textAlign: 'center', marginBottom: 6, lineHeight: 1.5 }}>
+              {checkedCount ? `已勾選 ${checkedCount} 項 — 按下方送出才算完成` : '✅ 做完的任務請勾選 →（需拍照的先拍照）→ 按下方「批次送出」才算完成'}
+            </div>
+            <button onClick={handleSubmit} disabled={submitting || checkedCount === 0} style={{ width: '100%', fontSize: 17, padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: (submitting || checkedCount === 0) ? .5 : 1, background: 'linear-gradient(135deg, #c9a84c, #8b7a3e)', color: '#0a0a0a', fontWeight: 700, border: 'none', borderRadius: 10, cursor: (submitting || checkedCount === 0) ? 'default' : 'pointer', letterSpacing: 1 }}>
+              <Send size={18} /> {submitting ? '上傳中...' : checkedCount ? `批次送出 ${checkedCount} 項` : '批次送出（請先勾選任務）'}
+            </button>
+          </div>
+        )
+      })()}
     </div>
   )
 }
@@ -240,7 +253,7 @@ function TaskCard({ task: t, def, user, isGrab, checked, onCheck, photo, preview
             <div style={{ marginTop: 8 }}>
               <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={e => onPhoto(e.target.files?.[0] || null)} />
               <button style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, padding: '12px 14px', width: '100%', justifyContent: 'center', borderRadius: 10, cursor: 'pointer', fontWeight: 600, background: photo ? 'rgba(77,168,108,.15)' : 'rgba(201,168,76,.1)', border: photo ? '2px solid rgba(77,168,108,.4)' : '2px dashed rgba(201,168,76,.4)', color: photo ? 'var(--green)' : 'var(--gold)' }} onClick={() => fileRef.current?.click()}>
-                <Camera size={18} /> {photo ? `✅ 已選擇 (${Math.round(photo.size / 1024)}KB)` : '📷 點擊拍照上傳'}
+                <Camera size={18} /> {photo ? `✅ 已拍（按底部送出才上傳）` : '📷 點擊拍照（送出後才上傳）'}
               </button>
               {preview && <img src={preview} alt="預覽" style={{ width: '100%', maxHeight: 160, objectFit: 'cover', borderRadius: 10, marginTop: 8, border: '1px solid var(--border-gold)' }} />}
             </div>

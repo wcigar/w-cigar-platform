@@ -75,8 +75,11 @@ export default function LeaveRequest() {
 
       {tab === 'new' && (
         <div className="card" style={{ padding: 16 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--gold)', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}><Calendar size={16} /> 請假申請</div>
-          
+          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--gold)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}><Calendar size={16} /> 請假申請</div>
+          <div style={{ fontSize: 11.5, color: 'var(--text-dim)', lineHeight: 1.7, marginBottom: 14, padding: '10px 12px', background: 'rgba(201,168,76,.05)', border: '1px solid var(--border-gold)', borderRadius: 8 }}>
+            💡 送出後狀態為<b style={{ color: '#f59e0b' }}>「待審核」</b>，由老闆審核。結果請到上方<b style={{ color: 'var(--gold)' }}>「我的假單」</b>查看：<b style={{ color: 'var(--green)' }}>已核准</b> 或 <b style={{ color: 'var(--red)' }}>已駁回</b>（駁回會附原因）。審核前可自行取消。
+          </div>
+
           <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 4 }}>請假日期 *</div>
           <input type="date" value={form.date} onChange={e => setForm(p => ({ ...p, date: e.target.value }))} min={format(new Date(), 'yyyy-MM-dd')} style={{ marginBottom: 12, fontSize: 14, padding: 10 }} />
           

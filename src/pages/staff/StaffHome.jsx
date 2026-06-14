@@ -434,6 +434,7 @@ export default function StaffHome() {
           ) : <div style={{fontFamily:'var(--serif)',fontSize:18,color:'rgba(196,163,90,.4)',margin:'16px 0'}}>{shiftName ? `今日${shiftName}` : '尚未排班'}</div>}
 
           {(shiftInfo?.start || canPunch) && <>
+            {crossDayPunchDate && <div style={{fontFamily:'var(--serif)',fontSize:11,color:'#f59e0b',margin:'4px 0 6px',padding:'7px 10px',background:'rgba(245,158,11,.06)',border:'1px solid rgba(245,158,11,.2)',borderRadius:8,lineHeight:1.6}}>📅 以下為<b>昨日 {crossDayPunchDate.slice(5)} 晚班</b>的打卡（跨夜下班用）。今日新班次的打卡，請於上班時再操作。</div>}
             <div style={{display:'flex',gap:16,justifyContent:'center',alignItems:'center',margin:'16px 0'}}>
               <div style={{display:'flex',alignItems:'center',gap:8}}><span style={{fontFamily:'var(--mono)',fontSize:9,color:'rgba(196,163,90,.3)',letterSpacing:1}}>CLOCK IN{crossDayPunchDate?` (${crossDayPunchDate.slice(5)})`:''}</span><span style={{fontFamily:'var(--mono)',fontSize:16,fontWeight:400,color:punchIn?(crossDayPunchDate?'#f59e0b':'rgba(100,170,100,.8)'):'rgba(196,163,90,.2)'}}>{punchIn?toTaipei(punchIn.time,true):'—:—'}</span></div>
               <div style={{width:1,height:16,background:'rgba(196,163,90,.1)'}}/>
@@ -518,6 +519,7 @@ export default function StaffHome() {
 
         {/* 異常回報 */}
         <button className="wcb-btn-danger" style={{width:'100%',padding:16,fontSize:14,letterSpacing:2}} onClick={() => setShowAbnormal(true)}>🚨 突發異常回報</button>
+        <div style={{fontFamily:'var(--serif)',fontSize:10.5,color:'var(--smoke)',textAlign:'center',marginTop:6,lineHeight:1.6}}>僅供突發狀況回報（設備故障・客訴・安全事件等），一般小事不需使用；緊急危難請先撥 119／110。</div>
       </div>
 
       {/* ══════ Zone B：今日任務 ══════ */}
@@ -526,10 +528,12 @@ export default function StaffHome() {
 
         {/* SOP 進度 */}
         <div className="wcb-card">
-          <div style={{display:'flex',justifyContent:'space-between',marginBottom:10}}><span style={{fontFamily:'var(--serif)',fontSize:14,color:'var(--bone)',fontWeight:600}}>SOP 進度</span><span style={{fontFamily:'var(--mono)',fontSize:15,color:'rgba(196,163,90,1)',fontWeight:700}}>{done} / {tasks.length}</span></div>
-          <div className="wcb-progress-track"><div className="wcb-progress-fill" style={{width:`${sopPct}%`}}/></div>
+          <div style={{display:'flex',justifyContent:'space-between',marginBottom:10}}><span style={{fontFamily:'var(--serif)',fontSize:14,color:'var(--bone)',fontWeight:600}}>SOP 進度</span><span style={{fontFamily:'var(--mono)',fontSize:15,color:'rgba(196,163,90,1)',fontWeight:700}}>{tasks.length ? `${done} / ${tasks.length}` : '—'}</span></div>
+          {tasks.length > 0 && <div className="wcb-progress-track"><div className="wcb-progress-fill" style={{width:`${sopPct}%`}}/></div>}
           <div className="wcb-sep"/>
-          {tasks.slice(0,5).map(t => (
+          {tasks.length === 0
+            ? <div style={{textAlign:'center',padding:'12px 0',fontFamily:'var(--serif)',fontSize:12.5,color:'var(--ash)',lineHeight:1.6}}>今日 SOP 任務尚未發布<br /><span style={{fontSize:11,color:'var(--smoke)'}}>排定後會出現在這裡，可到下方「任務」頁查看</span></div>
+            : tasks.slice(0,5).map(t => (
             <div key={t.id} style={{display:'flex',alignItems:'center',gap:14,padding:'11px 0',borderBottom:'1px solid rgba(196,163,90,.08)'}}>
               <div style={{width:22,height:22,borderRadius:6,flexShrink:0,border:`1.5px solid ${t.completed?'rgba(77,168,108,.7)':'rgba(196,163,90,.4)'}`,display:'flex',alignItems:'center',justifyContent:'center',...(t.completed?{background:'rgba(77,168,108,.2)'}:{})}}>{t.completed&&<span style={{fontSize:14,color:'#4da86c',fontWeight:900,lineHeight:1}}>✓</span>}</div>
               <span style={{fontFamily:'var(--serif)',fontSize:14,color:t.completed?'rgba(232,220,200,.55)':'rgba(232,220,200,1)',fontWeight:t.completed?400:500,flex:1,...(t.completed?{textDecoration:'line-through',textDecorationColor:'rgba(196,163,90,.3)'}:{})}}>{t.title}</span>
@@ -581,6 +585,7 @@ export default function StaffHome() {
             </div>
             <div style={{fontFamily:'Cormorant Garamond,serif',fontSize:10,fontStyle:'italic',color:'rgba(196,163,90,.3)',letterSpacing:2,padding:'4px 14px',borderRadius:20,border:'1px solid rgba(196,163,90,.1)'}}>{showPerformance?'收合 ▴':'展開 ▾'}</div>
           </div>
+          <div style={{fontFamily:'var(--serif)',fontSize:10,color:'var(--smoke)',marginTop:8,lineHeight:1.6}}>營業額 · 分紅% · 搶單數。<b style={{color:'rgba(196,163,90,.55)'}}>分紅%</b> 依當月店營業額分級（滿 30 萬 3%、50 萬 5%、70 萬 7%、百萬 10%），與你的搶單／全勤／開櫃獎金分開計算。點開看完整明細。</div>
         </div>
 
         {showPerformance && <>
