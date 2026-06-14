@@ -235,7 +235,11 @@ export default function StaffHome() {
         if (schErr) { alert('❌ 自動排班失敗：' + schErr.message); setPunchAsEmp(null); return }
       }
       const { error: punchErr } = await supabase.from('punch_records').insert({ date: punchDate, employee_id: targetEmp.id, name: targetEmp.name, punch_type: type, photo_url: photoUrl || null, lat, lng, distance_m: Math.round(dist), is_valid: valid })
-      if (punchErr) { alert('❌ 打卡失敗：' + punchErr.message + '\n請重試或叫老闆代登'); setPunchAsEmp(null); return }
+      if (punchErr) {
+        const dup = punchErr.code === '23505' || /duplicate|uniq_punch/i.test(punchErr.message || '')
+        if (dup) { alert(`這個班次的「${type}」卡已經打過了 ✅\n系統幫你更新狀態，請確認畫面。`); setPunchAsEmp(null); load(); return }
+        alert('❌ 打卡失敗：' + punchErr.message + '\n請重試或叫老闆代登'); setPunchAsEmp(null); return
+      }
       // 打卡成功 → 立即觸發 staff-reminders 推播確認音到員工 LINE 群（fire-and-forget）
       if (valid) {
         supabase.functions.invoke('staff-reminders', { body: {} }).catch(() => {})
