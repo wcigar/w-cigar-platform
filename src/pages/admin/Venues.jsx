@@ -3,7 +3,7 @@
 // 與 venueSales.js 共用 venues service —— 改動會直接影響 KEY-in 頁的大使下拉。
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Pencil, X, Check, Search, Power, Users, MapPin, UserCheck } from 'lucide-react'
+import { Plus, Pencil, X, Check, Search, Power, Users, MapPin, UserCheck, Receipt } from 'lucide-react'
 import {
   listVenues, upsertVenue, deactivateVenue, activateVenue, REGION_OPTIONS,
 } from '../../lib/services/venues'
@@ -173,6 +173,11 @@ function VenueRow({ venue, ambassadors, onEdit, onToggleActive }) {
               <MapPin size={11} /> {venue.address}
             </div>
           )}
+          {venue.finance_contact_name && (
+            <div style={{ color: '#6a655c', fontSize: 11, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Receipt size={11} /> 對接會計/總務：{venue.finance_contact_name}
+            </div>
+          )}
           <div style={{ marginTop: 6, fontSize: 11, color: codes.length === 0 ? '#f59e0b' : '#8a8278', display: 'flex', alignItems: 'center', gap: 4 }}>
             <Users size={11} />
             {codes.length === 0
@@ -199,6 +204,7 @@ function VenueEditModal({ venue, ambassadors, busy, onClose, onSave }) {
   const [codes, setCodes] = useState(() => new Set(venue?.assigned_ambassador_codes || []))
   const [hasSelfSale, setHasSelfSale] = useState(venue?.has_self_sale === true)
   const [supervisorId, setSupervisorId] = useState(venue?.supervisor_id || '')
+  const [financeContactName, setFinanceContactName] = useState(venue?.finance_contact_name || '')
   const isNew = !venue
 
   function toggleCode(id) {
@@ -220,6 +226,7 @@ function VenueEditModal({ venue, ambassadors, busy, onClose, onSave }) {
       assigned_ambassador_codes: [...codes],
       has_self_sale: hasSelfSale,
       supervisor_id: supervisorId || null,
+      finance_contact_name: financeContactName.trim(),
     })
   }
 
@@ -276,6 +283,10 @@ function VenueEditModal({ venue, ambassadors, busy, onClose, onSave }) {
               <option key={s.id} value={s.id}>{s.name}（{s.region === 'taipei' ? '台北' : '台中'}）</option>
             ))}
           </select>
+        </Field>
+
+        <Field label={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Receipt size={11} /> 對接會計/總務（店家那邊負責對帳、收款的窗口）</span>}>
+          <input value={financeContactName} onChange={e => setFinanceContactName(e.target.value)} style={inputStyle()} placeholder="例如：豪哥（選填）" />
         </Field>
 
         <div style={{ marginTop: 14, marginBottom: 6, fontSize: 12, color: '#8a8278', letterSpacing: 1 }}>

@@ -18,6 +18,7 @@ function syncCache(rows) {
     default_alert_threshold: r.default_alert_threshold ?? 3,
     has_self_sale: !!r.has_self_sale,
     supervisor_id: r.supervisor_id || null,
+    finance_contact_name: r.finance_contact_name || '',
     source: r.source || 'manual',
   }))
 }
@@ -54,6 +55,7 @@ export async function upsertVenue(payload) {
       : 3,
     has_self_sale: !!payload.has_self_sale,
     supervisor_id: payload.supervisor_id || null,
+    finance_contact_name: String(payload.finance_contact_name || '').trim(),
     source: payload.source || 'manual',
     updated_at: new Date().toISOString(),
   }
