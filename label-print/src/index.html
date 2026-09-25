@@ -1,0 +1,1531 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0d0d0d">
+<title>W Cigar 標籤列印 · Cetak Label</title>
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%230d0d0d'/%3E%3Ctext x='32' y='44' font-size='36' text-anchor='middle' fill='%23c9a84c' font-family='serif'%3EW%3C/text%3E%3C/svg%3E">
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;background:#0d0d0d;color:#e8e4dc;
+       font-family:'Microsoft JhengHei','PingFang TC','Noto Sans TC',system-ui,sans-serif;
+       padding:16px 14px 48px;max-width:520px;margin:0 auto}
+  h1{font-size:19px;margin:0 0 2px;color:#c9a84c;letter-spacing:.06em;font-weight:600}
+  .sub{font-size:12px;color:#7d7568;margin-bottom:16px}
+  label{display:block;font-size:12px;color:#9b9384;margin:14px 0 5px;letter-spacing:.04em}
+  label i{font-style:normal;color:#6e675c}
+  input[type=text],input[type=date],select{
+    width:100%;padding:12px;font-size:16px;border-radius:9px;
+    border:1px solid #2e2a24;background:#161513;color:#e8e4dc;font-family:inherit}
+  input:focus,select:focus{outline:none;border-color:#c9a84c}
+  .seg{display:flex;border:1px solid #2e2a24;border-radius:9px;overflow:hidden}
+  .seg button{flex:1;padding:11px 4px;font-size:13px;background:#161513;color:#9b9384;
+              border:none;font-family:inherit;cursor:pointer;line-height:1.3}
+  .seg button.on{background:#c9a84c;color:#141210;font-weight:600}
+  .seg button span{display:block;font-size:11px;opacity:.72}
+  #mode{margin-bottom:4px}
+  #mode button{padding:11px 4px;font-size:14px}
+  .chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:6px}
+  .chips button{padding:9px 12px;font-size:14px;border-radius:8px;border:1px solid #2e2a24;
+                background:#161513;color:#cfc7b8;font-family:inherit;cursor:pointer;line-height:1.25}
+  .chips button .id{display:block;font-size:11px;color:#8a8272;margin-top:2px}
+  .chips button.on{background:#c9a84c;color:#141210;border-color:#c9a84c}
+  .chips button.on .id{color:#4a3f21}
+  #preview{width:100%;background:#fff;border-radius:8px;display:block}
+  .pv-wrap{border:1px solid #2e2a24;border-radius:10px;padding:10px;background:#1a1917;margin-top:6px}
+  .pv-note{font-size:11px;color:#6e675c;margin-top:7px;text-align:center}
+  #send{width:100%;margin-top:22px;padding:16px;font-size:17px;font-weight:700;border:none;
+      border-radius:11px;background:#c9a84c;color:#141210;font-family:inherit;cursor:pointer;line-height:1.3}
+  #send span{display:block;font-size:13px;font-weight:600;opacity:.72}
+  #send:disabled{opacity:.45}
+  #msg{margin-top:14px;padding:13px;border-radius:9px;font-size:14px;line-height:1.6;display:none}
+  .ok{background:#14261a;color:#7fd39b;border:1px solid #24452f}
+  .err{background:#2a1616;color:#e88}
+  .wait{background:#241f14;color:#d9bd76}
+  #iconcat{margin:14px 0 0}
+  #iconcat button{padding:9px 2px;font-size:12px}
+  #iconcat button span{font-size:9px}
+  .icons{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+  .icons button{padding:0;border:1px solid #2e2a24;border-radius:9px;background:#fff;
+                cursor:pointer;overflow:hidden;display:block}
+  .icons button img{width:100%;display:block}
+  .icons button .cap{display:block;background:#161513;color:#cfc7b8;font-size:12px;padding:5px 2px;font-family:inherit}
+  .icons button.on{border-color:#c9a84c;box-shadow:0 0 0 2px #c9a84c}
+  .icons button.on .cap{background:#c9a84c;color:#141210;font-weight:600}
+  .icons button .cap::before{content:'';display:inline-block;width:11px;height:11px;border:1.5px solid #6e675c;
+    border-radius:3px;margin-right:5px;vertical-align:-1px}
+  .icons button.on .cap::before{background:#141210;border-color:#141210;
+    box-shadow:inset 0 0 0 2px #c9a84c}
+  .chars{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px}
+  .chars button{padding:10px 4px;border:1px solid #2e2a24;border-radius:9px;background:#161513;
+    color:#e8e4dc;font-family:inherit;cursor:pointer;line-height:1.2}
+  .chars button b{display:block;font-size:26px;font-weight:700}
+  .chars button::before{content:'';display:block;width:12px;height:12px;border:1.5px solid #6e675c;
+    border-radius:3px;margin:0 auto 4px}
+  .chars button.on::before{background:#141210;border-color:#141210;box-shadow:inset 0 0 0 2px #c9a84c}
+  .selbar{display:flex;gap:8px;margin-top:10px}
+  .selbar button{flex:1;padding:9px;font-size:13px;border:1px solid #2e2a24;border-radius:8px;
+    background:#161513;color:#c9a84c;font-family:inherit;cursor:pointer}
+  .chars button span{display:block;font-size:11px;color:#8a8272;margin-top:3px}
+  .chars button.on{background:#c9a84c;color:#141210;border-color:#c9a84c}
+  .chars button.on span{color:#4a3f21}
+  #cnt{font-size:12px;color:#c9a84c;margin-top:10px;text-align:center}
+  .hint{font-size:11px;color:#6e675c;margin-top:6px;line-height:1.5}
+  .hint.warn{color:#c9a84c}
+  .row2{display:flex;gap:10px}
+  .row2>div{flex:1}
+</style>
+</head>
+<body>
+
+<h1>W CIGAR 標籤列印</h1>
+<div class="sub">Cetak Label · 辦公室 TSC DH220 · 40×25mm</div>
+
+<div class="seg" id="mode">
+  <button data-m="food" class="on">食物<span>Makanan</span></button>
+  <button data-m="icon">圖案<span>Stickers</span></button>
+  <button data-m="learn">學習<span>Learn</span></button>
+  <button data-m="general">一般<span>Label</span></button>
+  <button data-m="customs">報關<span>Customs</span></button>
+</div>
+
+<!-- ── 圖案貼紙（小孩用）────────────────────── -->
+<div id="pane-icon" style="display:none">
+  <div class="seg" id="iconcat"></div>
+  <div class="selbar"><button id="icall">\u5168\u9078 Select All</button><button id="icnone">\u6e05\u9664 Clear</button></div>
+  <div class="icons" id="iconpick"></div>
+  <div class="hint">點一下打勾，可以一次選很多個，按一次全部印出來</div>
+  <div id="ictextbox">
+    <label>下面印的字 <i>· Text below</i></label>
+    <div class="row2">
+      <div><input type="text" id="ictext" placeholder="中文" maxlength="16"></div>
+      <div><input type="text" id="ictext2" placeholder="English" maxlength="20"></div>
+    </div>
+    <div class="hint">可以改成小孩的名字。兩欄都清空就整張只印圖案</div>
+  </div>
+</div>
+
+<!-- ── 學習貼紙 ──────────────────────────────── -->
+<div id="pane-learn" style="display:none">
+  <div class="seg" id="learncat"></div>
+  <div class="selbar"><button id="lnall">\u5168\u9078 Select All</button><button id="lnnone">\u6e05\u9664 Clear</button></div>
+  <div class="chars" id="learnpick"></div>
+  <div class="hint">點一下打勾，可以一次選很多個。印出來是「大字＋中文＋英文」，適合 2～3 歲認字</div>
+</div>
+
+<!-- ── 食物標籤（中文＋印尼文）──────────────── -->
+<div id="pane-food">
+  <label>常用食物 <i>· Makanan umum</i></label>
+  <div class="chips" id="foodchips"></div>
+
+  <div class="row2" style="margin-top:14px">
+    <div>
+      <label style="margin-top:0">中文 <i>· Mandarin</i></label>
+      <input type="text" id="fzh" placeholder="雞蛋" maxlength="14">
+    </div>
+    <div>
+      <label style="margin-top:0">印尼文 <i>· Indonesia</i></label>
+      <input type="text" id="fid" placeholder="Telur" maxlength="22">
+    </div>
+  </div>
+  <div class="hint" id="trhint">打其中一欄，另一欄會自動出現　<i>Ketik satu kolom, kolom lain otomatis terisi</i></div>
+
+  <label>提醒 <i>· Pengingat</i></label>
+  <div class="chips" id="notechips"></div>
+
+  <label>日期 <i>· Tanggal</i></label>
+  <div class="row2">
+    <div><select id="dtype">
+      <option value="">不印日期 · Tanpa tanggal</option>
+      <option value="opened">開封日 · Dibuka</option>
+      <option value="expire">到期日 · Kedaluwarsa</option>
+    </select></div>
+    <div><input type="date" id="dval"></div>
+  </div>
+</div>
+
+<!-- ── 一般標籤 ────────────────────────────── -->
+<div id="pane-general" style="display:none">
+  <label>第一行（大字） <i>· Baris 1</i></label>
+  <input type="text" id="l1" placeholder="例：影印紙 A4" maxlength="24">
+  <label>第二行（選填） <i>· Baris 2</i></label>
+  <input type="text" id="l2" placeholder="例：文具櫃 第二層" maxlength="24">
+  <label>第三行（選填） <i>· Baris 3</i></label>
+  <input type="text" id="l3" placeholder="例：2026/08" maxlength="24">
+
+  <label>條碼 / QR（選填） <i>· Barcode / QR</i></label>
+  <div class="seg" id="seg">
+    <button data-t="none" class="on">不加<span>Tidak</span></button>
+    <button data-t="barcode">條碼<span>Barcode</span></button>
+    <button data-t="qr">QR 碼<span>Kode QR</span></button>
+  </div>
+  <input type="text" id="code" placeholder="條碼／QR 內容" maxlength="80" style="margin-top:8px;display:none">
+  <div class="hint" id="codehint" style="display:none">條碼只支援英數字元，中文會自動略過</div>
+</div>
+
+<!-- ── 雪茄報關綑包標籤 ────────────────────── -->
+<div id="pane-customs" style="display:none">
+  <label>品名（點一下直接帶入三行＋份數） <i>· Pilih cepat</i></label>
+  <div class="chips" id="customspresets"></div>
+  <div class="hint">這是這批報單成功印過的品名，點了還是可以照下面三行再改字</div>
+
+  <label>第一行（大字・品名） <i>· Baris 1</i></label>
+  <input type="text" id="cl1" placeholder="例：D4" maxlength="30">
+  <label>第二行（選填） <i>· Baris 2</i></label>
+  <input type="text" id="cl2" placeholder="例：Cigars Dominican Cigars Dominican" maxlength="34">
+  <label>第三行（選填・產地） <i>· Baris 3</i></label>
+  <input type="text" id="cl3" placeholder="例：DOMINICAN REPUBLIC" maxlength="24">
+
+  <label>報單項次（選填，會加在第三行後面） <i>· No. urut</i></label>
+  <div class="chips" id="customsitemno"></div>
+  <div class="hint">點一下把「#數字」加到第三行尾巴；再點一次取消。品名跟項次都點好可以直接送印，內容跟下次報單不同就直接改字就好</div>
+</div>
+
+<!-- ── 報關密碼保護遮罩 ────────────────────── -->
+<div id="customsLock" style="display:none;position:fixed;inset:0;background:rgba(13,13,13,.94);z-index:999;align-items:center;justify-content:center;padding:20px">
+  <div style="width:100%;max-width:280px;text-align:center">
+    <div style="font-size:15px;color:#c9a84c;margin-bottom:14px;letter-spacing:.04em">🔒 報關專用・請輸入密碼</div>
+    <input type="password" id="customsPwd" inputmode="numeric" pattern="[0-9]*" maxlength="8" placeholder="密碼"
+      style="width:100%;padding:12px;font-size:18px;text-align:center;letter-spacing:.3em;border-radius:9px;border:1px solid #2e2a24;background:#161513;color:#e8e4dc">
+    <div id="customsPwdErr" style="color:#e0645c;font-size:12px;margin-top:8px;height:14px"></div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button id="customsPwdCancel" type="button" style="flex:1;padding:11px;border-radius:9px;border:1px solid #2e2a24;background:#161513;color:#9b9384;font-family:inherit">取消</button>
+      <button id="customsPwdOk" type="button" style="flex:1;padding:11px;border-radius:9px;border:none;background:#c9a84c;color:#141210;font-weight:600;font-family:inherit">確認</button>
+    </div>
+  </div>
+</div>
+
+<label>份數 <i>· Jumlah</i></label>
+<select id="copies">
+  <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
+  <option>6</option><option>7</option><option>8</option><option>9</option><option>10</option>
+</select>
+
+<label>預覽 <i>· Pratinjau</i></label>
+<div class="pv-wrap"><canvas id="preview"></canvas></div>
+<div class="pv-note">40mm × 25mm ・ 203dpi</div>
+
+<div id="cnt"></div>
+<button id="send">送出列印<span>Cetak Label</span></button>
+<div id="msg"></div>
+
+<script>
+const SB   = 'https://yzujoxdltvklrehphzsl.supabase.co/rest/v1';
+const AK   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6dWpveGRsdHZrbHJlaHBoenNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1NDgzOTUsImV4cCI6MjA5MTEyNDM5NX0.xMDhOKXfFNueC_XIGQ-zzUutNpBXpnuo97Gf5IEKUcs';
+const STORE = 'office';
+const W = 320, H = 200;
+const $ = id => document.getElementById(id);
+
+// ── 中文 ↔ 印尼文 字典（買菜、日用品常見詞）──────────────────
+const DICT = [
+  // 蛋 · 奶 · 豆
+  ['雞蛋','Telur'],['鴨蛋','Telur bebek'],['皮蛋','Telur pitan'],['鹹蛋','Telur asin'],
+  ['牛奶','Susu'],['鮮奶','Susu segar'],['保久乳','Susu UHT'],['豆漿','Susu kedelai'],
+  ['優格','Yogurt'],['起司','Keju'],['奶油','Mentega'],['鮮奶油','Krim'],['煉乳','Susu kental manis'],
+  ['豆腐','Tahu'],['豆乾','Tahu kering'],['天貝','Tempe'],
+  // 肉
+  ['豬肉','Daging babi'],['牛肉','Daging sapi'],['雞肉','Daging ayam'],['羊肉','Daging kambing'],
+  ['鴨肉','Daging bebek'],['絞肉','Daging cincang'],['培根','Bacon'],['香腸','Sosis'],['火腿','Ham'],
+  ['雞胸肉','Dada ayam'],['雞腿','Paha ayam'],['排骨','Iga'],['牛排','Steak'],['肉','Daging'],
+  // 海鮮
+  ['魚','Ikan'],['蝦','Udang'],['蝦子','Udang'],['螃蟹','Kepiting'],['花枝','Cumi'],['蛤蜊','Kerang'],
+  ['鮭魚','Salmon'],['鮪魚','Tuna'],['吳郭魚','Ikan nila'],['虱目魚','Ikan bandeng'],['干貝','Skalop'],
+  ['生蠔','Tiram'],['牡蠣','Tiram'],
+  // 蔬菜
+  ['蔬菜','Sayur'],['高麗菜','Kubis'],['白菜','Sawi putih'],['青江菜','Pakcoy'],['空心菜','Kangkung'],
+  ['菠菜','Bayam'],['地瓜葉','Daun ubi'],['紅蘿蔔','Wortel'],['白蘿蔔','Lobak'],['洋蔥','Bawang bombay'],
+  ['大蒜','Bawang putih'],['蔥','Daun bawang'],['薑','Jahe'],['辣椒','Cabai'],['番茄','Tomat'],
+  ['小黃瓜','Timun'],['茄子','Terong'],['苦瓜','Pare'],['絲瓜','Oyong'],['南瓜','Labu'],
+  ['玉米','Jagung'],['馬鈴薯','Kentang'],['地瓜','Ubi'],['芋頭','Talas'],['香菇','Jamur'],
+  ['金針菇','Jamur enoki'],['豆芽','Tauge'],['四季豆','Buncis'],['花椰菜','Kembang kol'],
+  ['青花菜','Brokoli'],['芹菜','Seledri'],['竹筍','Rebung'],['青椒','Paprika hijau'],
+  // 水果
+  ['水果','Buah'],['蘋果','Apel'],['香蕉','Pisang'],['橘子','Jeruk'],['柳丁','Jeruk manis'],
+  ['葡萄','Anggur'],['西瓜','Semangka'],['鳳梨','Nanas'],['芒果','Mangga'],['木瓜','Pepaya'],
+  ['芭樂','Jambu'],['火龍果','Buah naga'],['榴槤','Durian'],['山竹','Manggis'],['荔枝','Leci'],
+  ['龍眼','Kelengkeng'],['草莓','Stroberi'],['水梨','Pir'],['桃子','Persik'],['檸檬','Lemon'],
+  ['椰子','Kelapa'],['酪梨','Alpukat'],['哈密瓜','Melon'],
+  // 主食
+  ['白飯','Nasi putih'],['飯','Nasi'],['麵條','Mie'],['泡麵','Mie instan'],['米粉','Bihun'],
+  ['冬粉','Soun'],['乾麵','Mie kering'],['麵包','Roti'],['吐司','Roti tawar'],['饅頭','Bakpao'],
+  ['水餃','Pangsit'],['包子','Bakpao isi'],['麵粉','Tepung terigu'],['米','Beras'],['義大利麵','Pasta'],
+  ['油飯','Nasi ketan gurih'],['糯米','Beras ketan'],
+  // 調味料
+  ['鹽','Garam'],['糖','Gula'],['醬油','Kecap asin'],['甜醬油','Kecap manis'],['醋','Cuka'],
+  ['油','Minyak'],['沙拉油','Minyak goreng'],['香油','Minyak wijen'],['蠔油','Saus tiram'],
+  ['番茄醬','Saus tomat'],['辣椒醬','Sambal'],['味精','Micin'],['胡椒','Merica'],['咖哩','Kari'],
+  ['蜂蜜','Madu'],['花生醬','Selai kacang'],['果醬','Selai'],
+  // 飲料
+  ['水','Air'],['開水','Air putih'],['礦泉水','Air mineral'],['茶','Teh'],['咖啡','Kopi'],
+  ['果汁','Jus'],['汽水','Soda'],['啤酒','Bir'],['冰塊','Es batu'],
+  // 零食 · 點心
+  ['餅乾','Biskuit'],['蛋糕','Kue'],['巧克力','Cokelat'],['糖果','Permen'],['洋芋片','Keripik kentang'],
+  ['冰淇淋','Es krim'],['布丁','Puding'],['果凍','Jeli'],['花生','Kacang tanah'],['堅果','Kacang'],
+  // 熟食 · 狀態
+  ['剩菜','Sisa makanan'],['便當','Nasi kotak'],['湯','Sup'],['粥','Bubur'],['炒飯','Nasi goreng'],
+  ['炒麵','Mie goreng'],['沙拉','Salad'],['熟食','Makanan matang'],['生的','Mentah'],
+  ['已開封','Sudah dibuka'],['未開封','Belum dibuka'],['今天買的','Beli hari ini'],
+  // 存放
+  ['冰箱','Kulkas'],['冷凍庫','Freezer'],['冷藏','Dingin'],['常溫','Suhu ruang'],['櫥櫃','Lemari'],
+  // 日用品
+  ['衛生紙','Tisu'],['洗碗精','Sabun cuci piring'],['洗衣精','Deterjen'],['肥皂','Sabun'],
+  ['洗髮精','Sampo'],['牙膏','Pasta gigi'],['垃圾袋','Kantong sampah'],['保鮮膜','Plastik wrap'],
+  ['鋁箔紙','Aluminium foil'],['夾鏈袋','Kantong ziplock'],['清潔劑','Pembersih'],['漂白水','Pemutih'],
+  ['抹布','Lap'],['手套','Sarung tangan'],['口罩','Masker'],['電池','Baterai'],['燈泡','Bohlam'],
+  ['狗飼料','Makanan anjing'],['貓飼料','Makanan kucing'],
+];
+const Z2I = new Map(), I2Z = new Map();
+DICT.forEach(([z, i]) => { Z2I.set(z, i); const k = i.toLowerCase(); if (!I2Z.has(k)) I2Z.set(k, z); });
+
+/** 查中文 → 印尼文（先完全比對；再找包含的詞，取最長的那個才會準）
+ *  取最長：「冷凍雞肉」要配到「雞肉」不是「肉」 */
+function toId(zhw){
+  const s = zhw.trim(); if (!s) return '';
+  if (Z2I.has(s)) return Z2I.get(s);
+  let best = '', bestLen = 0;
+  for (const [z, i] of DICT) if (z.length > 1 && z.length > bestLen && s.includes(z)) { best = i; bestLen = z.length; }
+  return best;
+}
+/** 查印尼文 → 中文（不分大小寫；先完全比對，再取最長的包含詞，最後逐字比對）
+ *  取最長：「air mineral dingin」要配到「air mineral＝礦泉水」不是「air＝水」 */
+function toZh(idw){
+  const s = idw.trim().toLowerCase(); if (!s) return '';
+  if (I2Z.has(s)) return I2Z.get(s);
+  let best = '', bestLen = 0;
+  for (const [z, i] of DICT) { const k = i.toLowerCase(); if (k.length > 2 && k.length > bestLen && s.includes(k)) { best = z; bestLen = k.length; } }
+  if (best) return best;
+  for (const w of s.split(/\s+/)) if (I2Z.has(w)) return I2Z.get(w);
+  return '';
+}
+
+// 快選（最常買的）
+const QUICK = ['雞蛋','牛奶','豆漿','麵包','雞肉','豬肉','魚','蝦','蔬菜','水果','白飯','剩菜',
+               '起司','優格','香蕉','蘋果','番茄','洋蔥','馬鈴薯','湯','咖啡','茶','衛生紙','冰塊'];
+const NOTES = [
+  ['可以吃','Boleh dimakan'], ['不要吃','Jangan dimakan'], ['需冷藏','Simpan di kulkas'],
+  ['需冷凍','Simpan di freezer'], ['要加熱','Panaskan dulu'], ['先吃這個','Makan ini dulu'],
+];
+
+// ── 車車圖案（小孩貼紙）────────────────────────────────
+// 熱感印表機只有純黑白、沒有灰階 → 一律粗線條、實心黑塊，不用漸層陰影。
+// 畫布 200×125，跟標籤 320×200 同比例，所以「只印圖」時剛好滿版。
+const ICONS = {
+  fire:   ['消防車','Mobil pemadam', `
+    <rect x="12" y="46" width="176" height="46" rx="7"/>
+    <rect x="136" y="54" width="38" height="22" rx="3" fill="#000"/>
+    <rect x="24" y="28" width="100" height="13" rx="4"/>
+    <line x1="49" y1="28" x2="49" y2="41"/><line x1="74" y1="28" x2="74" y2="41"/><line x1="99" y1="28" x2="99" y2="41"/>
+    <rect x="144" y="30" width="30" height="12" rx="5" fill="#000"/>
+    <line x1="24" y1="68" x2="122" y2="68"/>
+    <circle cx="54" cy="94" r="16" fill="#fff"/><circle cx="54" cy="94" r="7" fill="#000"/>
+    <circle cx="150" cy="94" r="16" fill="#fff"/><circle cx="150" cy="94" r="7" fill="#000"/>`],
+  police: ['警車','Mobil polisi', `
+    <path d="M10 90 L10 70 Q10 62 20 60 L58 57 L78 38 L124 38 L144 57 L182 60 Q190 62 190 70 L190 90 Z"/>
+    <rect x="88" y="43" width="30" height="15" fill="#000" stroke="none"/>
+    <path d="M83 43 L69 57 L83 57 Z" fill="#000" stroke="none"/>
+    <path d="M123 43 L137 57 L123 57 Z" fill="#000" stroke="none"/>
+    <rect x="86" y="24" width="32" height="12" rx="4" fill="#000"/>
+    <circle cx="52" cy="92" r="16" fill="#fff"/><circle cx="52" cy="92" r="7" fill="#000"/>
+    <circle cx="150" cy="92" r="16" fill="#fff"/><circle cx="150" cy="92" r="7" fill="#000"/>`],
+  taxi:   ['計程車','Taksi', `
+    <path d="M10 90 L10 70 Q10 62 20 60 L58 57 L78 38 L124 38 L144 57 L182 60 Q190 62 190 70 L190 90 Z"/>
+    <rect x="88" y="43" width="30" height="15" fill="#000" stroke="none"/>
+    <path d="M83 43 L69 57 L83 57 Z" fill="#000" stroke="none"/>
+    <path d="M123 43 L137 57 L123 57 Z" fill="#000" stroke="none"/>
+    <rect x="76" y="19" width="50" height="18" rx="3"/>
+    <text x="101" y="33" font-size="14" font-family="Arial,Helvetica,sans-serif" font-weight="bold" text-anchor="middle" fill="#000" stroke="none">TAXI</text>
+    <rect x="94" y="66" width="11" height="9" fill="#000" stroke="none"/>
+    <rect x="112" y="66" width="11" height="9" fill="#000" stroke="none"/>
+    <rect x="103" y="75" width="11" height="9" fill="#000" stroke="none"/>
+    <rect x="121" y="75" width="11" height="9" fill="#000" stroke="none"/>
+    <circle cx="52" cy="92" r="16" fill="#fff"/><circle cx="52" cy="92" r="7" fill="#000"/>
+    <circle cx="150" cy="92" r="16" fill="#fff"/><circle cx="150" cy="92" r="7" fill="#000"/>`],
+  ambu:   ['救護車','Ambulans', `
+    <path d="M8 90 L8 44 L112 44 L112 90 Z"/>
+    <path d="M112 54 L148 54 L184 76 L184 90 L112 90 Z"/>
+    <path d="M120 60 L146 60 L168 74 L120 74 Z" fill="#000" stroke="none"/>
+    <rect x="50" y="52" width="12" height="34" fill="#000" stroke="none"/>
+    <rect x="39" y="63" width="34" height="12" fill="#000" stroke="none"/>
+    <rect x="44" y="28" width="32" height="12" rx="4" fill="#000"/>
+    <circle cx="46" cy="94" r="15" fill="#fff"/><circle cx="46" cy="94" r="7" fill="#000"/>
+    <circle cx="146" cy="94" r="15" fill="#fff"/><circle cx="146" cy="94" r="7" fill="#000"/>`],
+  bus:    ['公車','Bus', `
+    <rect x="10" y="28" width="180" height="64" rx="9"/>
+    <rect x="24" y="40" width="32" height="24" fill="#000" stroke="none"/>
+    <rect x="64" y="40" width="32" height="24" fill="#000" stroke="none"/>
+    <rect x="104" y="40" width="32" height="24" fill="#000" stroke="none"/>
+    <rect x="144" y="40" width="34" height="24" fill="#000" stroke="none"/>
+    <line x1="14" y1="74" x2="186" y2="74"/>
+    <circle cx="54" cy="96" r="15" fill="#fff"/><circle cx="54" cy="96" r="7" fill="#000"/>
+    <circle cx="148" cy="96" r="15" fill="#fff"/><circle cx="148" cy="96" r="7" fill="#000"/>`],
+  truck:  ['卡車','Truk', `
+    <rect x="6" y="32" width="108" height="58" rx="5"/>
+    <path d="M118 90 L118 50 L154 50 L186 76 L186 90 Z"/>
+    <path d="M126 56 L150 56 L172 74 L126 74 Z" fill="#000" stroke="none"/>
+    <circle cx="44" cy="94" r="15" fill="#fff"/><circle cx="44" cy="94" r="7" fill="#000"/>
+    <circle cx="150" cy="94" r="15" fill="#fff"/><circle cx="150" cy="94" r="7" fill="#000"/>`],
+  digger: ['挖土機','Ekskavator', `
+    <rect x="10" y="74" width="96" height="28" rx="14"/>
+    <circle cx="30" cy="88" r="8" fill="#000" stroke="none"/>
+    <circle cx="86" cy="88" r="8" fill="#000" stroke="none"/>
+    <rect x="24" y="30" width="58" height="44" rx="5"/>
+    <rect x="33" y="39" width="37" height="23" fill="#000" stroke="none"/>
+    <path d="M82 54 L134 28" stroke-width="9"/>
+    <path d="M134 28 L150 60" stroke-width="9"/>
+    <path d="M141 56 L176 61 L169 88 L136 75 Z"/>`],
+  train:  ['火車','Kereta', `
+    <path d="M14 86 L14 46 L92 46 L92 30 L152 30 L152 86 Z"/>
+    <rect x="104" y="40" width="38" height="22" fill="#000" stroke="none"/>
+    <rect x="26" y="56" width="30" height="20" fill="#000" stroke="none"/>
+    <rect x="22" y="20" width="20" height="26" rx="3"/>
+    <line x1="8" y1="90" x2="184" y2="90"/>
+    <circle cx="42" cy="98" r="11" fill="#fff"/><circle cx="42" cy="98" r="5" fill="#000"/>
+    <circle cx="86" cy="98" r="11" fill="#fff"/><circle cx="86" cy="98" r="5" fill="#000"/>
+    <circle cx="128" cy="98" r="11" fill="#fff"/><circle cx="128" cy="98" r="5" fill="#000"/>`],
+  plane:  ['飛機','Pesawat', `
+    <path d="M12 68 Q12 56 34 53 L150 45 Q180 44 188 58 Q180 72 150 72 L34 72 Q12 72 12 68 Z"/>
+    <path d="M40 53 L22 22 L46 22 L64 51"/>
+    <path d="M72 72 L56 98 L82 98 L104 72"/>
+    <circle cx="152" cy="58" r="6" fill="#000" stroke="none"/>
+    <circle cx="92" cy="61" r="4" fill="#000" stroke="none"/>
+    <circle cx="108" cy="60" r="4" fill="#000" stroke="none"/>
+    <circle cx="124" cy="59" r="4" fill="#000" stroke="none"/>`],
+  heli:   ['直升機','Helikopter', `
+    <path d="M18 62 Q18 42 56 40 Q86 40 100 56 L128 62 Q140 64 140 70 Q140 78 124 78 L44 78 Q18 78 18 62 Z"/>
+    <path d="M140 70 L182 66"/><path d="M182 50 L182 82"/>
+    <circle cx="48" cy="57" r="11" fill="#000" stroke="none"/>
+    <line x1="60" y1="24" x2="60" y2="40"/><line x1="14" y1="24" x2="122" y2="24"/>
+    <path d="M32 82 L32 98"/><path d="M118 82 L118 98"/><line x1="18" y1="98" x2="134" y2="98"/>`],
+  boat:   ['船','Kapal', `
+    <path d="M16 72 L184 72 L160 100 L40 100 Z"/>
+    <rect x="66" y="44" width="64" height="28" rx="3"/>
+    <rect x="76" y="52" width="18" height="14" fill="#000" stroke="none"/>
+    <rect x="102" y="52" width="18" height="14" fill="#000" stroke="none"/>
+    <rect x="88" y="18" width="18" height="26" rx="3"/>
+    <line x1="14" y1="110" x2="58" y2="110"/><line x1="78" y1="110" x2="122" y2="110"/><line x1="142" y1="110" x2="186" y2="110"/>`],
+  rocket: ['火箭','Roket', `
+    <path d="M100 10 Q126 44 126 78 L74 78 Q74 44 100 10 Z"/>
+    <circle cx="100" cy="46" r="12" fill="#000" stroke="none"/>
+    <path d="M74 58 L52 90 L74 82 Z"/><path d="M126 58 L148 90 L126 82 Z"/>
+    <path d="M82 78 L82 92 L118 92 L118 78"/>
+    <line x1="88" y1="98" x2="92" y2="114"/><line x1="100" y1="98" x2="100" y2="118"/><line x1="112" y1="98" x2="108" y2="114"/>`],
+  jet:    ['戰鬥機','Jet tempur', `
+    <path d="M100 8 L110 46 L170 76 L170 90 L108 76 L106 100 L124 112 L124 118 L100 112 L76 118 L76 112 L94 100 L92 76 L30 90 L30 76 L90 46 Z"/>`],
+  balloon:['熱氣球','Balon udara', `
+    <path d="M100 8 Q142 8 142 48 Q142 76 100 94 Q58 76 58 48 Q58 8 100 8 Z"/>
+    <path d="M100 8 Q80 48 100 94"/><path d="M100 8 Q120 48 100 94"/>
+    <path d="M84 90 L88 106"/><path d="M116 90 L112 106"/>
+    <rect x="85" y="104" width="30" height="17" rx="3"/>`],
+  ufo:    ['飛碟','Piring terbang', `
+    <ellipse cx="100" cy="72" rx="72" ry="20"/>
+    <path d="M63 64 Q69 32 100 32 Q131 32 137 64"/>
+    <circle cx="54" cy="80" r="6" fill="#000" stroke="none"/>
+    <circle cx="100" cy="86" r="6" fill="#000" stroke="none"/>
+    <circle cx="146" cy="80" r="6" fill="#000" stroke="none"/>
+    <path d="M80 100 L70 120"/><path d="M120 100 L130 120"/>`],
+  cat:    ['貓咪','Kucing', `
+    <circle cx="100" cy="68" r="40"/>
+    <path d="M72 42 L64 12 L92 30 Z"/><path d="M128 42 L136 12 L108 30 Z"/>
+    <circle cx="86" cy="62" r="5" fill="#000" stroke="none"/>
+    <circle cx="114" cy="62" r="5" fill="#000" stroke="none"/>
+    <path d="M100 72 L100 78"/><path d="M92 80 Q100 88 108 80"/>
+    <line x1="50" y1="66" x2="72" y2="70"/><line x1="50" y1="80" x2="72" y2="80"/>
+    <line x1="150" y1="66" x2="128" y2="70"/><line x1="150" y1="80" x2="128" y2="80"/>`],
+  dog:    ['小狗','Anjing', `
+    <ellipse cx="56" cy="74" rx="17" ry="32" fill="#fff"/>
+    <ellipse cx="144" cy="74" rx="17" ry="32" fill="#fff"/>
+    <circle cx="100" cy="62" r="35" fill="#fff"/>
+    <circle cx="88" cy="56" r="5" fill="#000" stroke="none"/>
+    <circle cx="112" cy="56" r="5" fill="#000" stroke="none"/>
+    <ellipse cx="100" cy="73" rx="9" ry="6" fill="#000" stroke="none"/>
+    <path d="M100 79 Q100 90 89 90"/><path d="M100 79 Q100 90 111 90"/>`],
+  rabbit: ['兔子','Kelinci', `
+    <circle cx="100" cy="78" r="33"/>
+    <ellipse cx="83" cy="32" rx="10" ry="25"/><ellipse cx="117" cy="32" rx="10" ry="25"/>
+    <circle cx="88" cy="74" r="5" fill="#000" stroke="none"/>
+    <circle cx="112" cy="74" r="5" fill="#000" stroke="none"/>
+    <ellipse cx="100" cy="87" rx="7" ry="5" fill="#000" stroke="none"/>
+    <path d="M100 92 Q100 100 92 100"/><path d="M100 92 Q100 100 108 100"/>`],
+  bear:   ['小熊','Beruang', `
+    <circle cx="100" cy="70" r="37"/>
+    <circle cx="67" cy="37" r="14"/><circle cx="133" cy="37" r="14"/>
+    <circle cx="87" cy="63" r="5" fill="#000" stroke="none"/>
+    <circle cx="113" cy="63" r="5" fill="#000" stroke="none"/>
+    <ellipse cx="100" cy="84" rx="17" ry="13"/>
+    <ellipse cx="100" cy="79" rx="8" ry="5" fill="#000" stroke="none"/>`],
+  panda:  ['貓熊','Panda', `
+    <circle cx="100" cy="70" r="37"/>
+    <circle cx="67" cy="37" r="14" fill="#000"/><circle cx="133" cy="37" r="14" fill="#000"/>
+    <ellipse cx="84" cy="64" rx="12" ry="14" fill="#000" stroke="none"/>
+    <ellipse cx="116" cy="64" rx="12" ry="14" fill="#000" stroke="none"/>
+    <circle cx="84" cy="62" r="4" fill="#fff" stroke="none"/>
+    <circle cx="116" cy="62" r="4" fill="#fff" stroke="none"/>
+    <ellipse cx="100" cy="86" rx="8" ry="5" fill="#000" stroke="none"/>
+    <path d="M100 91 Q100 99 92 99"/><path d="M100 91 Q100 99 108 99"/>`],
+  eleph:  ['大象','Gajah', `
+    <path d="M66 32 Q24 28 24 66 Q24 98 64 94 Z" fill="#fff"/>
+    <path d="M134 32 Q176 28 176 66 Q176 98 136 94 Z" fill="#fff"/>
+    <circle cx="100" cy="58" r="37" fill="#fff"/>
+    <circle cx="86" cy="50" r="5" fill="#000" stroke="none"/>
+    <circle cx="114" cy="50" r="5" fill="#000" stroke="none"/>
+    <path d="M100 72 L100 98 Q100 116 120 110" stroke-width="13"/>
+    <path d="M82 84 Q78 96 80 104"/><path d="M118 84 Q122 96 120 104"/>`],
+  lion:   ['獅子','Singa', `
+    <circle cx="136" cy="64" r="15" fill="#fff"/><circle cx="131" cy="82" r="15" fill="#fff"/>
+    <circle cx="118" cy="95" r="15" fill="#fff"/><circle cx="100" cy="100" r="15" fill="#fff"/>
+    <circle cx="82" cy="95" r="15" fill="#fff"/><circle cx="69" cy="82" r="15" fill="#fff"/>
+    <circle cx="64" cy="64" r="15" fill="#fff"/><circle cx="69" cy="46" r="15" fill="#fff"/>
+    <circle cx="82" cy="33" r="15" fill="#fff"/><circle cx="100" cy="28" r="15" fill="#fff"/>
+    <circle cx="118" cy="33" r="15" fill="#fff"/><circle cx="131" cy="46" r="15" fill="#fff"/>
+    <circle cx="100" cy="64" r="29" fill="#fff"/>
+    <circle cx="89" cy="58" r="4.5" fill="#000" stroke="none"/>
+    <circle cx="111" cy="58" r="4.5" fill="#000" stroke="none"/>
+    <ellipse cx="100" cy="72" rx="8" ry="5.5" fill="#000" stroke="none"/>
+    <path d="M100 78 Q100 87 91 87"/><path d="M100 78 Q100 87 109 87"/>`],
+  peng:   ['企鵝','Penguin', `
+    <path d="M70 54 Q48 74 60 102 Q74 90 76 66 Z" fill="#000" stroke="none"/>
+    <path d="M130 54 Q152 74 140 102 Q126 90 124 66 Z" fill="#000" stroke="none"/>
+    <path d="M88 100 L66 118 L96 118 Z" fill="#000" stroke="none"/>
+    <path d="M112 100 L134 118 L104 118 Z" fill="#000" stroke="none"/>
+    <ellipse cx="100" cy="62" rx="34" ry="44" fill="#000" stroke="none"/>
+    <ellipse cx="100" cy="74" rx="22" ry="30" fill="#fff" stroke="none"/>
+    <ellipse cx="100" cy="40" rx="20" ry="16" fill="#fff" stroke="none"/>
+    <circle cx="91" cy="38" r="4" fill="#000" stroke="none"/>
+    <circle cx="109" cy="38" r="4" fill="#000" stroke="none"/>
+    <path d="M93 47 L100 58 L107 47 Z" fill="#000" stroke="none"/>`],
+  trex:   ['暴龍','T-Rex', `
+    <path d="M20 98 Q48 98 60 86 Q48 64 60 44 Q74 22 104 22 Q136 22 148 46 Q158 68 146 88 L146 106 L128 106 L128 96 L92 96 L92 106 L74 106 L74 90 Q50 106 20 98 Z" fill="#fff"/>
+    <circle cx="128" cy="46" r="4.5" fill="#000" stroke="none"/>
+    <path d="M114 64 L150 64"/>
+    <path d="M118 70 L124 76 L130 70 L136 76 L142 70"/>
+    <path d="M94 62 L110 68 L96 76"/>
+    <path d="M62 44 L68 28 L78 42"/><path d="M84 30 L92 14 L100 28"/>`],
+  bracho: ['長頸龍','Brachiosaurus', `
+    <path d="M12 98 Q30 94 44 82 Q58 70 82 68 L112 66 Q114 40 126 26 Q134 14 148 16 Q160 18 158 32 Q156 46 144 54 Q136 62 134 70 Q150 78 152 92 L152 106 L136 106 L136 92 L108 92 L108 106 L92 106 L92 90 Q58 100 12 98 Z"/>
+    <circle cx="150" cy="26" r="3.5" fill="#fff" stroke="none"/>`],
+  trice:  ['三角龍','Triceratops', `
+    <path d="M18 98 Q46 98 58 86 Q46 64 58 44 Q72 22 102 22 Q126 22 138 40 L156 46 Q176 54 172 70 Q166 86 146 84 L142 84 L142 106 L124 106 L124 96 L88 96 L88 106 L72 106 L72 90 Q48 106 18 98 Z" fill="#fff"/>
+    <path d="M92 26 Q86 4 110 2 Q136 0 140 22" fill="#fff"/>
+    <path d="M104 24 L100 6 L116 18"/>
+    <path d="M126 22 L134 4 L142 24"/>
+    <path d="M172 66 L188 60 L180 78"/>
+    <circle cx="150" cy="62" r="4.5" fill="#000" stroke="none"/>
+    <path d="M138 76 L166 74"/>`],
+  stego:  ['劍龍','Stegosaurus', `
+    <path d="M14 96 Q32 92 46 82 Q60 70 84 68 L124 66 Q132 52 150 52 Q166 52 168 66 Q168 78 152 80 L136 82 Q130 90 116 92 L116 106 L102 106 L102 92 L74 92 L74 106 L60 106 L60 86 Q34 96 14 96 Z"/>
+    <path d="M50 74 L58 52 L70 72 Z"/><path d="M74 68 L84 44 L96 66 Z"/><path d="M100 64 L110 42 L120 62 Z"/>
+    <circle cx="156" cy="62" r="3.5" fill="#fff" stroke="none"/>`],
+  crown:  ['皇冠','Mahkota', `
+    <path d="M30 98 L30 40 L62 68 L100 26 L138 68 L170 40 L170 98 Z"/>
+    <circle cx="30" cy="32" r="7" fill="#000" stroke="none"/>
+    <circle cx="100" cy="18" r="7" fill="#000" stroke="none"/>
+    <circle cx="170" cy="32" r="7" fill="#000" stroke="none"/>
+    <line x1="34" y1="82" x2="166" y2="82"/>`],
+  castle: ['城堡','Istana', `
+    <path d="M20 112 L20 52 L32 52 L32 40 L44 40 L44 52 L56 52 L56 112 Z"/>
+    <path d="M144 112 L144 52 L156 52 L156 40 L168 40 L168 52 L180 52 L180 112 Z"/>
+    <path d="M56 112 L56 66 L68 66 L68 54 L80 54 L80 66 L120 66 L120 54 L132 54 L132 66 L144 66 L144 112 Z"/>
+    <path d="M84 112 L84 88 Q100 74 116 88 L116 112"/>
+    <rect x="31" y="68" width="14" height="14" fill="#000" stroke="none"/>
+    <rect x="155" y="68" width="14" height="14" fill="#000" stroke="none"/>
+    <path d="M100 28 L100 54"/><path d="M100 28 L122 35 L100 42"/>`],
+  uni:    ['獨角獸','Unicorn', `
+    <path d="M78 46 L73 16 L95 36 Z" fill="#fff"/>
+    <path d="M122 46 L127 16 L105 36 Z" fill="#fff"/>
+    <path d="M100 2 L113 36 L87 36 Z" fill="#fff"/>
+    <path d="M62 50 Q46 34 58 22 Q66 34 78 28"/>
+    <path d="M138 50 Q154 34 142 22 Q134 34 122 28"/>
+    <circle cx="100" cy="76" r="35" fill="#fff"/>
+    <circle cx="88" cy="70" r="5" fill="#000" stroke="none"/>
+    <circle cx="112" cy="70" r="5" fill="#000" stroke="none"/>
+    <ellipse cx="100" cy="92" rx="15" ry="10" fill="#fff"/>
+    <circle cx="94" cy="90" r="2.5" fill="#000" stroke="none"/>
+    <circle cx="106" cy="90" r="2.5" fill="#000" stroke="none"/>`],
+  butter: ['蝴蝶','Kupu-kupu', `
+    <path d="M95 44 Q60 10 40 32 Q20 56 52 66 Q28 78 46 96 Q66 114 95 78 Z"/>
+    <path d="M105 44 Q140 10 160 32 Q180 56 148 66 Q172 78 154 96 Q134 114 105 78 Z"/>
+    <ellipse cx="100" cy="62" rx="6" ry="34" fill="#000" stroke="none"/>
+    <path d="M96 30 L82 12"/><path d="M104 30 L118 12"/>`],
+  star:   ['星星','Bintang', `
+    <path d="M100 14 L113 48 L150 50 L121 73 L131 108 L100 88 L69 108 L79 73 L50 50 L87 48 Z"/>`],
+  heart:  ['愛心','Hati', `
+    <path d="M100 112 C40 74 28 50 42 32 C56 14 84 20 100 42 C116 20 144 14 158 32 C172 50 160 74 100 112 Z"/>`],
+  garbage:['垃圾車','Truk sampah', `
+    <path d="M8 92 L8 46 L24 28 L114 28 L114 92 Z"/>
+    <rect x="26" y="44" width="74" height="11"/>
+    <path d="M118 92 L118 50 L152 50 L184 76 L184 92 Z"/>
+    <path d="M126 56 L150 56 L170 74 L126 74 Z" fill="#000" stroke="none"/>
+    <circle cx="46" cy="96" r="15" fill="#fff"/><circle cx="46" cy="96" r="7" fill="#000" stroke="none"/>
+    <circle cx="152" cy="96" r="15" fill="#fff"/><circle cx="152" cy="96" r="7" fill="#000" stroke="none"/>`],
+  mixer:  ['水泥車','Truk molen', `
+    <path d="M120 88 L120 50 L152 50 L184 74 L184 88 Z"/>
+    <path d="M128 56 L150 56 L170 72 L128 72 Z" fill="#000" stroke="none"/>
+    <path d="M18 76 Q6 56 26 42 Q44 30 72 32 Q100 34 112 50 Q122 64 110 74 Q96 82 66 82 Q34 82 18 76 Z" fill="#fff"/>
+    <path d="M34 36 Q28 58 36 80"/><path d="M58 32 Q52 56 60 82"/><path d="M82 34 Q78 58 86 80"/>
+    <rect x="8" y="82" width="176" height="8"/>
+    <circle cx="42" cy="100" r="13" fill="#fff"/><circle cx="42" cy="100" r="6" fill="#000" stroke="none"/>
+    <circle cx="80" cy="100" r="13" fill="#fff"/><circle cx="80" cy="100" r="6" fill="#000" stroke="none"/>
+    <circle cx="152" cy="100" r="13" fill="#fff"/><circle cx="152" cy="100" r="6" fill="#000" stroke="none"/>`],
+  crane:  ['吊車','Truk derek', `
+    <path d="M118 92 L118 56 L150 56 L182 80 L182 92 Z"/>
+    <path d="M126 62 L148 62 L168 78 L126 78 Z" fill="#000" stroke="none"/>
+    <rect x="8" y="70" width="110" height="22" rx="3"/>
+    <path d="M26 70 L26 46 L54 46 L54 70"/>
+    <path d="M32 46 L148 12" stroke-width="8"/>
+    <line x1="148" y1="14" x2="148" y2="32"/>
+    <path d="M138 32 L158 32 L154 46 L142 46 Z"/>
+    <circle cx="42" cy="98" r="13" fill="#fff"/><circle cx="42" cy="98" r="6" fill="#000" stroke="none"/>
+    <circle cx="86" cy="98" r="13" fill="#fff"/><circle cx="86" cy="98" r="6" fill="#000" stroke="none"/>
+    <circle cx="150" cy="98" r="13" fill="#fff"/><circle cx="150" cy="98" r="6" fill="#000" stroke="none"/>`],
+  moto:   ['摩托車','Motor', `
+    <circle cx="40" cy="84" r="27" fill="#fff"/><circle cx="40" cy="84" r="10" fill="#000" stroke="none"/>
+    <circle cx="160" cy="84" r="27" fill="#fff"/><circle cx="160" cy="84" r="10" fill="#000" stroke="none"/>
+    <path d="M124 88 L152 88" stroke-width="8"/>
+    <path d="M62 62 L86 46" stroke-width="7"/>
+    <path d="M62 62 L52 34" stroke-width="7"/><path d="M36 26 L74 40" stroke-width="7"/>
+    <rect x="80" y="60" width="46" height="30" rx="6" fill="#fff"/>
+    <path d="M84 46 Q98 32 126 32 L152 32 Q164 34 158 48 L126 48 Q116 48 108 44 Z" fill="#fff"/>
+    <path d="M126 48 L144 66" stroke-width="7"/>`],
+  giraffe:['長頸鹿','Jerapah', `
+    <path d="M84 60 L84 120 L116 120 L116 60 Z" fill="#fff"/>
+    <ellipse cx="62" cy="42" rx="17" ry="9" fill="#fff"/>
+    <ellipse cx="138" cy="42" rx="17" ry="9" fill="#fff"/>
+    <line x1="89" y1="24" x2="84" y2="10"/><circle cx="83" cy="8" r="5" fill="#000" stroke="none"/>
+    <line x1="111" y1="24" x2="116" y2="10"/><circle cx="117" cy="8" r="5" fill="#000" stroke="none"/>
+    <ellipse cx="100" cy="46" rx="30" ry="26" fill="#fff"/>
+    <circle cx="88" cy="42" r="4.5" fill="#000" stroke="none"/>
+    <circle cx="112" cy="42" r="4.5" fill="#000" stroke="none"/>
+    <ellipse cx="100" cy="60" rx="14" ry="10" fill="#fff"/>
+    <circle cx="94" cy="58" r="2.5" fill="#000" stroke="none"/><circle cx="106" cy="58" r="2.5" fill="#000" stroke="none"/>
+    <circle cx="93" cy="84" r="6" fill="#000" stroke="none"/><circle cx="109" cy="98" r="6" fill="#000" stroke="none"/>
+    <circle cx="93" cy="110" r="6" fill="#000" stroke="none"/>`],
+  monkey: ['猴子','Monyet', `
+    <circle cx="60" cy="60" r="18" fill="#fff"/><circle cx="140" cy="60" r="18" fill="#fff"/>
+    <circle cx="100" cy="60" r="36" fill="#fff"/>
+    <ellipse cx="100" cy="76" rx="27" ry="22" fill="#fff"/>
+    <circle cx="88" cy="52" r="5" fill="#000" stroke="none"/>
+    <circle cx="112" cy="52" r="5" fill="#000" stroke="none"/>
+    <circle cx="94" cy="70" r="2.5" fill="#000" stroke="none"/>
+    <circle cx="106" cy="70" r="2.5" fill="#000" stroke="none"/>
+    <path d="M88 82 Q100 91 112 82"/>`],
+  tiger:  ['老虎','Harimau', `
+    <circle cx="70" cy="34" r="15" fill="#fff"/><circle cx="130" cy="34" r="15" fill="#fff"/>
+    <circle cx="100" cy="66" r="38" fill="#fff"/>
+    <circle cx="87" cy="60" r="5" fill="#000" stroke="none"/>
+    <circle cx="113" cy="60" r="5" fill="#000" stroke="none"/>
+    <path d="M91 74 L100 81 L109 74 Z" fill="#000" stroke="none"/>
+    <path d="M100 81 L100 87"/><path d="M89 91 Q100 98 111 91"/>
+    <path d="M79 36 L83 50"/><path d="M92 29 L94 45"/><path d="M108 29 L106 45"/><path d="M121 36 L117 50"/>
+    <path d="M62 62 L76 64"/><path d="M62 76 L76 76"/>
+    <path d="M138 62 L124 64"/><path d="M138 76 L124 76"/>`],
+  cop:    ['警察','Police', `
+    <path d="M58 46 Q58 22 100 22 Q142 22 142 46 Z" fill="#fff"/>
+    <rect x="50" y="44" width="100" height="13" rx="5" fill="#fff"/>
+    <circle cx="100" cy="34" r="7" fill="#000" stroke="none"/>
+    <circle cx="100" cy="78" r="29" fill="#fff"/>
+    <circle cx="90" cy="74" r="4.5" fill="#000" stroke="none"/>
+    <circle cx="110" cy="74" r="4.5" fill="#000" stroke="none"/>
+    <path d="M89 90 Q100 99 111 90"/>
+    <path d="M48 125 Q54 100 100 100 Q146 100 152 125 Z" fill="#fff"/>`],
+  fireman:['消防員','Firefighter', `
+    <path d="M54 52 Q54 20 100 20 Q146 20 146 52 Z" fill="#fff"/>
+    <path d="M36 52 Q36 64 58 64 L142 64 Q164 64 164 52 Z" fill="#fff"/>
+    <path d="M100 28 L109 44 L91 44 Z" fill="#000" stroke="none"/>
+    <circle cx="100" cy="84" r="27" fill="#fff"/>
+    <circle cx="90" cy="80" r="4.5" fill="#000" stroke="none"/>
+    <circle cx="110" cy="80" r="4.5" fill="#000" stroke="none"/>
+    <path d="M89 95 Q100 104 111 95"/>
+    <path d="M50 125 Q56 102 100 102 Q144 102 150 125 Z" fill="#fff"/>`],
+  doctor: ['醫生','Doctor', `
+    <circle cx="100" cy="46" r="28" fill="#fff"/>
+    <circle cx="90" cy="42" r="4.5" fill="#000" stroke="none"/>
+    <circle cx="110" cy="42" r="4.5" fill="#000" stroke="none"/>
+    <path d="M89 58 Q100 67 111 58"/>
+    <path d="M46 125 Q52 80 100 76 Q148 80 154 125 Z" fill="#fff"/>
+    <path d="M100 76 L100 125"/>
+    <rect x="116" y="92" width="9" height="26" fill="#000" stroke="none"/>
+    <rect x="108" y="100" width="25" height="9" fill="#000" stroke="none"/>`],
+  chef:   ['廚師','Chef', `
+    <path d="M64 46 Q46 46 46 30 Q46 14 64 18 Q68 4 88 6 Q100 -2 114 6 Q132 2 138 16 Q156 16 156 32 Q156 46 136 46 Z" fill="#fff"/>
+    <rect x="64" y="44" width="72" height="14" rx="3" fill="#fff"/>
+    <circle cx="100" cy="84" r="27" fill="#fff"/>
+    <circle cx="90" cy="80" r="4.5" fill="#000" stroke="none"/>
+    <circle cx="110" cy="80" r="4.5" fill="#000" stroke="none"/>
+    <path d="M89 95 Q100 104 111 95"/>
+    <path d="M52 125 Q58 102 100 102 Q142 102 148 125 Z" fill="#fff"/>`],
+  sun:    ['太陽','Sun', `
+    <circle cx="100" cy="62" r="32" fill="#fff"/>
+    <line x1="100" y1="20" x2="100" y2="6"/><line x1="100" y1="104" x2="100" y2="118"/>
+    <line x1="58" y1="62" x2="44" y2="62"/><line x1="142" y1="62" x2="156" y2="62"/>
+    <line x1="70" y1="32" x2="60" y2="22"/><line x1="130" y1="32" x2="140" y2="22"/>
+    <line x1="70" y1="92" x2="60" y2="102"/><line x1="130" y1="92" x2="140" y2="102"/>
+    <circle cx="89" cy="56" r="4" fill="#000" stroke="none"/>
+    <circle cx="111" cy="56" r="4" fill="#000" stroke="none"/>
+    <path d="M87 72 Q100 82 113 72"/>`],
+  moon:   ['月亮','Moon', `
+    <path d="M116 10 A52 52 0 1 0 116 114 A40 40 0 1 1 116 10 Z" fill="#fff"/>
+    <path d="M158 22 L163 36 L177 40 L165 49 L167 64 L156 56 L143 63 L146 48 L136 38 L151 36 Z" fill="#000" stroke="none"/>`],
+  cloud:  ['雲朵','Cloud', `
+    <path d="M56 98 Q26 98 26 74 Q26 52 52 52 Q56 26 86 26 Q112 26 120 46 Q146 42 154 62 Q178 64 178 82 Q178 98 152 98 Z" fill="#fff"/>`],
+  umb:    ['雨傘','Umbrella', `
+    <path d="M12 60 Q12 16 100 16 Q188 16 188 60 Q162 46 144 60 Q126 46 100 60 Q74 46 56 60 Q38 46 12 60 Z" fill="#fff"/>
+    <path d="M100 60 L100 100 Q100 118 80 118 Q66 118 66 104"/>`],
+  rain:   ['下雨','Rain', `
+    <path d="M58 68 Q32 68 32 50 Q32 32 54 32 Q58 12 86 12 Q108 12 116 28 Q138 24 146 40 Q168 42 168 56 Q168 68 144 68 Z" fill="#fff"/>
+    <path d="M62 82 L56 100"/><path d="M92 82 L86 100"/><path d="M122 82 L116 100"/>
+    <path d="M76 102 L70 120"/><path d="M108 102 L102 120"/>`],
+  snow:   ['雪花','Snowflake', `
+    <line x1="100" y1="8" x2="100" y2="116"/>
+    <line x1="53" y1="35" x2="147" y2="89"/><line x1="147" y1="35" x2="53" y2="89"/>
+    <path d="M100 24 L88 14"/><path d="M100 24 L112 14"/>
+    <path d="M100 100 L88 110"/><path d="M100 100 L112 110"/>
+    <path d="M67 43 L64 29"/><path d="M67 43 L53 47"/>
+    <path d="M133 81 L136 95"/><path d="M133 81 L147 77"/>
+    <path d="M133 43 L136 29"/><path d="M133 43 L147 47"/>
+    <path d="M67 81 L64 95"/><path d="M67 81 L53 77"/>`],
+  rbow:   ['彩虹','Rainbow', `
+    <path d="M14 110 Q14 26 100 26 Q186 26 186 110"/>
+    <path d="M38 110 Q38 50 100 50 Q162 50 162 110"/>
+    <path d="M62 110 Q62 74 100 74 Q138 74 138 110"/>`],
+  soccer: ['足球','Soccer', `
+    <circle cx="100" cy="62" r="48" fill="#fff"/>
+    <path d="M100 32 L123 48 L114 76 L86 76 L77 48 Z" fill="#000" stroke="none"/>
+    <path d="M100 14 L100 32"/><path d="M77 48 L56 40"/><path d="M123 48 L144 40"/>
+    <path d="M86 76 L76 100"/><path d="M114 76 L124 100"/>`],
+  basket: ['籃球','Basketball', `
+    <circle cx="100" cy="62" r="48" fill="#fff"/>
+    <line x1="52" y1="62" x2="148" y2="62"/><line x1="100" y1="14" x2="100" y2="110"/>
+    <path d="M66 27 Q86 62 66 97"/><path d="M134 27 Q114 62 134 97"/>`],
+  base:   ['棒球','Baseball', `
+    <circle cx="100" cy="62" r="46" fill="#fff"/>
+    <path d="M70 24 Q52 62 70 100"/><path d="M130 24 Q148 62 130 100"/>
+    <path d="M61 40 L72 44"/><path d="M57 54 L69 55"/><path d="M57 72 L69 70"/><path d="M61 86 L72 82"/>
+    <path d="M139 40 L128 44"/><path d="M143 54 L131 55"/><path d="M143 72 L131 70"/><path d="M139 86 L128 82"/>`],
+  s_cir:  ['圓形','Circle',   `<circle cx="100" cy="62" r="48"/>`],
+  s_sqr:  ['正方形','Square', `<rect x="52" y="14" width="96" height="96" rx="4"/>`],
+  s_tri:  ['三角形','Triangle',`<path d="M100 12 L152 110 L48 110 Z"/>`],
+  s_rect: ['長方形','Rectangle',`<rect x="26" y="30" width="148" height="64" rx="4"/>`],
+  s_oval: ['橢圓形','Oval',   `<ellipse cx="100" cy="62" rx="66" ry="42"/>`],
+  s_dia:  ['菱形','Diamond',  `<path d="M100 10 L154 62 L100 114 L46 62 Z"/>`],
+  s_hex:  ['六角形','Hexagon',`<path d="M100 12 L146 38 L146 86 L100 112 L54 86 L54 38 Z"/>`],
+  apple:  ['蘋果','Apple', `
+    <path d="M100 42 Q84 30 66 38 Q46 48 46 74 Q46 100 68 112 Q84 118 100 106 Q116 118 132 112 Q154 100 154 74 Q154 48 134 38 Q116 30 100 42 Z" fill="#fff"/>
+    <path d="M100 42 L100 20"/>
+    <path d="M100 24 Q120 8 138 16 Q128 34 104 32" fill="#fff"/>`],
+  banana: ['香蕉','Banana', `
+    <path d="M32 40 Q30 96 86 108 Q144 120 170 76 Q150 90 114 84 Q72 76 58 36 Z" fill="#fff"/>
+    <path d="M32 40 L26 26"/>`],
+  grape:  ['葡萄','Grapes', `
+    <circle cx="100" cy="48" r="15" fill="#fff"/><circle cx="76" cy="64" r="15" fill="#fff"/>
+    <circle cx="124" cy="64" r="15" fill="#fff"/><circle cx="100" cy="78" r="15" fill="#fff"/>
+    <circle cx="64" cy="90" r="15" fill="#fff"/><circle cx="136" cy="90" r="15" fill="#fff"/>
+    <circle cx="100" cy="104" r="15" fill="#fff"/>
+    <path d="M100 33 L100 14"/><path d="M100 18 Q120 6 134 16" fill="#fff"/>`],
+  straw:  ['草莓','Strawberry', `
+    <path d="M100 116 Q54 96 52 60 Q52 40 76 38 L124 38 Q148 40 148 60 Q146 96 100 116 Z" fill="#fff"/>
+    <path d="M68 38 L84 20 L100 34 L116 20 L132 38 Z" fill="#fff"/>
+    <path d="M100 14 L100 32"/>
+    <circle cx="84" cy="60" r="4" fill="#000" stroke="none"/><circle cx="116" cy="60" r="4" fill="#000" stroke="none"/>
+    <circle cx="100" cy="78" r="4" fill="#000" stroke="none"/><circle cx="74" cy="82" r="4" fill="#000" stroke="none"/>
+    <circle cx="126" cy="82" r="4" fill="#000" stroke="none"/><circle cx="100" cy="98" r="4" fill="#000" stroke="none"/>`],
+  melon:  ['西瓜','Watermelon', `
+    <path d="M18 32 L182 32 Q182 114 100 114 Q18 114 18 32 Z" fill="#fff"/>
+    <path d="M32 46 L168 46"/>
+    <circle cx="74" cy="68" r="5" fill="#000" stroke="none"/><circle cx="126" cy="68" r="5" fill="#000" stroke="none"/>
+    <circle cx="100" cy="60" r="5" fill="#000" stroke="none"/><circle cx="100" cy="88" r="5" fill="#000" stroke="none"/>`],
+  orange: ['橘子','Orange', `
+    <circle cx="100" cy="76" r="42" fill="#fff"/>
+    <path d="M100 34 L100 18"/>
+    <path d="M103 22 Q128 4 146 18 Q128 38 105 32" fill="#fff"/>
+    <path d="M74 60 Q82 50 94 48"/>`],
+  pine:   ['鳳梨','Pineapple', `
+    <path d="M92 48 L68 12 L100 38 Z" fill="#fff"/>
+    <path d="M100 44 L100 2 L115 34 Z" fill="#fff"/>
+    <path d="M108 48 L134 14 L104 40 Z" fill="#fff"/>
+    <path d="M100 46 Q68 46 68 78 Q68 112 100 120 Q132 112 132 78 Q132 46 100 46 Z" fill="#fff"/>
+    <path d="M72 64 L128 96"/><path d="M72 82 L126 112"/><path d="M72 96 L128 64"/><path d="M74 112 L126 82"/>`],
+  carrot: ['紅蘿蔔','Carrot', `
+    <path d="M96 38 Q74 28 64 6 Q90 10 98 32" fill="#fff"/>
+    <path d="M100 36 Q94 14 100 2 Q112 16 106 36" fill="#fff"/>
+    <path d="M104 38 Q126 28 136 6 Q110 10 102 32" fill="#fff"/>
+    <path d="M100 120 L68 46 Q84 38 100 38 Q116 38 132 46 Z" fill="#fff"/>
+    <path d="M80 66 L114 58"/><path d="M88 88 L118 80"/>`],
+  tomato: ['番茄','Tomato', `
+    <circle cx="100" cy="80" r="38" fill="#fff"/>
+    <path d="M100 44 L64 34 L88 54 Z" fill="#fff"/>
+    <path d="M100 44 L136 34 L112 54 Z" fill="#fff"/>
+    <path d="M100 46 L84 16 L100 32 L116 16 Z" fill="#fff"/>
+    <path d="M100 32 L100 10"/>`],
+  corn:   ['玉米','Corn', `
+    <path d="M72 56 Q40 62 32 100 Q62 96 76 74" fill="#fff"/>
+    <path d="M128 56 Q160 62 168 100 Q138 96 124 74" fill="#fff"/>
+    <path d="M100 10 Q126 10 126 56 Q126 100 100 118 Q74 100 74 56 Q74 10 100 10 Z" fill="#fff"/>
+    <path d="M87 22 L87 106"/><path d="M100 16 L100 116"/><path d="M113 22 L113 106"/>
+    <path d="M76 40 L124 40"/><path d="M74 60 L126 60"/><path d="M77 80 L123 80"/><path d="M82 99 L118 99"/>`],
+  broc:   ['花椰菜','Broccoli', `
+    <path d="M84 72 L86 118 L114 118 L116 72 Z" fill="#fff"/>
+    <circle cx="68" cy="52" r="22" fill="#fff"/><circle cx="132" cy="52" r="22" fill="#fff"/>
+    <circle cx="100" cy="38" r="25" fill="#fff"/>
+    <circle cx="82" cy="68" r="20" fill="#fff"/><circle cx="118" cy="68" r="20" fill="#fff"/>`],
+  mush:   ['蘑菇','Mushroom', `
+    <path d="M78 62 L78 104 Q78 118 100 118 Q122 118 122 104 L122 62 Z" fill="#fff"/>
+    <path d="M26 64 Q26 20 100 20 Q174 20 174 64 Z" fill="#fff"/>
+    <circle cx="62" cy="46" r="8" fill="#000" stroke="none"/>
+    <circle cx="108" cy="40" r="9" fill="#000" stroke="none"/>
+    <circle cx="142" cy="50" r="7" fill="#000" stroke="none"/>`],
+  eye:    ['眼睛','Eye', `
+    <path d="M12 62 Q100 4 188 62 Q100 120 12 62 Z" fill="#fff"/>
+    <circle cx="100" cy="62" r="27" fill="#fff"/>
+    <circle cx="100" cy="62" r="13" fill="#000" stroke="none"/>`],
+  ear:    ['耳朵','Ear', `
+    <path d="M120 8 Q66 8 62 58 Q60 92 80 110 Q102 126 110 104 Q116 86 100 78 Q88 70 92 56 Q96 40 114 42 Q132 44 132 62 Q132 78 124 88" fill="#fff"/>`],
+  nose:   ['鼻子','Nose', `
+    <path d="M100 12 Q106 42 118 64 Q132 86 132 98 Q132 116 100 116 Q68 116 68 98 Q68 86 82 64 Q94 42 100 12 Z" fill="#fff"/>
+    <ellipse cx="83" cy="98" rx="9" ry="6.5" fill="#000" stroke="none"/>
+    <ellipse cx="117" cy="98" rx="9" ry="6.5" fill="#000" stroke="none"/>
+    <path d="M100 84 Q100 94 92 98"/>`],
+  mouth:  ['嘴巴','Mouth', `
+    <path d="M12 60 Q52 22 100 44 Q148 22 188 60 Q148 114 100 114 Q52 114 12 60 Z" fill="#fff"/>
+    <path d="M12 60 Q100 78 188 60"/>`],
+  teeth:  ['牙齒','Teeth', `
+    <path d="M28 34 L172 34 L172 66 Q172 96 100 96 Q28 96 28 66 Z" fill="#fff"/>
+    <path d="M28 62 L172 62"/>
+    <path d="M64 34 L64 62"/><path d="M100 34 L100 62"/><path d="M136 34 L136 62"/>
+    <path d="M64 62 L64 92"/><path d="M100 62 L100 96"/><path d="M136 62 L136 92"/>`],
+  hand:   ['手','Hand', `
+    <path d="M104 120 Q70 116 64 86 L54 54 Q51 43 61 40 Q71 37 75 48 L84 72 L70 26 Q67 15 78 12 Q88 9 92 20 L104 58 L102 14 Q102 3 113 3 Q124 3 124 14 L124 58 L134 22 Q137 11 147 14 Q157 17 154 28 L144 72 L153 54 Q159 44 168 49 Q177 54 172 64 L154 100 Q144 120 124 120 Z" fill="#fff"/>`],
+  foot:   ['腳','Foot', `
+    <path d="M76 116 Q58 100 60 76 Q62 50 86 46 Q112 42 122 62 Q132 82 124 102 Q118 116 102 116 Z" fill="#fff"/>
+    <ellipse cx="76" cy="30" rx="11" ry="10" fill="#fff"/>
+    <ellipse cx="100" cy="22" rx="10" ry="9" fill="#fff"/>
+    <ellipse cx="121" cy="26" rx="9" ry="8" fill="#fff"/>
+    <ellipse cx="138" cy="36" rx="8" ry="7" fill="#fff"/>
+    <ellipse cx="151" cy="50" rx="7" ry="6" fill="#fff"/>`],
+  t_light:['\u7d05\u7da0\u71c8','Traffic Light', `
+    <rect x="64" y="6" width="72" height="106" rx="14" fill="#fff"/>
+    <circle cx="100" cy="32" r="16" fill="#000" stroke="none"/>
+    <circle cx="100" cy="60" r="16" fill="#fff"/>
+    <circle cx="100" cy="88" r="16" fill="#fff"/>
+    <path d="M100 112 L100 122"/>
+    <path d="M142 24 L156 20"/><path d="M142 40 L156 44"/>`],
+  t_stop: ['\u505c','Stop', `
+    <path d="M78 14 L122 14 L152 44 L152 88 L122 118 L78 118 L48 88 L48 44 Z" fill="#fff"/>
+    <text x="100" y="80" font-size="48" text-anchor="middle" fill="#000" stroke="none"
+          font-family="Microsoft JhengHei,PingFang TC,sans-serif" font-weight="bold">\u505c</text>`],
+  t_cross:['\u6591\u99ac\u7dda','Crosswalk', `
+    <rect x="14" y="24" width="172" height="76" rx="4" fill="#fff"/>
+    <rect x="28" y="32" width="24" height="60" fill="#000" stroke="none"/>
+    <rect x="66" y="32" width="24" height="60" fill="#000" stroke="none"/>
+    <rect x="104" y="32" width="24" height="60" fill="#000" stroke="none"/>
+    <rect x="142" y="32" width="24" height="60" fill="#000" stroke="none"/>`],
+  t_warn: ['\u5c0f\u5fc3','Careful', `
+    <path d="M100 10 L176 114 L24 114 Z" fill="#fff"/>
+    <rect x="92" y="48" width="16" height="34" rx="4" fill="#000" stroke="none"/>
+    <circle cx="100" cy="96" r="9" fill="#000" stroke="none"/>`],
+  t_no:   ['\u4e0d\u53ef\u4ee5','No', `
+    <circle cx="100" cy="62" r="48" fill="#fff"/>
+    <path d="M66 28 L134 96" stroke-width="14"/>`],
+  e_happy:['\u958b\u5fc3','Happy', `
+    <circle cx="100" cy="62" r="48" fill="#fff"/>
+    <circle cx="82" cy="48" r="6" fill="#000" stroke="none"/>
+    <circle cx="118" cy="48" r="6" fill="#000" stroke="none"/>
+    <path d="M68 72 Q100 104 132 72"/>`],
+  e_sad:  ['\u96e3\u904e','Sad', `
+    <circle cx="100" cy="62" r="48" fill="#fff"/>
+    <circle cx="82" cy="48" r="6" fill="#000" stroke="none"/>
+    <circle cx="118" cy="48" r="6" fill="#000" stroke="none"/>
+    <path d="M84 58 Q80 76 86 88"/>
+    <path d="M72 96 Q100 70 128 96"/>`],
+  e_angry:['\u751f\u6c23','Angry', `
+    <circle cx="100" cy="62" r="48" fill="#fff"/>
+    <path d="M66 34 L92 48"/><path d="M134 34 L108 48"/>
+    <circle cx="82" cy="60" r="6" fill="#000" stroke="none"/>
+    <circle cx="118" cy="60" r="6" fill="#000" stroke="none"/>
+    <path d="M74 96 Q100 76 126 96"/>`],
+  e_wow:  ['\u9a5a\u8a1d','Surprised', `
+    <circle cx="100" cy="62" r="48" fill="#fff"/>
+    <circle cx="82" cy="46" r="7" fill="#000" stroke="none"/>
+    <circle cx="118" cy="46" r="7" fill="#000" stroke="none"/>
+    <ellipse cx="100" cy="84" rx="13" ry="18" fill="#000" stroke="none"/>`],
+  e_sleep:['\u60f3\u7761','Sleepy', `
+    <circle cx="92" cy="66" r="44" fill="#fff"/>
+    <path d="M64 56 Q76 68 88 56"/><path d="M98 56 Q110 68 122 56"/>
+    <ellipse cx="92" cy="88" rx="11" ry="8" fill="#fff"/>
+    <path d="M144 14 L176 14 L144 44 L176 44"/>`],
+  a_eat:  ['\u5403\u98ef','Eat', `
+    <path d="M26 58 L174 58 Q166 116 100 116 Q34 116 26 58 Z" fill="#fff"/>
+    <path d="M112 6 L138 54"/><path d="M128 4 L150 52"/>
+    <path d="M66 42 Q56 30 66 18"/><path d="M90 40 Q80 28 90 16"/>`],
+  a_sleep:['\u7761\u89ba','Sleep', `
+    <circle cx="76" cy="52" r="30" fill="#fff"/>
+    <path d="M58 48 Q68 58 78 48"/><path d="M84 48 Q94 58 104 48"/>
+    <path d="M22 92 Q22 76 52 76 L124 76 Q154 76 154 92 Q154 110 124 110 L52 110 Q22 110 22 92 Z" fill="#fff"/>
+    <path d="M140 10 L176 10 L140 42 L176 42"/>`],
+  a_wash: ['\u6d17\u624b','Wash Hands', `
+    <circle cx="40" cy="40" r="13" fill="#fff"/><circle cx="26" cy="70" r="9" fill="#fff"/>
+    <circle cx="164" cy="42" r="12" fill="#fff"/><circle cx="178" cy="72" r="8" fill="#fff"/>
+    <circle cx="52" cy="16" r="8" fill="#fff"/><circle cx="150" cy="18" r="7" fill="#fff"/>
+    <path d="M98 120 Q70 116 65 90 L57 62 Q54 52 63 49 Q72 46 76 56 L83 76 L71 38 Q68 28 78 25 Q87 22 90 32 L98 64 L97 27 Q97 17 107 17 Q117 17 117 27 L118 64 L127 33 Q129 23 139 26 Q148 29 145 39 L135 76 L143 61 Q148 51 157 56 Q166 61 161 70 L145 101 Q135 120 117 120 Z" fill="#fff"/>`],
+  a_brush:['\u5237\u7259','Brush Teeth', `
+    <rect x="16" y="70" width="122" height="22" rx="11" fill="#fff"/>
+    <rect x="130" y="62" width="52" height="38" rx="9" fill="#fff"/>
+    <path d="M140 62 L140 40"/><path d="M152 62 L152 36"/>
+    <path d="M164 62 L164 36"/><path d="M176 62 L176 42"/>`],
+  a_drink:['\u559d\u6c34','Drink', `
+    <path d="M54 34 L146 34 L133 114 Q131 120 123 120 L77 120 Q69 120 67 114 Z" fill="#fff"/>
+    <path d="M54 34 L146 34"/>
+    <path d="M112 34 L138 4" stroke-width="8"/>
+    <path d="M64 60 L136 60"/>`],
+  a_walk: ['\u8d70\u8def','Walk', `
+    <circle cx="104" cy="20" r="15" fill="#fff"/>
+    <path d="M104 35 L100 78"/>
+    <path d="M100 78 L74 118"/><path d="M100 78 L130 116"/>
+    <path d="M104 48 L72 62"/><path d="M104 48 L136 32"/>`],
+  h_table:['\u684c\u5b50','Table', `
+    <rect x="16" y="38" width="168" height="18" rx="5" fill="#fff"/>
+    <path d="M38 56 L38 114"/><path d="M162 56 L162 114"/>`],
+  h_chair:['\u6905\u5b50','Chair', `
+    <path d="M60 8 L60 68"/><path d="M140 8 L140 68"/>
+    <path d="M60 24 L140 24"/><path d="M60 46 L140 46"/>
+    <rect x="48" y="64" width="104" height="16" rx="5" fill="#fff"/>
+    <path d="M62 80 L62 118"/><path d="M138 80 L138 118"/>`],
+  h_bed:  ['\u5e8a','Bed', `
+    <path d="M16 98 L16 56 Q16 44 34 44 L166 44 Q184 44 184 56 L184 98 Z" fill="#fff"/>
+    <path d="M16 72 L184 72"/>
+    <rect x="32" y="50" width="50" height="20" rx="7" fill="#fff"/>
+    <path d="M16 98 L16 118"/><path d="M184 98 L184 118"/>`],
+  h_cup:  ['\u676f\u5b50','Cup', `
+    <path d="M50 28 L138 28 L128 112 Q126 118 118 118 L70 118 Q62 118 60 112 Z" fill="#fff"/>
+    <path d="M50 28 L138 28"/>
+    <path d="M138 44 Q170 44 170 66 Q170 88 136 88"/>`],
+  h_bowl: ['\u7897','Bowl', `
+    <path d="M20 50 L180 50 Q172 116 100 116 Q28 116 20 50 Z" fill="#fff"/>
+    <path d="M40 76 L160 76"/>`],
+  h_spoon:['\u6e6f\u5319','Spoon', `
+    <ellipse cx="100" cy="36" rx="31" ry="28" fill="#fff"/>
+    <path d="M100 64 L100 118" stroke-width="13"/>`],
+  h_book: ['\u66f8','Book', `
+    <path d="M100 30 Q76 14 22 18 L22 104 Q76 100 100 116 Q124 100 178 104 L178 18 Q124 14 100 30 Z" fill="#fff"/>
+    <path d="M100 30 L100 116"/>`],
+  egg:    ['恐龍蛋','Telur dino', `
+    <path d="M100 10 Q141 40 141 78 Q141 114 100 114 Q59 114 59 78 Q59 40 100 10 Z" fill="#fff"/>
+    <path d="M60 70 L76 60 L86 76 L100 62 L114 78 L128 64 L140 74" stroke-width="6"/>
+    <circle cx="78" cy="46" r="5" fill="#000" stroke="none"/>
+    <circle cx="102" cy="38" r="6" fill="#000" stroke="none"/>
+    <circle cx="122" cy="52" r="5" fill="#000" stroke="none"/>
+    <circle cx="84" cy="94" r="6" fill="#000" stroke="none"/>
+    <circle cx="113" cy="98" r="7" fill="#000" stroke="none"/>`],
+};
+// 圖案貼紙印中文＋英文（小孩學習用；印尼文只用在食物標籤那邊）
+const EN = {
+  fire:'Fire Truck', police:'Police Car', taxi:'Taxi', ambu:'Ambulance', bus:'Bus', truck:'Truck',
+  garbage:'Garbage Truck', mixer:'Mixer Truck', crane:'Crane Truck', digger:'Excavator',
+  moto:'Motorcycle', train:'Train', boat:'Boat',
+  plane:'Airplane', heli:'Helicopter', rocket:'Rocket', jet:'Jet', balloon:'Hot Air Balloon', ufo:'UFO',
+  cat:'Cat', dog:'Dog', rabbit:'Rabbit', bear:'Bear', panda:'Panda', eleph:'Elephant',
+  lion:'Lion', tiger:'Tiger', monkey:'Monkey', giraffe:'Giraffe', peng:'Penguin',
+  trex:'T-Rex', bracho:'Brachiosaurus', trice:'Triceratops', stego:'Stegosaurus', egg:'Dinosaur Egg',
+  crown:'Crown', castle:'Castle', uni:'Unicorn', butter:'Butterfly', star:'Star', heart:'Heart',
+  cop:'Police Officer', fireman:'Firefighter', doctor:'Doctor', chef:'Chef',
+  sun:'Sun', moon:'Moon', cloud:'Cloud', umb:'Umbrella', rain:'Rain', snow:'Snowflake', rbow:'Rainbow',
+  soccer:'Soccer Ball', basket:'Basketball', base:'Baseball',
+  s_cir:'Circle', s_sqr:'Square', s_tri:'Triangle', s_rect:'Rectangle', s_oval:'Oval', s_dia:'Diamond', s_hex:'Hexagon',
+  apple:'Apple', banana:'Banana', grape:'Grapes', straw:'Strawberry', melon:'Watermelon', orange:'Orange',
+  pine:'Pineapple', carrot:'Carrot', tomato:'Tomato', corn:'Corn', broc:'Broccoli', mush:'Mushroom',
+  eye:'Eye', ear:'Ear', nose:'Nose', mouth:'Mouth', teeth:'Teeth', hand:'Hand', foot:'Foot',
+  t_light:'Traffic Light', t_stop:'Stop', t_cross:'Crosswalk', t_warn:'Careful', t_no:'No',
+  e_happy:'Happy', e_sad:'Sad', e_angry:'Angry', e_wow:'Surprised', e_sleep:'Sleepy',
+  a_eat:'Eat', a_sleep:'Sleep', a_wash:'Wash Hands', a_brush:'Brush Teeth', a_drink:'Drink', a_walk:'Walk',
+  h_table:'Table', h_chair:'Chair', h_bed:'Bed', h_cup:'Cup', h_bowl:'Bowl', h_spoon:'Spoon', h_book:'Book',
+};
+const iconEn = k => EN[k] || ICONS[k][1];
+
+// 分類（分頁）
+const ICON_CATS = [
+  ['車車','Vehicles', ['fire','police','taxi','ambu','bus','truck','garbage','mixer','crane','digger','moto','train','boat']],
+  ['天空','Sky',      ['plane','heli','rocket','jet','balloon','ufo']],
+  ['動物','Animals',  ['cat','dog','rabbit','bear','panda','eleph','lion','tiger','monkey','giraffe','peng']],
+  ['恐龍','Dinosaurs',['trex','bracho','trice','stego','egg']],
+  ['人物','People',   ['cop','fireman','doctor','chef']],
+  ['天氣','Weather',  ['sun','moon','cloud','umb','rain','snow','rbow']],
+  ['運動','Sports',   ['soccer','basket','base']],
+  ['形狀','Shapes',   ['s_cir','s_sqr','s_tri','s_rect','s_oval','s_dia','s_hex','star','heart']],
+  ['蔬果','Fruit',    ['apple','banana','grape','straw','melon','orange','pine','carrot','tomato','corn','broc','mush']],
+  ['身體','Body',     ['eye','ear','nose','mouth','teeth','hand','foot']],
+  ['表情','Feelings', ['e_happy','e_sad','e_angry','e_wow','e_sleep']],
+  ['動作','Actions',  ['a_eat','a_sleep','a_wash','a_brush','a_drink','a_walk']],
+  ['家裡','Home',     ['h_table','h_chair','h_bed','h_cup','h_bowl','h_spoon','h_book']],
+  ['號誌','Signs',    ['t_light','t_stop','t_cross','t_warn','t_no']],
+  ['可愛','Cute',     ['crown','castle','uni','butter','star','heart']],
+];
+
+// ── 學習貼紙（2 歲半～3 歲用）：大字 + 中文 + 英文 ──────────
+const LEARN_SETS = [
+  ['數字','Numbers', [
+    ['0','零','Zero'],['1','一','One'],['2','二','Two'],['3','三','Three'],['4','四','Four'],
+    ['5','五','Five'],['6','六','Six'],['7','七','Seven'],['8','八','Eight'],['9','九','Nine'],['10','十','Ten'],
+  ]],
+  ['ABC','Letters', [
+    ['Aa','蘋果','Apple'],['Bb','球','Ball'],['Cc','貓','Cat'],['Dd','狗','Dog'],['Ee','大象','Elephant'],
+    ['Ff','魚','Fish'],['Gg','長頸鹿','Giraffe'],['Hh','帽子','Hat'],['Ii','冰淇淋','Ice Cream'],['Jj','果汁','Juice'],
+    ['Kk','鑰匙','Key'],['Ll','獅子','Lion'],['Mm','月亮','Moon'],['Nn','鼻子','Nose'],['Oo','橘子','Orange'],
+    ['Pp','豬','Pig'],['Qq','皇后','Queen'],['Rr','兔子','Rabbit'],['Ss','太陽','Sun'],['Tt','老虎','Tiger'],
+    ['Uu','雨傘','Umbrella'],['Vv','廂型車','Van'],['Ww','水','Water'],['Xx','木琴','Xylophone'],
+    ['Yy','溜溜球','Yo-yo'],['Zz','斑馬','Zebra'],
+  ]],
+  ['顏色','Colors', [
+    ['紅','紅色','Red'],['黃','黃色','Yellow'],['藍','藍色','Blue'],['綠','綠色','Green'],
+    ['橘','橘色','Orange'],['紫','紫色','Purple'],['粉紅','粉紅色','Pink'],
+    ['咖啡','咖啡色','Brown'],['黑','黑色','Black'],['白','白色','White'],
+  ]],
+  ['注音','Bopomofo', [
+    ['ㄅ','爸爸',''],['ㄆ','皮球',''],['ㄇ','媽媽',''],['ㄈ','飛機',''],['ㄉ','弟弟',''],['ㄊ','兔子',''],
+    ['ㄋ','牛奶',''],['ㄌ','老虎',''],['ㄍ','哥哥',''],['ㄎ','卡車',''],['ㄏ','花朵',''],['ㄐ','雞蛋',''],
+    ['ㄑ','汽車',''],['ㄒ','西瓜',''],['ㄓ','蜘蛛',''],['ㄔ','吃飯',''],['ㄕ','獅子',''],['ㄖ','熱狗',''],
+    ['ㄗ','足球',''],['ㄘ','草莓',''],['ㄙ','雨傘',''],['ㄧ','衣服',''],['ㄨ','烏龜',''],['ㄩ','魚',''],
+    ['ㄚ','鴨子',''],['ㄛ','喔',''],['ㄜ','鵝',''],['ㄝ','爺爺',''],['ㄞ','愛心',''],['ㄟ','飛機',''],
+    ['ㄠ','貓咪',''],['ㄡ','狗狗',''],['ㄢ','雨傘',''],['ㄣ','門',''],['ㄤ','糖果',''],['ㄥ','電燈',''],['ㄦ','耳朵',''],
+  ]],
+];
+/** SVG → data URL（畫布 200×125；粗線條、圓角端點，1-bit 印出來才漂亮） */
+function iconUrl(body, w, h){
+  const s = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 200 125">` +
+            `<rect width="200" height="125" fill="#fff"/>` +
+            `<g fill="none" stroke="#000" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">${body}</g></svg>`;
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(s);
+}
+const iconImg = {};   // 已載入的圖（canvas 要用同步的 Image）
+function preloadIcons(){
+  Object.keys(ICONS).forEach(k => {
+    const im = new Image();
+    im.onload = () => { iconImg[k] = im; if (mode === 'icon') draw(); };
+    im.src = iconUrl(ICONS[k][2], 640, 400);   // 2x 解析度，縮下來邊緣比較乾淨
+  });
+}
+
+let mode = 'food', codeType = 'none', note = null;
+let autoZh = false, autoId = false;   // 該欄是不是我們自動填的（自動填的才能被覆蓋）
+
+QUICK.forEach(zhw => {
+  const idw = Z2I.get(zhw) || '';
+  const b = document.createElement('button');
+  b.innerHTML = zhw + '<span class="id">' + idw + '</span>';
+  b.onclick = () => {
+    $('fzh').value = zhw; $('fid').value = idw;
+    autoZh = false; autoId = true;
+    [...$('foodchips').children].forEach(x => x.classList.toggle('on', x === b));
+    hintTr(); draw();
+  };
+  $('foodchips').appendChild(b);
+});
+NOTES.forEach(([zhw, idw]) => {
+  const b = document.createElement('button');
+  b.innerHTML = zhw + '<span class="id">' + idw + '</span>';
+  b.onclick = () => {
+    const same = note && note[0] === zhw;
+    note = same ? null : [zhw, idw];
+    [...$('notechips').children].forEach(x => x.classList.toggle('on', !same && x === b));
+    draw();
+  };
+  $('notechips').appendChild(b);
+});
+
+// 報關綑包標籤常用品名（實際印過成功的項次，跨多份報單累積；同品名+同第二行的不重複加）
+// 點了直接帶入三行＋份數；帶完還是一般輸入框，字不對可以再改，不是鎖死的。
+// 這些內容延後到密碼驗證通過才建立 DOM，避免沒輸入密碼的人用「檢查元素」就看到報單機密。
+let customsBuilt = false;
+function buildCustomsUI() {
+  if (customsBuilt) return;
+  customsBuilt = true;
+  let customsItemNo = null;
+  const CUSTOMS_BUNDLE_PRESETS = [
+    // CE/15/023/15512（2026-08-31，Dominican Republic 進口，14 項）
+    { l1:'ES',                      l2:'Cigars Dominican Cigars Dominican', country:'DOMINICAN REPUBLIC', n:1,  copies:1 },
+    { l1:'Trinidad Toro',           l2:'Cigars Dominican Cigars Dominican', country:'DOMINICAN REPUBLIC', n:2,  copies:3 },
+    { l1:'D4',                      l2:'Cigars Dominican Cigars Dominican', country:'DOMINICAN REPUBLIC', n:3,  copies:2 },
+    { l1:'Montecristo 2',           l2:'Cigars Dominican Cigars Dominican', country:'DOMINICAN REPUBLIC', n:4,  copies:2 },
+    { l1:'MONTECRISTO WIDE EDMUNDO',l2:'Cigars Dominican Cigars Dominican', country:'DOMINICAN REPUBLIC', n:5,  copies:2 },
+    { l1:'Trinidad RB',             l2:'Cigars Dominican Cigars Dominican', country:'DOMINICAN REPUBLIC', n:6,  copies:2 },
+    { l1:'M2',                      l2:'Cigars Dominican Cigars Dominican', country:'DOMINICAN REPUBLIC', n:7,  copies:1 },
+    { l1:'D4',                      l2:'Cigars Dominican Cigars Dominican', country:'DOMINICAN REPUBLIC', n:8,  copies:4 },
+    { l1:'Montecristo 2',           l2:'Cigars Dominican Cigars Dominican', country:'DOMINICAN REPUBLIC', n:9,  copies:1 },
+    { l1:'WA',                      l2:'Cigars Dominican',                  country:'DOMINICAN REPUBLIC', n:10, copies:1 },
+    { l1:'Trinidad Toro',           l2:'Cigars Dominican',                  country:'DOMINICAN REPUBLIC', n:11, copies:3 },
+    { l1:'D4',                      l2:'Cigars Dominican',                  country:'DOMINICAN REPUBLIC', n:12, copies:2 },
+    { l1:'Montecristo 2',           l2:'Cigars Dominican',                  country:'DOMINICAN REPUBLIC', n:13, copies:2 },
+    { l1:'MONTECRISTO WIDE EDMUNDO',l2:'Cigars Dominican',                  country:'DOMINICAN REPUBLIC', n:14, copies:2 },
+    // CE/15/023/16061（2026-08-31，Cuba＋Dominican Republic 進口，8 項；#7 Trinidad Toro 跟上面重複，不重加）
+    { l1:'COHIBA Siglo IV',           l2:'Cigars',            country:'CUBA',              n:1, copies:1 },
+    { l1:'El Rey del Mundo Libano',   l2:'Cigars Dominican',  country:'DOMINICAN REPUBLIC', n:2, copies:2 },
+    { l1:'Ramon Allones Robusto',     l2:'Cigars Dominican',  country:'DOMINICAN REPUBLIC', n:3, copies:4 },
+    { l1:'Ramon Allones Exclusivo 90',l2:'Cigars Dominican',  country:'DOMINICAN REPUBLIC', n:4, copies:5 },
+    { l1:'h.upmann 2024',             l2:'Cigars Dominican',  country:'DOMINICAN REPUBLIC', n:5, copies:2 },
+    { l1:'bolivar casa habano',       l2:'Cigars Dominican',  country:'DOMINICAN REPUBLIC', n:6, copies:3 },
+    { l1:'Juan Lopez Exclusivo Qatar',l2:'Cigars Dominican',  country:'DOMINICAN REPUBLIC', n:8, copies:1 },
+  ];
+  // 品名（大字第一行）相同的只留第一個按鈕——同一份報單常常同品名出好幾個項次（箱子大小不同），
+  // 按鈕一樣大字重複顯示會很亂；點了先帶入第一個項次的內容，項次/份數不對再自己改。
+  const seenL1 = new Set();
+  const CUSTOMS_PRESET_BUTTONS = CUSTOMS_BUNDLE_PRESETS.filter(p => {
+    if (seenL1.has(p.l1)) return false;
+    seenL1.add(p.l1); return true;
+  });
+  CUSTOMS_PRESET_BUTTONS.forEach(p => {
+    const b = document.createElement('button');
+    b.innerHTML = p.l1 + '<span class="id">' + p.country + ' #' + p.n + ' · ' + p.copies + '張</span>';
+    b.onclick = () => {
+      $('cl1').value = p.l1; $('cl2').value = p.l2;
+      $('cl3').value = p.country + ' #' + p.n;
+      $('copies').value = String(p.copies);
+      customsItemNo = p.n;
+      [...$('customspresets').children].forEach(x => x.classList.toggle('on', x === b));
+      [...$('customsitemno').children].forEach(x => x.classList.toggle('on', Number(x.dataset.n) === customsItemNo));
+      draw();
+    };
+    $('customspresets').appendChild(b);
+  });
+
+  // 報單項次選號（報關綑包標籤專用）：內容每次報單都不同，不預存文字，
+  // 只把「#數字」附加到第三行尾巴，省得每張手打。點同一個數字再取消。
+  for (let n = 1; n <= 24; n++) {
+    const b = document.createElement('button');
+    b.textContent = '#' + n;
+    b.dataset.n = n;
+    b.onclick = () => {
+      customsItemNo = customsItemNo === n ? null : n;
+      const base = $('cl3').value.replace(/\s*#\d+\s*$/, '').trim();
+      $('cl3').value = customsItemNo ? (base ? base + ' #' + customsItemNo : '#' + customsItemNo) : base;
+      [...$('customsitemno').children].forEach(x => x.classList.toggle('on', Number(x.dataset.n) === customsItemNo));
+      draw();
+    };
+    $('customsitemno').appendChild(b);
+  }
+}
+
+// 圖案選擇器：直接把圖畫出來給人挑；分類分頁；可以打勾多選一次印
+let iconCat = 0;
+const sel = new Set(['fire']);      // 已勾選的圖案
+let lastIcon = 'fire';              // 預覽顯示的那個（＝最後點選的）
+ICON_CATS.forEach(([zhw, enw], n) => {
+  const b = document.createElement('button');
+  b.innerHTML = `${zhw}<span>${enw}</span>`;
+  if (n === 0) b.classList.add('on');
+  b.onclick = () => { iconCat = n; [...$('iconcat').children].forEach(x => x.classList.toggle('on', x === b)); buildIconGrid(); };
+  $('iconcat').appendChild(b);
+});
+function buildIconGrid(){
+  const pick = $('iconpick');
+  pick.innerHTML = '';
+  ICON_CATS[iconCat][2].forEach(k => {
+    const [zhw, , body] = ICONS[k];
+    const b = document.createElement('button');
+    b.dataset.k = k;
+    b.innerHTML = `<img alt="${zhw}" src="${iconUrl(body, 200, 125)}"><span class="cap">${zhw}<br>${iconEn(k)}</span>`;
+    if (sel.has(k)) b.classList.add('on');
+    b.onclick = () => {
+      if (sel.has(k)) { sel.delete(k); if (lastIcon === k) lastIcon = [...sel][0] || null; }
+      else { sel.add(k); lastIcon = k; }         // 預覽顯示最後點的那個，才看得到剛選了什麼
+      b.classList.toggle('on', sel.has(k)); syncIconText(); draw();
+    };
+    pick.appendChild(b);
+  });
+}
+/** 只選一個時才給改文字；選多個時每張各自印自己的名稱 */
+function syncIconText(){
+  const one = sel.size === 1 ? [...sel][0] : null;
+  $('ictextbox').style.display = one ? 'block' : 'none';
+  if (one) { $('ictext').value = ICONS[one][0]; $('ictext2').value = iconEn(one); }
+}
+buildIconGrid();
+$('ictext').oninput = draw;
+$('ictext2').oninput = draw;
+
+// 學習貼紙選擇器（數字／ABC／注音），一樣可以多選
+let learnCat = 0;
+const selL = new Set(['0:1']);      // "分類:索引"
+let lastL = '0:1';
+LEARN_SETS.forEach(([zhw, enw], n) => {
+  const b = document.createElement('button');
+  b.innerHTML = `${zhw}<span>${enw}</span>`;
+  if (n === 0) b.classList.add('on');
+  b.onclick = () => { learnCat = n; [...$('learncat').children].forEach(x => x.classList.toggle('on', x === b)); buildLearnGrid(); };
+  $('learncat').appendChild(b);
+});
+function buildLearnGrid(){
+  const pick = $('learnpick');
+  pick.innerHTML = '';
+  LEARN_SETS[learnCat][2].forEach((it, i) => {
+    const key = learnCat + ':' + i;
+    const b = document.createElement('button');
+    b.innerHTML = `<b>${it[0]}</b><span>${it[1]}</span>`;
+    if (selL.has(key)) b.classList.add('on');
+    b.onclick = () => {
+      if (selL.has(key)) { selL.delete(key); if (lastL === key) lastL = [...selL][0] || null; }
+      else { selL.add(key); lastL = key; }
+      b.classList.toggle('on', selL.has(key)); draw();
+    };
+    pick.appendChild(b);
+  });
+}
+buildLearnGrid();
+
+// 全選／清除：只動目前分頁裡的項目，別的分頁選好的不會被清掉
+$('icall').onclick  = () => { ICON_CATS[iconCat][2].forEach(k => sel.add(k)); lastIcon = ICON_CATS[iconCat][2][0]; buildIconGrid(); syncIconText(); draw(); };
+$('icnone').onclick = () => { ICON_CATS[iconCat][2].forEach(k => sel.delete(k)); lastIcon = [...sel][0] || null; buildIconGrid(); syncIconText(); draw(); };
+$('lnall').onclick  = () => { LEARN_SETS[learnCat][2].forEach((_, i) => selL.add(learnCat + ':' + i)); lastL = learnCat + ':0'; buildLearnGrid(); draw(); };
+$('lnnone').onclick = () => { LEARN_SETS[learnCat][2].forEach((_, i) => selL.delete(learnCat + ':' + i)); lastL = [...selL][0] || null; buildLearnGrid(); draw(); };
+
+const learnItem = key => { const [c, i] = key.split(':').map(Number); return LEARN_SETS[c][2][i]; };
+
+// ── 雙向自動翻譯 ────────────────────────────────────────
+function hintTr(){
+  const z = $('fzh').value.trim(), i = $('fid').value.trim();
+  const h = $('trhint');
+  if (z && !i)      { h.className = 'hint warn'; h.innerHTML = '字典裡沒有這個詞，只會印中文　<i>Tidak ada di kamus, hanya cetak Mandarin</i>'; }
+  else if (i && !z) { h.className = 'hint warn'; h.innerHTML = '字典裡沒有這個詞，只會印印尼文　<i>Tidak ada di kamus, hanya cetak Indonesia</i>'; }
+  else              { h.className = 'hint'; h.innerHTML = '打其中一欄，另一欄會自動出現　<i>Ketik satu kolom, kolom lain otomatis terisi</i>'; }
+}
+// 正在打的那一欄＝主導欄，另一欄跟著它走。
+// 查不到翻譯時：若對面是之前自動填的就清掉（留著會變成兩欄對不起來的錯標籤），
+// 若對面是使用者自己打的就保留不動。
+$('fzh').oninput = () => {
+  [...$('foodchips').children].forEach(x => x.classList.remove('on'));
+  autoZh = false;
+  const t = toId($('fzh').value);
+  if (t) { $('fid').value = t; autoId = true; }
+  else if (autoId) { $('fid').value = ''; autoId = false; }
+  hintTr(); draw();
+};
+$('fid').oninput = () => {
+  [...$('foodchips').children].forEach(x => x.classList.remove('on'));
+  autoId = false;
+  const t = toZh($('fid').value);
+  if (t) { $('fzh').value = t; autoZh = true; }
+  else if (autoZh) { $('fzh').value = ''; autoZh = false; }
+  hintTr(); draw();
+};
+
+// ── 報關密碼保護：只有輸入對密碼才切得進報關分頁 ──────────────
+const CUSTOMS_PIN = '8541';
+function openCustomsLock(onSuccess) {
+  const overlay = $('customsLock'), input = $('customsPwd'), err = $('customsPwdErr');
+  const okBtn = $('customsPwdOk'), cancelBtn = $('customsPwdCancel');
+  err.textContent = ''; input.value = '';
+  overlay.style.display = 'flex';
+  setTimeout(() => input.focus(), 50);
+  function close() { overlay.style.display = 'none'; okBtn.onclick = null; cancelBtn.onclick = null; input.onkeydown = null; }
+  okBtn.onclick = () => {
+    if (input.value === CUSTOMS_PIN) { close(); onSuccess(); }
+    else { err.textContent = '密碼錯誤，再試一次'; input.value = ''; input.focus(); }
+  };
+  cancelBtn.onclick = close;
+  input.onkeydown = ev => { if (ev.key === 'Enter') okBtn.onclick(); };
+}
+
+// ── 模式切換 ────────────────────────────────────────────
+function selectMode(b) {
+  mode = b.dataset.m;
+  [...$('mode').children].forEach(x => x.classList.toggle('on', x === b));
+  $('pane-general').style.display = mode === 'general' ? 'block' : 'none';
+  $('pane-food').style.display    = mode === 'food'    ? 'block' : 'none';
+  $('pane-icon').style.display    = mode === 'icon'    ? 'block' : 'none';
+  $('pane-learn').style.display   = mode === 'learn'   ? 'block' : 'none';
+  $('pane-customs').style.display = mode === 'customs' ? 'block' : 'none';
+  draw();
+}
+$('mode').onclick = e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.m === 'customs') { openCustomsLock(() => { buildCustomsUI(); selectMode(b); }); return; }
+  selectMode(b);
+};
+$('seg').onclick = e => {
+  const b = e.target.closest('button'); if (!b) return;
+  codeType = b.dataset.t;
+  [...$('seg').children].forEach(x => x.classList.toggle('on', x === b));
+  $('code').style.display = codeType !== 'none' ? 'block' : 'none';
+  $('codehint').style.display = codeType === 'barcode' ? 'block' : 'none';
+  draw();
+};
+['l1','l2','l3','code','dval','cl1','cl2','cl3'].forEach(id => $(id).oninput = draw);
+$('dtype').onchange = draw;
+
+const zh  = px => `bold ${px}px 'Microsoft JhengHei','PingFang TC','Noto Sans TC',sans-serif`;
+const reg = px => `${px}px 'Microsoft JhengHei','PingFang TC','Noto Sans TC',sans-serif`;
+
+function fitSize(ctx, text, start, min, font, maxW){
+  let s = start;
+  while (s > min) { ctx.font = font(s); if (ctx.measureText(text).width <= maxW) break; s -= 1; }
+  return s;
+}
+function center(ctx, text, y){ ctx.fillText(text, (W - ctx.measureText(text).width) / 2, y); }
+
+function paintGeneral(ctx, textH, ids){
+  ids = ids || ['l1', 'l2', 'l3'];
+  const lines = ids.map(id => $(id).value.trim()).filter(Boolean);
+  if (!lines.length) return;
+  const pad = 12, maxW = W - pad * 2;
+  const big = fitSize(ctx, lines[0], 64, 14, zh, maxW);
+  const sizes = [big, Math.max(13, Math.round(big * 0.5)), Math.max(12, Math.round(big * 0.42))];
+  for (let i = 1; i < lines.length; i++) sizes[i] = fitSize(ctx, lines[i], sizes[i], 11, reg, maxW);
+  const gap = 6;
+  let total = 0; lines.forEach((_, i) => total += sizes[i] * 1.2 + (i ? gap : 0));
+  let y = Math.max(2, (textH - total) / 2);
+  lines.forEach((ln, i) => { ctx.font = i === 0 ? zh(sizes[i]) : reg(sizes[i]); center(ctx, ln, y); y += sizes[i] * 1.2 + gap; });
+}
+
+function paintFood(ctx, textH){
+  const nameZh = $('fzh').value.trim(), nameId = $('fid').value.trim();
+  if (!nameZh && !nameId) return;
+  const pad = 10, maxW = W - pad * 2;
+  const dt = $('dtype').value, dv = $('dval').value;
+  const hasDate = !!(dt && dv), hasNote = !!note;
+  const extras = (hasDate ? 1 : 0) + (hasNote ? 2 : 0);
+
+  const zhMax = extras >= 2 ? 52 : (extras === 1 ? 60 : 72);
+  const sZh = nameZh ? fitSize(ctx, nameZh, zhMax, 16, zh, maxW) : 0;
+  const sId = nameId ? fitSize(ctx, nameId, Math.round((sZh || 44) * 0.62) || 30, 13, reg, maxW) : 0;
+  const sSm = extras >= 3 ? 17 : 20;
+
+  const blocks = [];
+  if (nameZh) blocks.push({ t: nameZh, f: zh(sZh), h: sZh * 1.16 });
+  if (nameId) blocks.push({ t: nameId, f: reg(sId), h: sId * 1.16 });
+  if (hasDate) {
+    const txt = (dt === 'opened' ? '開封 Dibuka ' : '到期 Kedaluwarsa ') + dv.slice(5).replace('-', '/');
+    blocks.push({ t: txt, f: reg(fitSize(ctx, txt, sSm, 12, reg, maxW)), h: sSm * 1.2, line: true });
+  }
+  if (hasNote) {
+    blocks.push({ t: note[0], f: zh(fitSize(ctx, note[0], sSm + 2, 12, zh, maxW)), h: (sSm + 2) * 1.16, line: !hasDate });
+    blocks.push({ t: note[1], f: reg(fitSize(ctx, note[1], sSm, 11, reg, maxW)), h: sSm * 1.16 });
+  }
+
+  const gap = 4;
+  const total = blocks.reduce((a, b, i) => a + b.h + (i ? gap : 0), 0);
+  let y = Math.max(2, (textH - total) / 2);
+  blocks.forEach(b => {
+    if (b.line) { ctx.fillRect(pad + 14, Math.round(y) - 3, W - (pad + 14) * 2, 1); y += 3; }
+    ctx.font = b.f; center(ctx, b.t, y); y += b.h + gap;
+  });
+}
+
+function toBits(ctx, h){
+  const img = ctx.getImageData(0, 0, W, h).data;
+  const wb = Math.ceil(W / 8);
+  const out = new Uint8Array(wb * h);
+  for (let yy = 0; yy < h; yy++) for (let bx = 0; bx < wb; bx++) {
+    let b = 0;
+    for (let bit = 0; bit < 8; bit++) {
+      const x = bx * 8 + bit; let v = 1;
+      if (x < W) { const i = (yy * W + x) * 4;
+        if (img[i+3] > 64 && (img[i] + img[i+1] + img[i+2]) / 3 < 128) v = 0; }
+      b |= v << (7 - bit);
+    }
+    out[yy * wb + bx] = b;
+  }
+  return { bits: out, wb };
+}
+
+/** 圖案貼紙：圖填滿版面；有加字的話圖往上縮，中文＋英文放下面
+ *  多選時每張各自印自己的名稱，只選一個時才吃文字欄（可改成小孩名字） */
+function paintIcon(ctx, textH, key){
+  const k = key || lastIcon || [...sel][0];
+  if (!k) return;
+  const im = iconImg[k];
+  const one = sel.size === 1 && !key;
+  const t1 = one ? $('ictext').value.trim() : ICONS[k][0];
+  const t2 = one ? $('ictext2').value.trim() : iconEn(k);
+  const lines = [t1, t2].filter(Boolean);
+  // 一行留 40、兩行留 66；兩者都空就整張滿版只印圖
+  const gap = lines.length === 0 ? 0 : (lines.length === 1 ? 42 : 66);
+  const areaH = textH - gap;
+  if (im) {
+    // 圖是 200×125（與 320×200 同比例），等比縮放置中，不會變形
+    const s = Math.min(W / im.width, areaH / im.height);
+    const w = im.width * s, h = im.height * s;
+    ctx.drawImage(im, (W - w) / 2, (areaH - h) / 2, w, h);
+  }
+  if (!lines.length) return;
+  const maxW = W - 16;
+  const s1 = t1 ? fitSize(ctx, t1, lines.length === 1 ? 34 : 32, 12, zh, maxW) : 0;
+  const s2 = t2 ? fitSize(ctx, t2, t1 ? 22 : 30, 11, reg, maxW) : 0;
+  const total = (t1 ? s1 * 1.16 : 0) + (t2 ? s2 * 1.16 : 0) + (t1 && t2 ? 3 : 0);
+  let y = areaH + (gap - total) / 2;
+  if (t1) { ctx.font = zh(s1); center(ctx, t1, y); y += s1 * 1.16 + 3; }
+  if (t2) { ctx.font = reg(s2); center(ctx, t2, y); }
+}
+
+/** 學習貼紙：超大字（數字／字母／注音）＋ 中文 ＋ 英文 */
+function paintLearn(ctx, textH, key){
+  const k = key || lastL || [...selL][0];
+  if (!k) return;
+  const [big, zhw, enw] = learnItem(k);
+  const maxW = W - 20;
+  const subs = [zhw, enw].filter(Boolean);
+  const subH = subs.length === 2 ? 62 : (subs.length === 1 ? 36 : 0);
+  const sBig = fitSize(ctx, big, Math.min(126, textH - subH - 6), 30, zh, maxW);
+  ctx.font = zh(sBig);
+  center(ctx, big, Math.max(2, (textH - subH - sBig * 1.1) / 2));
+  if (!subs.length) return;
+  let y = textH - subH + 2;
+  if (zhw) { const s = fitSize(ctx, zhw, 30, 12, zh, maxW); ctx.font = zh(s); center(ctx, zhw, y); y += s * 1.18 + 2; }
+  if (enw) { const s = fitSize(ctx, enw, 24, 11, reg, maxW); ctx.font = reg(s); center(ctx, enw, y); }
+}
+
+function textHeight(){ return (mode !== 'general' || codeType === 'none') ? H : 105; }
+function paint(ctx, textH, key){
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, textH);
+  ctx.fillStyle = '#000'; ctx.textBaseline = 'top';
+  if (mode === 'food') paintFood(ctx, textH);
+  else if (mode === 'icon') paintIcon(ctx, textH, key);
+  else if (mode === 'learn') paintLearn(ctx, textH, key);
+  else if (mode === 'customs') paintGeneral(ctx, textH, ['cl1', 'cl2', 'cl3']);
+  else paintGeneral(ctx, textH);
+}
+
+function buildTSPL(key){
+  const th = textHeight();
+  const c = document.createElement('canvas'); c.width = W; c.height = th;
+  const ctx = c.getContext('2d');
+  paint(ctx, th, key);
+  const { bits, wb } = toBits(ctx, th);
+  const enc = new TextEncoder();
+  const head = enc.encode(
+    'SIZE 40 mm,25 mm\r\nGAP 2 mm,0 mm\r\nDIRECTION 1\r\nREFERENCE 0,0\r\nDENSITY 12\r\nSPEED 4\r\nCLS\r\n' +
+    `BITMAP 0,0,${wb},${th},0,`);
+  let tailStr = '\r\n';
+  if (mode === 'general') {
+    const raw = $('code').value.trim();
+    if (codeType === 'barcode') {
+      const v = raw.replace(/[^\x20-\x7e]/g, '').replace(/"/g, '');
+      if (v) tailStr += `BARCODE 20,116,"128",64,1,0,2,2,"${v}"\r\n`;
+    } else if (codeType === 'qr') {
+      const v = raw.replace(/"/g, '');
+      if (v) tailStr += `QRCODE 118,110,L,3,A,0,"${v}"\r\n`;
+    }
+  }
+  tailStr += 'PRINT 1,1\r\n';
+  const tail = enc.encode(tailStr);
+  const all = new Uint8Array(head.length + bits.length + tail.length);
+  all.set(head, 0); all.set(bits, head.length); all.set(tail, head.length + bits.length);
+  return all;
+}
+
+function draw(){
+  const pv = $('preview');
+  const scale = Math.max(1, Math.min(2, (pv.parentElement.clientWidth - 20) / W));
+  pv.width = W * scale; pv.height = H * scale;
+  const ctx = pv.getContext('2d');
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
+
+  const th = textHeight();
+  const t = document.createElement('canvas'); t.width = W; t.height = th;
+  paint(t.getContext('2d'), th);
+  ctx.drawImage(t, 0, 0);
+
+  const raw = $('code').value.trim();
+  if (mode === 'general' && codeType !== 'none' && raw) {
+    ctx.fillStyle = '#000';
+    if (codeType === 'barcode') {
+      let x = 20;
+      for (let i = 0; i < 46 && x < 300; i++) { const w = 1 + (i * 7 % 3); ctx.fillRect(x, 116, w, 64); x += w + 2 + (i % 2); }
+      ctx.font = '13px monospace'; ctx.fillText(raw.slice(0, 22), 20, 182);
+    } else {
+      const n = 21, cell = 3, ox = 118, oy = 110;
+      for (let a = 0; a < n; a++) for (let b = 0; b < n; b++) {
+        const edge = (a < 7 && b < 7) || (a < 7 && b > n-8) || (a > n-8 && b < 7);
+        const on = edge ? ((a%6===0||b%6===0) || (a>1&&a<5&&b>1&&b<5)) : ((a*3 + b*5 + a*b) % 3 === 0);
+        if (on) ctx.fillRect(ox + b*cell, oy + a*cell, cell, cell);
+      }
+    }
+  }
+  ctx.strokeStyle = '#d8d2c6'; ctx.lineWidth = 1;
+  ctx.strokeRect(.5, .5, W-1, H-1);
+
+  // 多選時告訴使用者總共會印幾張，預覽的是第一張
+  const n = mode === 'icon' ? sel.size : (mode === 'learn' ? selL.size : 1);
+  const c2 = parseInt($('copies').value, 10) || 1;
+  $('cnt').textContent = n > 1
+    ? `已選 ${n} 個，每個 ${c2} 張 → 總共 ${n * c2} 張（預覽是第一張）`
+    : (n === 0 ? '還沒選任何一個' : '');
+  $('send').firstChild.nodeValue = n > 1 ? `送出列印 ${n * c2} 張` : '送出列印';
+}
+window.addEventListener('resize', draw);
+
+function b64(bytes){
+  let s = ''; const CH = 0x8000;
+  for (let i = 0; i < bytes.length; i += CH) s += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
+  return btoa(s);
+}
+function say(cls, html){ const m = $('msg'); m.className = cls; m.innerHTML = html; m.style.display = 'block'; }
+
+$('copies').onchange = draw;
+
+$('send').onclick = async () => {
+  // 這一次要印哪些（圖案／學習可多選，其他模式一張）
+  let keys;
+  if (mode === 'icon') {
+    if (!sel.size) return say('err', '先點選至少一個圖案<br><span style="font-size:12px">Pilih minimal satu gambar</span>');
+    keys = [...sel];
+    if (keys.some(k => !iconImg[k]))
+      return say('err', '圖案還在載入，等一秒再按<br><span style="font-size:12px">Gambar sedang dimuat</span>');
+  } else if (mode === 'learn') {
+    if (!selL.size) return say('err', '先點選至少一個字<br><span style="font-size:12px">Pilih minimal satu huruf</span>');
+    keys = [...selL];
+  } else {
+    const empty = mode === 'food'
+      ? (!$('fzh').value.trim() && !$('fid').value.trim())
+      : mode === 'customs'
+      ? (!$('cl1').value.trim() && !$('cl2').value.trim() && !$('cl3').value.trim())
+      : (!$('l1').value.trim() && !$('l2').value.trim() && !$('l3').value.trim());
+    if (empty) return say('err', '至少要填一個欄位<br><span style="font-size:12px">Isi minimal satu kolom</span>');
+    keys = [null];
+  }
+
+  const btn = $('send'); btn.disabled = true;
+  const copies = parseInt($('copies').value, 10) || 1;
+  const total = keys.length * copies;
+  say('wait', `送出中… ${total} 張 <span style="font-size:12px">Mengirim…</span>`);
+  try {
+    const ids = [];
+    for (const k of keys) {
+      const r = await fetch(`${SB}/pos_print_jobs`, {
+        method: 'POST',
+        headers: { apikey: AK, Authorization: `Bearer ${AK}`,
+                   'Content-Type': 'application/json', Prefer: 'return=representation' },
+        body: JSON.stringify({ store: STORE, kind: 'label',
+                payload: { copies, tspl_b64: b64(buildTSPL(k)), source: 'office-label-page' } })
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status} ${await r.text()}`);
+      ids.push((await r.json())[0].id);
+    }
+    say('wait', `已排入佇列 ${total} 張，等待標籤機…<br><span style="font-size:12px">Menunggu printer…</span>`);
+
+    // 每張都要等到真的印出來才回報成功（張數多的時候要等久一點）
+    const rounds = 8 + keys.length * 3;
+    for (let i = 0; i < rounds; i++) {
+      await new Promise(s => setTimeout(s, 2500));
+      const q = await fetch(`${SB}/pos_print_jobs?id=in.(${ids.join(',')})&select=id,status`,
+                            { headers: { apikey: AK, Authorization: `Bearer ${AK}` } });
+      const rows = await q.json();
+      const done = rows.filter(x => x.status === 'printed').length;
+      if (rows.some(x => x.status === 'error'))
+        return say('err', '❌ 列印失敗 · Gagal mencetak<br><span style="font-size:12px">標籤機可能離線或沒紙</span>');
+      if (done === ids.length)
+        return say('ok', `✅ 已印出 ${total} 張 · Done<br><span style="font-size:12px;opacity:.75">去辦公室標籤機拿</span>`);
+      if (ids.length > 1) say('wait', `列印中… ${done}/${ids.length} 種已完成`);
+    }
+    say('wait', '⏳ 已排進佇列，標籤機還沒全部印完<br><span style="font-size:12px">確認機器有開機、有紙，恢復後會自動補印</span>');
+  } catch (e) {
+    say('err', '送出失敗：' + e.message);
+  } finally { btn.disabled = false; }
+};
+
+// 放在最後，確保上面所有函式都已就緒
+$('dval').value = new Date().toISOString().slice(0, 10);
+syncIconText();
+preloadIcons();
+draw();
+</script>
+</body>
+</html>
