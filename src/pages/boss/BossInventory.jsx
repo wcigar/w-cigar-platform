@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
-import { Package, Search, AlertTriangle, X, Camera } from 'lucide-react'
+import { Package, Search, AlertTriangle, X, Camera, Plus, Printer } from 'lucide-react'
+import { printBarcode } from '../../utils/printer'
 
 const REASON_CODES = {
   normal: { label: '正常消耗', color: '#4da86c' },
@@ -26,6 +27,11 @@ export default function BossInventory() {
   const [photoItem, setPhotoItem] = useState(null)
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef(null)
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [addForm, setAddForm] = useState({ name: '', category: '', sub_category: '', unit: '', current_stock: '', safe_stock: '', retail_price: '' })
+  const [addSaving, setAddSaving] = useState(false)
+  const [addError, setAddError] = useState('')
+  const [printing, setPrinting] = useState(null)
 
   const lowCount = items.filter(i => Number(i.current_stock) < Number(i.safe_stock)).length
   useEffect(() => { loadInventory() }, [])
@@ -102,6 +108,45 @@ export default function BossInventory() {
     }
   }
 
+  async function handleAddItem() {
+    const name = addForm.name.trim()
+    const category = addForm.category.trim()
+    if (!name || !category) return
+    setAddSaving(true)
+    setAddError('')
+    const current_stock = Number(addForm.current_stock) || 0
+    const safe_stock = Number(addForm.safe_stock) || 0
+    const { error } = await supabase.from('inventory_master').insert({
+      id: 'inv_boss_' + Date.now(),
+      name,
+      category,
+      sub_category: addForm.sub_category.trim(),
+      unit: addForm.unit.trim() || '個',
+      current_stock,
+      safe_stock,
+      is_low: current_stock < safe_stock,
+      retail_price: Number(addForm.retail_price) || 0,
+      enabled: true,
+      created_by: 'ADMIN',
+    })
+    setAddSaving(false)
+    if (error) { setAddError('建立失敗: ' + error.message); return }
+    setShowAddModal(false)
+    setAddForm({ name: '', category: '', sub_category: '', unit: '', current_stock: '', safe_stock: '', retail_price: '' })
+    loadInventory()
+  }
+
+  async function handlePrintLabel(item) {
+    setPrinting(item.id)
+    try {
+      await printBarcode(item.id, item.name)
+    } catch (e) {
+      alert('列印失敗：' + (e.message || e) + '\n（請確認目前在店內 WiFi、標籤印表機已開機）')
+    } finally {
+      setPrinting(null)
+    }
+  }
+
   const filtered = items.filter(i => {
     const q = search.toLowerCase()
     return (i.name || '').toLowerCase().includes(q) || (i.category || '').toLowerCase().includes(q)
@@ -112,6 +157,7 @@ export default function BossInventory() {
     acc[cat].push(item)
     return acc
   }, {})
+  const existingCategories = [...new Set(items.map(i => i.category).filter(Boolean))].sort()
 
   const s = {
     page: { padding: 20, color: '#e8dcc8', maxWidth: 900, margin: '0 auto' },
@@ -130,6 +176,7 @@ export default function BossInventory() {
     btn: { padding: '5px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, background: '#c9a84c', color: '#0a0a0a' },
     overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 },
     modal: { background: '#1a1714', border: '1px solid #2a2520', borderRadius: 12, padding: 24, width: 360, maxWidth: '90vw' },
+    modalInput: { width: '100%', padding: '10px 12px', background: '#0a0a0a', border: '1px solid #2a2520', borderRadius: 8, color: '#e8dcc8', marginBottom: 10, fontSize: 14, boxSizing: 'border-box' },
   }
 
   return (
@@ -139,7 +186,13 @@ export default function BossInventory() {
           <Package size={22} /> 庫存管理
           {lowCount > 0 && <span style={s.badge}>{lowCount} 低庫存</span>}
         </div>
-        <div style={{ fontSize: 12, color: '#8a8278' }}>共 {items.length} 項商品</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ fontSize: 12, color: '#8a8278' }}>共 {items.length} 項商品</div>
+          <button onClick={() => { setAddForm({ name: '', category: '', sub_category: '', unit: '', current_stock: '', safe_stock: '', retail_price: '' }); setAddError(''); setShowAddModal(true) }}
+            style={{ ...s.btn, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Plus size={14} /> 新增品項
+          </button>
+        </div>
       </div>
 
       {/* Tab switcher */}
@@ -197,6 +250,7 @@ export default function BossInventory() {
                 <div style={s.unit}>{item.unit}</div>
                 {isLow ? <div style={s.statusBad}><AlertTriangle size={12} /> 低庫存</div> : <div style={s.statusOk}>正常</div>}
                 <button style={{ ...s.btn, background: 'transparent', border: '1px solid #2a2520', color: '#8a8278', padding: '5px 8px' }} onClick={() => setPhotoItem(item)} title="上傳圖片"><Camera size={14} /></button>
+                <button disabled={printing === item.id} style={{ ...s.btn, background: 'transparent', border: '1px solid #2a2520', color: printing === item.id ? '#c9a84c' : '#8a8278', padding: '5px 8px' }} onClick={() => handlePrintLabel(item)} title="列印標籤"><Printer size={14} /></button>
                 <button style={s.btn} onClick={() => { setSelected(item); setAdjType('in'); setAdjQty(''); setAdjReason('') }}>調整</button>
               </div>
             )
@@ -205,6 +259,39 @@ export default function BossInventory() {
       ))}
       {/* Hidden file input */}
       <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handlePhotoUpload} />
+
+      {/* 新增品項 modal — 給孟禾盤點出的新款配件建檔，建完立刻可在列表按🖨️印標籤 */}
+      {showAddModal && (
+        <div style={s.overlay} onClick={() => !addSaving && setShowAddModal(false)}>
+          <div style={s.modal} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <h3 style={{ color: '#c9a84c', margin: 0, fontSize: 18 }}>新增品項</h3>
+              <X size={20} style={{ cursor: 'pointer', color: '#8a8278' }} onClick={() => !addSaving && setShowAddModal(false)} />
+            </div>
+            <input autoFocus placeholder="品名 *" value={addForm.name} onChange={e => setAddForm(f => ({ ...f, name: e.target.value }))} style={s.modalInput} />
+            <input list="inv-categories" placeholder="分類 *（可選現有分類或直接輸入新分類）" value={addForm.category} onChange={e => setAddForm(f => ({ ...f, category: e.target.value }))} style={s.modalInput} />
+            <datalist id="inv-categories">
+              {existingCategories.map(c => <option key={c} value={c} />)}
+            </datalist>
+            <input placeholder="子分類（選填）" value={addForm.sub_category} onChange={e => setAddForm(f => ({ ...f, sub_category: e.target.value }))} style={s.modalInput} />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input type="number" min="0" placeholder="盤點數量" value={addForm.current_stock} onChange={e => setAddForm(f => ({ ...f, current_stock: e.target.value }))} style={{ ...s.modalInput, flex: 1 }} />
+              <input placeholder="單位（如：個/支）" value={addForm.unit} onChange={e => setAddForm(f => ({ ...f, unit: e.target.value }))} style={{ ...s.modalInput, flex: 1 }} />
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input type="number" min="0" placeholder="安全庫存（選填）" value={addForm.safe_stock} onChange={e => setAddForm(f => ({ ...f, safe_stock: e.target.value }))} style={{ ...s.modalInput, flex: 1 }} />
+              <input type="number" min="0" placeholder="售價（選填）" value={addForm.retail_price} onChange={e => setAddForm(f => ({ ...f, retail_price: e.target.value }))} style={{ ...s.modalInput, flex: 1 }} />
+            </div>
+            {addError && <div style={{ color: '#e74c3c', fontSize: 12, marginBottom: 10 }}>{addError}</div>}
+            <button disabled={addSaving || !addForm.name.trim() || !addForm.category.trim()} onClick={handleAddItem}
+              style={{ width: '100%', padding: 12, borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 15,
+                background: (addSaving || !addForm.name.trim() || !addForm.category.trim()) ? '#333' : '#c9a84c',
+                color: (addSaving || !addForm.name.trim() || !addForm.category.trim()) ? '#666' : '#0a0a0a' }}>
+              {addSaving ? '建立中...' : '建立品項 → 就能列印標籤'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Photo upload modal */}
       {photoItem && (
