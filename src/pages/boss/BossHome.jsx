@@ -6,6 +6,7 @@ import { format, endOfMonth } from 'date-fns'
 import { zhTW } from 'date-fns/locale'
 import { getTaskUrgency } from '../../lib/taskUtils'
 import { getSlaStatus } from '../../lib/slaUtils'
+import { BossCigarRewardSection } from '../../components/CigarRewardCard'
 
 export default function BossHome() {
   const navigate = useNavigate()
@@ -305,6 +306,8 @@ export default function BossHome() {
           {mainCards.map(c => <MenuCard key={c.path} card={c} navigate={navigate} />)}
         </div>
       </div>
+
+      <BossCigarRewardSection />
 
       <button onClick={() => setShowMoreMenu(!showMoreMenu)} style={{ width: '100%', fontSize: 12, color: 'var(--text-dim)', background: 'none', border: '1px dashed var(--border)', padding: 10, marginBottom: 12, cursor: 'pointer', borderRadius: 8 }}>
         {showMoreMenu ? '收合進階功能 ▴' : '更多功能（設定 / 報關 / CRM / 行銷 / QR Code）▾'}

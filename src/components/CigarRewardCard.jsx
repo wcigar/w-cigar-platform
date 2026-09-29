@@ -207,24 +207,24 @@ function ClaimModal({ reward, user, month, onClose, onDone }) {
   )
 }
 
-// ─── 老闆：簽核區塊 ───
+// ─── 老闆：簽核區塊 + 領取紀錄 ───
 export function BossCigarRewardSection() {
-  const [pending, setPending] = useState([])
-  const [signed, setSigned] = useState([])
+  const curMonth = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' }).slice(0, 7)
+  const [rows, setRows] = useState([])
+  const [month, setMonth] = useState(curMonth)
   const [expanded, setExpanded] = useState(null)
   const [signing, setSigning] = useState(null)
-  const [showSigned, setShowSigned] = useState(false)
+  const [open, setOpen] = useState(true)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => { load() }, [])
 
   async function load() {
     setLoading(true)
-    const [pR, sR] = await Promise.all([
-      supabase.from('cigar_rewards').select('*').eq('status', 'claimed').order('claimed_at', { ascending: false }),
-      supabase.from('cigar_rewards').select('*').eq('status', 'signed').order('signed_at', { ascending: false }).limit(10),
-    ])
-    setPending(pR.data || []); setSigned(sR.data || [])
+    // 確保本月每位員工都有一筆（RPC 為 idempotent；失敗不影響顯示）
+    try { await supabase.rpc('generate_monthly_cigar_rewards', { p_month: curMonth }) } catch (e) { /* ignore */ }
+    const { data } = await supabase.from('cigar_rewards').select('*').order('month', { ascending: false }).order('employee_name').limit(500)
+    setRows(data || [])
     setLoading(false)
   }
 
@@ -235,59 +235,84 @@ export function BossCigarRewardSection() {
   }
 
   if (loading) return null
-  if (pending.length === 0 && signed.length === 0) return null
+
+  const months = [...new Set([curMonth, ...rows.map(r => r.month)])].sort().reverse()
+  const list = rows.filter(r => r.month === month)
+  const pendingSign = rows.filter(r => r.status === 'claimed')
+  const cnt = { pending: 0, claimed: 0, signed: 0 }
+  list.forEach(r => { if (cnt[r.status] !== undefined) cnt[r.status]++ })
+  const badge = {
+    pending: { t: '❌ 未領取', c: 'var(--red)' },
+    claimed: { t: '⏳ 待簽核', c: '#f59e0b' },
+    signed: { t: '✅ 已簽核', c: 'var(--green)' },
+  }
 
   return (
-    <div className="card" style={{ marginTop: 16, borderColor: 'rgba(201,168,76,.25)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+    <div className="card" style={{ marginBottom: 12, borderColor: 'rgba(201,168,76,.25)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }} onClick={() => setOpen(!open)}>
         <span style={{ fontSize: 16 }}>🚬</span>
-        <span style={{ fontSize: 14, fontWeight: 700 }}>雪茄獎勵簽核</span>
-        {pending.length > 0 && <span style={{ fontSize: 11, background: 'rgba(196,77,77,.15)', color: 'var(--red)', padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>{pending.length} 待簽</span>}
+        <span style={{ fontSize: 14, fontWeight: 700, flex: 1 }}>員工雪茄獎勵領取紀錄</span>
+        {pendingSign.length > 0 && <span style={{ fontSize: 11, background: 'rgba(196,77,77,.15)', color: 'var(--red)', padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>{pendingSign.length} 待簽</span>}
+        <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{open ? '▲' : '▼'}</span>
       </div>
 
-      {pending.map(r => {
-        const isExp = expanded === r.id
-        const photoUrls = r.photo_urls ? r.photo_urls.split('|').filter(Boolean) : []
-        return (
-          <div key={r.id} style={{ padding: '10px 0', borderTop: '1px solid var(--border)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => setExpanded(isExp ? null : r.id)}>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{r.employee_name}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{r.month} · {r.claimed_at ? new Date(r.claimed_at).toLocaleDateString('zh-TW') : ''}</div>
-              </div>
-              <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                {photoUrls.slice(0, 2).map((url, i) => <img key={i} src={url} alt="" style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 4 }} />)}
-                <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{isExp ? '▲' : '▼'}</span>
-              </div>
-            </div>
-            {isExp && (
-              <div style={{ marginTop: 10, padding: 12, background: 'var(--black)', borderRadius: 10 }}>
-                {photoUrls.length > 0 && (
-                  <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-                    {photoUrls.map((url, i) => <img key={i} src={url} alt="" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, cursor: 'pointer' }} onClick={() => window.open(url)} />)}
+      {open && (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '10px 0' }}>
+            <select value={month} onChange={e => setMonth(e.target.value)} style={{ fontSize: 12, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--black)', color: 'var(--text)' }}>
+              {months.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>未領 {cnt.pending} · 待簽 {cnt.claimed} · 已簽 {cnt.signed}</span>
+          </div>
+
+          {list.length === 0 && <div style={{ fontSize: 12, color: 'var(--text-dim)', textAlign: 'center', padding: 12 }}>此月份尚無紀錄</div>}
+
+          {list.map(r => {
+            const isExp = expanded === r.id
+            const photoUrls = r.photo_urls ? r.photo_urls.split('|').filter(Boolean) : []
+            const b = badge[r.status] || badge.pending
+            return (
+              <div key={r.id} style={{ padding: '10px 0', borderTop: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => setExpanded(isExp ? null : r.id)}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{r.employee_name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                      非古巴×{r.non_cuban_count} + 古巴×{r.cuban_count}
+                      {r.claimed_at ? ` · 領取 ${new Date(r.claimed_at).toLocaleDateString('zh-TW')}` : ''}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    {photoUrls.slice(0, 1).map((url, i) => <img key={i} src={url} alt="" style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 4 }} />)}
+                    <span style={{ fontSize: 12, fontWeight: 600, color: b.c }}>{b.t}</span>
+                  </div>
+                </div>
+                {isExp && (
+                  <div style={{ marginTop: 10, padding: 12, background: 'var(--black)', borderRadius: 10 }}>
+                    {photoUrls.length > 0 && (
+                      <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+                        {photoUrls.map((url, i) => <img key={i} src={url} alt="" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, cursor: 'pointer' }} onClick={() => window.open(url)} />)}
+                      </div>
+                    )}
+                    {r.non_cuban_items?.length > 0 && <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 4 }}>非古巴：{r.non_cuban_items.join('、')}</div>}
+                    {r.cuban_items?.length > 0 && <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 4 }}>古巴：{r.cuban_items.join('、')}</div>}
+                    {r.notes && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>📝 {r.notes}</div>}
+                    {r.status === 'pending' && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>員工尚未領取</div>}
+                    {r.status === 'claimed' && (
+                      <button onClick={() => setSigning(r.id)} style={{ width: '100%', padding: 10, borderRadius: 8, border: 'none', background: 'var(--gold)', color: 'var(--black)', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>✍️ 簽名確認</button>
+                    )}
+                    {r.status === 'signed' && (
+                      <>
+                        {r.boss_signature && <img src={r.boss_signature} alt="簽名" style={{ height: 40, borderRadius: 6, background: '#fff' }} />}
+                        <div style={{ fontSize: 11, color: 'var(--green)', marginTop: 4 }}>✅ 簽核於 {r.signed_at ? new Date(r.signed_at).toLocaleString('zh-TW') : ''}</div>
+                      </>
+                    )}
                   </div>
                 )}
-                {r.non_cuban_items?.length > 0 && <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 4 }}>非古巴：{r.non_cuban_items.join('、')}</div>}
-                {r.cuban_items?.length > 0 && <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 4 }}>古巴：{r.cuban_items.join('、')}</div>}
-                {r.notes && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>📝 {r.notes}</div>}
-                <button onClick={() => setSigning(r.id)} style={{ width: '100%', padding: 10, borderRadius: 8, border: 'none', background: 'var(--gold)', color: 'var(--black)', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>✍️ 簽名確認</button>
+                {signing === r.id && <SignaturePad onSave={(sig) => doSign(r.id, sig)} onCancel={() => setSigning(null)} />}
               </div>
-            )}
-            {signing === r.id && <SignaturePad onSave={(sig) => doSign(r.id, sig)} onCancel={() => setSigning(null)} />}
-          </div>
-        )
-      })}
-
-      {signed.length > 0 && (
-        <div style={{ marginTop: 10 }}>
-          <button onClick={() => setShowSigned(!showSigned)} style={{ fontSize: 11, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}>{showSigned ? '▲ 收合已簽核' : `▼ 已簽核 (${signed.length})`}</button>
-          {showSigned && signed.map(r => (
-            <div key={r.id} style={{ padding: '6px 0', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-              <span style={{ color: 'var(--text-dim)' }}>{r.employee_name} · {r.month}</span>
-              <span style={{ color: 'var(--green)' }}>✅ {r.signed_at ? new Date(r.signed_at).toLocaleDateString('zh-TW') : ''}</span>
-            </div>
-          ))}
-        </div>
+            )
+          })}
+        </>
       )}
     </div>
   )
