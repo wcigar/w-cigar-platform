@@ -401,9 +401,96 @@ function PreferenceContent() {
   )
 }
 
+const TEAM_SHIFT_LABEL = { '早班': '早', '晚班': '晚', '單人班': '單', '彈性班': '彈', '休假': '休', '臨時請假': '假', '病假': '病', '事假': '事', '特休': '特', '調班': '調' }
+const TEAM_SHIFT_COLOR = { '早班': 'var(--green)', '晚班': 'var(--blue)', '單人班': '#c9a84c', '彈性班': '#c9a84c', '休假': 'var(--red)', '臨時請假': 'var(--red)', '病假': '#ffb347', '事假': '#ffd700', '特休': '#64c8ff', '調班': '#c896ff' }
+
+// 全員班表：所有同事都可查看公司整月排班（唯讀）
+function TeamScheduleContent() {
+  const { user } = useAuth()
+  const [month, setMonth] = useState(new Date())
+  const [rows, setRows] = useState([])
+  const [emps, setEmps] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  const start = startOfMonth(month), end = endOfMonth(month)
+  const days = eachDayOfInterval({ start, end })
+  const todayStr = format(new Date(), 'yyyy-MM-dd')
+
+  useEffect(() => { load() }, [month])
+
+  async function load() {
+    setLoading(true); setError('')
+    const s = format(start, 'yyyy-MM-dd'), e = format(end, 'yyyy-MM-dd')
+    const [sR, eR] = await Promise.all([
+      supabase.from('schedules').select('employee_id, date, shift').gte('date', s).lte('date', e),
+      supabase.from('employees').select('id, name').eq('enabled', true),
+    ])
+    if (sR.error || eR.error) setError((sR.error || eR.error).message)
+    setRows(sR.data || [])
+    // 自己排第一，其餘依姓名
+    const list = (eR.data || []).filter(x => x.id !== 'ADMIN')
+    list.sort((a, b) => (a.id === user.employee_id ? -1 : b.id === user.employee_id ? 1 : a.name.localeCompare(b.name, 'zh-Hant')))
+    setEmps(list)
+    setLoading(false)
+  }
+
+  const map = {}
+  rows.forEach(r => { map[r.employee_id + '|' + r.date] = r.shift })
+  const cellW = 30
+
+  return (
+    <div className="fade-in">
+      <div className="section-title">全員班表</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <button onClick={() => setMonth(subMonths(month, 1))} style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid var(--border-gold)', borderRadius: 10, padding: '10px 16px', color: '#c9a84c', cursor: 'pointer', minWidth: 48, minHeight: 48, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ChevronLeft size={20} /></button>
+        <div style={{ fontSize: 20, color: '#c9a84c', fontWeight: 700, minWidth: 140, textAlign: 'center' }}>{format(month, 'yyyy年M月')}</div>
+        <button onClick={() => setMonth(addMonths(month, 1))} style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid var(--border-gold)', borderRadius: 10, padding: '10px 16px', color: '#c9a84c', cursor: 'pointer', minWidth: 48, minHeight: 48, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ChevronRight size={20} /></button>
+      </div>
+      {error && <div style={{ padding: 10, marginBottom: 10, borderRadius: 10, background: 'rgba(196,77,77,.06)', border: '1px solid rgba(196,77,77,.2)', fontSize: 12, color: 'var(--red)' }}>❌ 載入失敗：{error}</div>}
+      {loading ? <div className="loading-shimmer" style={{ height: 300 }} /> : (
+        <>
+          {rows.length === 0 && !error && (
+            <div style={{ padding: 12, marginBottom: 12, borderRadius: 10, background: 'rgba(201,168,76,.05)', border: '1px solid var(--border-gold)', fontSize: 12.5, color: 'var(--text-dim)', textAlign: 'center' }}>📭 本月班表尚未公布</div>
+          )}
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>
+            {Object.entries(TEAM_SHIFT_LABEL).map(([k, v]) => <span key={k} style={{ marginRight: 8, color: TEAM_SHIFT_COLOR[k] }}>{v}={k}</span>)}
+          </div>
+          <div style={{ overflowX: 'auto', border: '1px solid var(--border)', borderRadius: 10 }}>
+            <table style={{ borderCollapse: 'collapse', fontSize: 11, minWidth: '100%' }}>
+              <thead>
+                <tr>
+                  <th style={{ position: 'sticky', left: 0, zIndex: 2, background: 'var(--black-card)', padding: '6px 8px', textAlign: 'left', minWidth: 64, borderBottom: '1px solid var(--border)', color: 'var(--text-dim)' }}>同事</th>
+                  {days.map(d => {
+                    const ds = format(d, 'yyyy-MM-dd'), td = ds === todayStr, wk = d.getDay() === 0 || d.getDay() === 6
+                    return <th key={ds} style={{ minWidth: cellW, padding: '4px 0', textAlign: 'center', background: td ? 'var(--gold-glow)' : 'var(--black-card)', color: td ? '#c9a84c' : wk || isHoliday(ds) ? 'var(--red)' : 'var(--text-dim)', borderBottom: '1px solid var(--border)', fontWeight: td ? 700 : 500 }}>
+                      <div>{format(d, 'd')}</div><div style={{ fontSize: 9 }}>{WEEKDAYS[d.getDay()]}</div>
+                    </th>
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {emps.map(emp => (
+                  <tr key={emp.id}>
+                    <td style={{ position: 'sticky', left: 0, zIndex: 1, background: 'var(--black-card)', padding: '6px 8px', fontWeight: emp.id === user.employee_id ? 700 : 500, color: emp.id === user.employee_id ? '#c9a84c' : 'var(--text)', whiteSpace: 'nowrap', borderBottom: '1px solid var(--border)' }}>{emp.name}</td>
+                    {days.map(d => {
+                      const ds = format(d, 'yyyy-MM-dd'), shift = map[emp.id + '|' + ds]
+                      return <td key={ds} style={{ textAlign: 'center', padding: '6px 0', borderBottom: '1px solid var(--border)', background: ds === todayStr ? 'var(--gold-glow)' : 'transparent', color: TEAM_SHIFT_COLOR[shift] || 'var(--text-muted)', fontWeight: 700 }}>{shift ? (TEAM_SHIFT_LABEL[shift] || shift.slice(0, 1)) : ''}</td>
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 export default function StaffSchedule() {
   const [pageMode, setPageMode] = useState('schedule')
-  const tabs = [{ id: 'schedule', l: '排班表' }, { id: 'preference', l: '📝 填寫希望' }, { id: 'leave', l: '請假' }]
+  const tabs = [{ id: 'schedule', l: '我的排班' }, { id: 'team', l: '👥 全員班表' }, { id: 'preference', l: '📝 填寫希望' }, { id: 'leave', l: '請假' }]
   return (
     <div className="page-container fade-in">
       <div style={{ display: 'flex', gap: 6, marginBottom: 16, overflowX: 'auto' }}>
@@ -411,7 +498,7 @@ export default function StaffSchedule() {
           <button key={t.id} onClick={() => setPageMode(t.id)} style={{ padding: '8px 14px', borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', background: pageMode === t.id ? 'var(--gold-glow)' : 'transparent', color: pageMode === t.id ? '#c9a84c' : 'var(--text-dim)', border: pageMode === t.id ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}>{t.l}</button>
         ))}
       </div>
-      {pageMode === 'leave' ? <LeaveRequest /> : pageMode === 'preference' ? <PreferenceContent /> : <ScheduleContent />}
+      {pageMode === 'leave' ? <LeaveRequest /> : pageMode === 'team' ? <TeamScheduleContent /> : pageMode === 'preference' ? <PreferenceContent /> : <ScheduleContent />}
     </div>
   )
 }
